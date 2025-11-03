@@ -68,3 +68,8 @@ logs/
 
 # Docker
 .dockerignore
+
+# VPN configs (contain secrets)
+*.conf
+!*.conf.example
+config/vpn/wireguard/*.conf
