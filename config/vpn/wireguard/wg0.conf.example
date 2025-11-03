@@ -1,0 +1,14 @@
+[Interface]
+# Never commit real private keys
+PrivateKey = <REPLACE_WITH_PRIVATE_KEY>
+Address = 10.8.0.2/32
+DNS = 1.1.1.1
+MTU = 1420
+
+[Peer]
+PublicKey = <REPLACE_WITH_PROVIDER_PUBLIC_KEY>
+# Route everything via VPN (split-tunnel is controlled by container routing rules)
+AllowedIPs = 0.0.0.0/0, ::/0
+Endpoint = vpn.example.com:51820
+PersistentKeepalive = 25
+
