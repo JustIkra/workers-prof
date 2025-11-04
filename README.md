@@ -40,6 +40,7 @@
 
 ### Предварительные требования
 
+- Перед началом работы обязательно изучите материалы в каталоге `.memory-base`
 - Docker и Docker Compose установлены
 - Git
 - Gemini API ключ(и) (бесплатные) - получить на https://aistudio.google.com/apikey

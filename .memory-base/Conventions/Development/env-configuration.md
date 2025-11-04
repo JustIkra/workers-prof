@@ -66,6 +66,13 @@ APP_ROOT_PATH=
 ENV=dev
 DETERMINISTIC=0
 
+# ===== Testing & Celery =====
+CELERY_TASK_ALWAYS_EAGER=0
+CELERY_EAGER_PROPAGATES_EXCEPTIONS=0
+ALLOW_EXTERNAL_NETWORK=1
+DETERMINISTIC_SEED=42
+FROZEN_TIME=
+
 # ===== Security =====
 JWT_SECRET=change_me
 JWT_ALG=HS256
@@ -128,31 +135,46 @@ CORS_ALLOW_ALL=true
 
 ```bash
 ENV=test
-DETERMINISTIC=1  # Фиксированное время, seed
 LOG_LEVEL=WARNING
 AI_RECOMMENDATIONS_ENABLED=0  # Офлайн режим
 AI_VISION_FALLBACK_ENABLED=0
 VPN_ENABLED=0
 ```
 
-- **Детерминированность обязательна!**
-- Моки для внешних API
+**Автоматически применяются** следующие настройки (через `model_validator`):
+- `DETERMINISTIC=1` - фиксированное время и seed
+- `CELERY_TASK_ALWAYS_EAGER=1` - задачи выполняются синхронно
+- `CELERY_EAGER_PROPAGATES_EXCEPTIONS=1` - исключения пробрасываются
+- `ALLOW_EXTERNAL_NETWORK=0` - внешняя сеть заблокирована
+- `FROZEN_TIME=2025-01-15T12:00:00Z` - фиксированное время (если не указано)
+
+Особенности:
+- **Детерминированность обязательна!** (включается автоматически)
+- Моки для всех внешних API
 - Отдельная тестовая БД
-- Celery в eager mode
+- Celery в eager mode (задачи выполняются синхронно)
 - Временное файловое хранилище
+- Офлайн режим (запрет внешних вызовов)
 
 ### ci (CI/CD pipeline)
 
 ```bash
 ENV=ci
-DETERMINISTIC=1
 LOG_LEVEL=INFO
 # Используются переменные из CI secrets
 ```
 
-- Детерминированные тесты
+**Автоматически применяются** те же настройки, что и для `test` профиля:
+- `DETERMINISTIC=1` - детерминированные тесты
+- `CELERY_TASK_ALWAYS_EAGER=1` - синхронное выполнение
+- `ALLOW_EXTERNAL_NETWORK=0` - офлайн режим
+- `FROZEN_TIME=2025-01-15T12:00:00Z` - фиксированное время
+
+Особенности:
+- Детерминированные тесты (гарантированная воспроизводимость)
 - Secrets из CI системы (GitHub Actions, GitLab CI)
 - Docker-based тесты
+- Офлайн режим (все внешние вызовы замокированы)
 
 ### prod (продакшен)
 
@@ -246,6 +268,38 @@ for key in settings.gemini_api_keys:  # Автоматически split по з
     print(f"Key: {key[:8]}...")
 ```
 
+### Использование тестовых настроек
+
+```python
+from app.core.config import settings
+
+# Проверка режима тестирования
+if settings.is_test or settings.is_ci:
+    # Использовать детерминированный режим
+    assert settings.deterministic is True
+    assert settings.is_offline is True
+
+# Celery конфигурация
+if settings.celery_task_always_eager:
+    # Задачи выполняются синхронно
+    result = task.apply()  # Выполняется немедленно
+else:
+    # Асинхронное выполнение через очередь
+    result = task.apply_async()
+
+# Блокировка внешней сети
+if not settings.allow_external_network:
+    raise RuntimeError("External network calls are disabled in test mode!")
+
+# Фиксированное время для тестов
+if settings.frozen_time:
+    # Использовать freezegun или подобную библиотеку
+    from freezegun import freeze_time
+    with freeze_time(settings.frozen_time):
+        # Время зафиксировано
+        pass
+```
+
 ## Переопределение через environment
 
 Переменные окружения имеют **приоритет** над .env файлом:
@@ -328,6 +382,7 @@ python -c "from app.core.config import settings; print(settings.model_dump())"
 
 ### Вывод при старте
 
+**Для dev профиля:**
 ```
 ============================================================
 🚀 Starting Workers Proficiency Assessment System
@@ -335,6 +390,21 @@ python -c "from app.core.config import settings; print(settings.model_dump())"
 ✓ Configuration validated (env=dev)
 ✓ Loading from: /path/to/workers-prof/.env
 ✓ App will listen on port 9187
+============================================================
+```
+
+**Для test/ci профиля:**
+```
+============================================================
+🚀 Starting Workers Proficiency Assessment System
+============================================================
+✓ Configuration validated (env=test)
+✓ Loading from: /path/to/workers-prof/.env
+✓ App will listen on port 9187
+✓ Running in DETERMINISTIC mode (testing)
+✓ Celery EAGER mode enabled (tasks run synchronously)
+✓ OFFLINE mode (external network disabled)
+✓ Time frozen at: 2025-01-15T12:00:00Z
 ============================================================
 ```
 

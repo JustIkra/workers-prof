@@ -111,15 +111,22 @@ async def root():
     }
 
 
-# ===== TODO: Register Routers =====
-# from app.routers import auth, participants, reports, metrics, weights, scoring, admin
-# app.include_router(auth.router, prefix="/api/auth", tags=["Auth"])
-# app.include_router(participants.router, prefix="/api/participants", tags=["Participants"])
+# ===== Register Routers =====
+from app.routers import admin, auth, participants, prof_activities, reports, weights
+
+app.include_router(auth.router, prefix="/api/auth", tags=["Auth"])
+app.include_router(admin.router, prefix="/api/admin", tags=["Admin"])
+app.include_router(participants.router, prefix="/api")
+app.include_router(prof_activities.router, prefix="/api")
+app.include_router(reports.router, prefix="/api")
+app.include_router(weights.router, prefix="/api/admin", tags=["Weights"])
+
+# TODO: Register additional routers as they are implemented
+# from app.routers import reports, metrics, weights, scoring
 # app.include_router(reports.router, prefix="/api/reports", tags=["Reports"])
 # app.include_router(metrics.router, prefix="/api/metrics", tags=["Metrics"])
 # app.include_router(weights.router, prefix="/api/weights", tags=["Weights"])
 # app.include_router(scoring.router, prefix="/api/scoring", tags=["Scoring"])
-# app.include_router(admin.router, prefix="/api/admin", tags=["Admin"])
 
 
 if __name__ == "__main__":

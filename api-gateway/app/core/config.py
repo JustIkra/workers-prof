@@ -9,7 +9,7 @@ import os
 from pathlib import Path
 from typing import Literal
 
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -43,6 +43,28 @@ class Settings(BaseSettings):
         description="Deterministic mode for testing (freezes time, seeds, etc.)"
     )
 
+    # ===== Testing & Celery Configuration =====
+    celery_task_always_eager: bool = Field(
+        default=False,
+        description="Run Celery tasks synchronously (test/ci mode)"
+    )
+    celery_eager_propagates_exceptions: bool = Field(
+        default=False,
+        description="Propagate exceptions in eager mode (test/ci mode)"
+    )
+    allow_external_network: bool = Field(
+        default=True,
+        description="Allow external network calls (disabled in test/ci)"
+    )
+    deterministic_seed: int = Field(
+        default=42,
+        description="Seed for random number generators in deterministic mode"
+    )
+    frozen_time: str | None = Field(
+        default=None,
+        description="Fixed timestamp for testing (ISO format: 2025-01-01T00:00:00Z)"
+    )
+
     # ===== Security =====
     jwt_secret: str = Field(..., description="JWT signing secret (MUST change in production)")
     jwt_alg: str = Field(default="HS256", description="JWT algorithm")
@@ -69,6 +91,11 @@ class Settings(BaseSettings):
     file_storage_base: str = Field(
         default="/app/storage",
         description="Base path for LOCAL storage"
+    )
+    report_max_size_mb: int = Field(
+        default=15,
+        ge=1,
+        description="Maximum allowed .docx report size in megabytes"
     )
 
     # ===== CORS =====
@@ -162,6 +189,16 @@ class Settings(BaseSettings):
         return self.env == "prod"
 
     @property
+    def is_ci(self) -> bool:
+        """Check if running in CI environment."""
+        return self.env == "ci"
+
+    @property
+    def is_offline(self) -> bool:
+        """Check if external network is disabled (test/ci mode)."""
+        return not self.allow_external_network
+
+    @property
     def cors_origins(self) -> list[str]:
         """Get parsed CORS origins."""
         if self.cors_allow_all:
@@ -174,6 +211,11 @@ class Settings(BaseSettings):
         return self._parse_comma_separated(self.gemini_api_keys)
 
     @property
+    def report_max_size_bytes(self) -> int:
+        """Maximum allowed report size in bytes."""
+        return self.report_max_size_mb * 1024 * 1024
+
+    @property
     def vpn_domains_list(self) -> list[str]:
         """Get parsed VPN route domains as list."""
         return self._parse_comma_separated(self.vpn_route_domains)
@@ -182,6 +224,40 @@ class Settings(BaseSettings):
     def vpn_bypass_list(self) -> list[str]:
         """Get parsed VPN bypass CIDRs as list."""
         return self._parse_comma_separated(self.vpn_bypass_cidrs)
+
+    # ===== Profile Auto-Configuration =====
+    @model_validator(mode="after")
+    def apply_profile_defaults(self) -> "Settings":
+        """
+        Apply profile-specific defaults for test/ci environments.
+
+        In test/ci profiles:
+        - Enable deterministic mode (frozen time, seeds)
+        - Run Celery tasks synchronously (eager mode)
+        - Disable external network calls
+        - Propagate exceptions in eager mode
+        """
+        if self.env in ("test", "ci"):
+            # Enable deterministic mode
+            if not self.deterministic:
+                self.deterministic = True
+
+            # Configure Celery for synchronous testing
+            if not self.celery_task_always_eager:
+                self.celery_task_always_eager = True
+
+            if not self.celery_eager_propagates_exceptions:
+                self.celery_eager_propagates_exceptions = True
+
+            # Disable external network calls in tests
+            if self.allow_external_network:
+                self.allow_external_network = False
+
+            # Set default frozen time for tests if not set
+            if not self.frozen_time:
+                self.frozen_time = "2025-01-15T12:00:00Z"
+
+        return self
 
     # ===== Pydantic Settings Configuration =====
     model_config = SettingsConfigDict(
@@ -251,5 +327,13 @@ def validate_config() -> None:
     print(f"✓ Configuration validated (env={settings.env})")
     print(f"✓ Loading from: {ENV_FILE}")
     print(f"✓ App will listen on port {settings.app_port}")
+
+    # Show testing mode flags
     if settings.deterministic:
         print("✓ Running in DETERMINISTIC mode (testing)")
+    if settings.celery_task_always_eager:
+        print("✓ Celery EAGER mode enabled (tasks run synchronously)")
+    if settings.is_offline:
+        print("✓ OFFLINE mode (external network disabled)")
+    if settings.frozen_time:
+        print(f"✓ Time frozen at: {settings.frozen_time}")
