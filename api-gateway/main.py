@@ -9,6 +9,8 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+from pathlib import Path
 
 from app.core.config import settings, validate_config
 
@@ -99,16 +101,11 @@ async def healthz():
 @app.get("/", tags=["Root"])
 async def root():
     """
-    Root endpoint.
-
-    Provides basic API information.
+    Root endpoint serves SPA index.html.
     """
-    return {
-        "message": "Workers Proficiency Assessment API",
-        "version": "0.1.0",
-        "docs": "/api/docs",
-        "health": "/api/healthz",
-    }
+    static_dir = Path(__file__).parent / "static"
+    index_file = static_dir / "index.html"
+    return FileResponse(index_file)
 
 
 # ===== Register Routers =====
