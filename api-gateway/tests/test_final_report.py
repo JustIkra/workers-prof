@@ -14,7 +14,6 @@ from uuid import uuid4
 import pytest
 from httpx import AsyncClient
 
-from app.db.models import WeightTable
 from app.repositories.metric import ExtractedMetricRepository, MetricDefRepository
 from app.repositories.participant import ParticipantRepository
 from app.repositories.prof_activity import ProfActivityRepository

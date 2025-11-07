@@ -427,9 +427,9 @@ async def test_strengths_dev_areas__stable_sorting__same_values_sorted_by_code(
 
     # Check they are sorted alphabetically by metric_code
     codes_with_2_5 = [item["metric_code"] for item in metrics_with_2_5]
-    assert codes_with_2_5 == sorted(
-        codes_with_2_5
-    ), f"Metrics with same value should be sorted by code. Got: {codes_with_2_5}"
+    assert codes_with_2_5 == sorted(codes_with_2_5), (
+        f"Metrics with same value should be sorted by code. Got: {codes_with_2_5}"
+    )
 
 
 @pytest.mark.asyncio
@@ -503,9 +503,9 @@ async def test_strengths_dev_areas__max_five_elements__enforced(
     )
 
     # Explicit check for ≤5 constraint
-    assert (
-        len(result["strengths"]) <= 5
-    ), f"Strengths must have ≤5 elements, got {len(result['strengths'])}"
-    assert (
-        len(result["dev_areas"]) <= 5
-    ), f"Dev areas must have ≤5 elements, got {len(result['dev_areas'])}"
+    assert len(result["strengths"]) <= 5, (
+        f"Strengths must have ≤5 elements, got {len(result['strengths'])}"
+    )
+    assert len(result["dev_areas"]) <= 5, (
+        f"Dev areas must have ≤5 elements, got {len(result['dev_areas'])}"
+    )

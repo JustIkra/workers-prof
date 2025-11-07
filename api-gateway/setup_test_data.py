@@ -6,6 +6,7 @@
 - Профдеятельность "Организация и проведение совещаний"
 - Весовая таблица с 13 метриками
 """
+
 import asyncio
 import sys
 from decimal import Decimal

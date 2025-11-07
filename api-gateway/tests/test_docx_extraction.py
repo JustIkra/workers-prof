@@ -73,7 +73,7 @@ def create_test_docx_with_images(path: Path, num_images: int = 2) -> None:
             img.save(img_bytes, format="PNG")
             img_bytes.seek(0)
 
-            docx_zip.writestr(f"word/media/image{i+1}.png", img_bytes.read())
+            docx_zip.writestr(f"word/media/image{i + 1}.png", img_bytes.read())
 
 
 class TestDocxImageExtractor:

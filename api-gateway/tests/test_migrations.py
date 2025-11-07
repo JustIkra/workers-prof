@@ -161,9 +161,9 @@ class TestMigrationStructure:
             "prof_activity",
             "weight_table",
         }
-        assert expected_tables.issubset(
-            set(tables)
-        ), f"Missing tables: {expected_tables - set(tables)}"
+        assert expected_tables.issubset(set(tables)), (
+            f"Missing tables: {expected_tables - set(tables)}"
+        )
 
     def test_user_table_structure(self, engine):
         """User table should have correct columns and constraints."""
