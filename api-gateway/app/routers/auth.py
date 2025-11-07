@@ -5,9 +5,11 @@ Handles user registration, login, and profile management.
 """
 
 from fastapi import APIRouter, Depends, HTTPException, Response, status
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.dependencies import get_current_active_user, get_current_user
+from app.core.config import settings
 from app.db.models import User
 from app.db.session import get_db
 from app.schemas.auth import (
@@ -51,6 +53,13 @@ async def register(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(e),
         )
+    except SQLAlchemyError:
+        # Common cause: database not initialized or migrations not applied
+        # Return 503 with actionable message instead of 500
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Database unavailable or schema not initialized. Please run migrations (alembic upgrade head).",
+        )
 
 
 @router.post("/login", response_model=TokenResponse)
@@ -74,7 +83,15 @@ async def login(
     - 403: User not active (PENDING or DISABLED)
     """
     # Authenticate user
-    user = await authenticate_user(db, request.email, request.password)
+    try:
+        user = await authenticate_user(db, request.email, request.password)
+    except SQLAlchemyError:
+        # Common cause: database not initialized or migrations not applied
+        # Return 503 with actionable message instead of 500
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Database unavailable or schema not initialized. Please run migrations (alembic upgrade head).",
+        )
 
     if not user:
         raise HTTPException(
@@ -92,12 +109,13 @@ async def login(
     # Create JWT token
     token = create_access_token(user.id, user.email, user.role)
 
-    # Set token in httpOnly Secure cookie
+    # Set token in httpOnly cookie
+    # Use Secure only when not in local dev (browsers ignore Secure over http)
     response.set_cookie(
         key="access_token",
         value=token,
         httponly=True,
-        secure=True,  # HTTPS only (NPM handles TLS)
+        secure=not settings.is_dev,  # In dev over HTTP, allow non-Secure for local testing
         samesite="lax",
         max_age=1800,  # 30 minutes (matches access_token_ttl_min)
     )

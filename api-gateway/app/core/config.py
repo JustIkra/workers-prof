@@ -5,6 +5,7 @@ Loads from ROOT .env file (one level up from api-gateway/).
 Supports multiple profiles: dev, test, ci, prod.
 """
 
+import logging
 import os
 from pathlib import Path
 from typing import Literal
@@ -17,6 +18,8 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 API_GATEWAY_DIR = Path(__file__).parent.parent.parent
 PROJECT_ROOT = API_GATEWAY_DIR.parent
 ENV_FILE = PROJECT_ROOT / ".env"
+
+logger = logging.getLogger(__name__)
 
 
 class Settings(BaseSettings):
@@ -225,6 +228,14 @@ class Settings(BaseSettings):
         """Get parsed VPN bypass CIDRs as list."""
         return self._parse_comma_separated(self.vpn_bypass_cidrs)
 
+    # Normalize empty strings to None for optional fields sourced from .env
+    @field_validator("frozen_time", mode="before")
+    @classmethod
+    def _frozen_time_empty_is_none(cls, v: str | None) -> str | None:
+        if isinstance(v, str) and v.strip() == "":
+            return None
+        return v
+
     # ===== Profile Auto-Configuration =====
     @model_validator(mode="after")
     def apply_profile_defaults(self) -> "Settings":
@@ -324,16 +335,25 @@ def validate_config() -> None:
                 "Get free keys at https://aistudio.google.com/apikey"
             )
 
-    print(f"✓ Configuration validated (env={settings.env})")
-    print(f"✓ Loading from: {ENV_FILE}")
-    print(f"✓ App will listen on port {settings.app_port}")
+    logger.info(
+        "configuration_validated",
+        extra={
+            "event": "configuration_validated",
+            "env_profile": settings.env,
+            "config_path": str(ENV_FILE),
+            "app_port": settings.app_port,
+        },
+    )
 
     # Show testing mode flags
     if settings.deterministic:
-        print("✓ Running in DETERMINISTIC mode (testing)")
+        logger.info("deterministic_mode_enabled")
     if settings.celery_task_always_eager:
-        print("✓ Celery EAGER mode enabled (tasks run synchronously)")
+        logger.info("celery_eager_mode_enabled")
     if settings.is_offline:
-        print("✓ OFFLINE mode (external network disabled)")
+        logger.info("offline_mode_enabled")
     if settings.frozen_time:
-        print(f"✓ Time frozen at: {settings.frozen_time}")
+        logger.info(
+            "frozen_time_active",
+            extra={"frozen_time": settings.frozen_time},
+        )

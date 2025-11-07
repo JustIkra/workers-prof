@@ -44,8 +44,10 @@ async def auth_cookies(client: AsyncClient, active_user: User) -> dict:
         json={"email": "active@example.com", "password": "password123"}
     )
     assert response.status_code == 200
-    # Return cookies dict
-    return dict(response.cookies)
+    cookies = dict(response.cookies)
+    # Clear shared client cookie jar so tests explicitly control auth state.
+    client.cookies.clear()
+    return cookies
 
 
 @pytest.fixture

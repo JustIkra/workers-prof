@@ -20,7 +20,9 @@ Professional competency assessment system that:
 
 **Task Queue**: Celery workers (queues: ocr, normalize, vision), RabbitMQ broker, Redis backend, Flower monitoring
 
-**Frontend**: Vue 3 (Composition API), Pinia, Naive UI/Element Plus, Vite
+**Frontend**: Vue 3 (Composition API), Pinia, Element Plus (офисный стиль), Vite
+
+**SPA Serving**: FastAPI StaticFiles + fallback для клиентской маршрутизации (S1-10)
 
 **Storage**: Local volume (default), MinIO (optional S3-compatible)
 
@@ -37,6 +39,7 @@ Professional competency assessment system that:
 - JWT authentication (OAuth2 Password), role-based access (ADMIN/USER)
 - Orchestrates Celery tasks for extraction pipeline
 - Returns downloadable DOCX reports and final assessment reports
+- **SPA serving**: StaticFiles для `/assets`, fallback на `index.html` для всех не-`/api` путей (S1-10)
 
 **ai-request-sender** (Celery workers)
 - Consumes queues: `ocr`, `normalize`, `vision`
@@ -44,9 +47,12 @@ Professional competency assessment system that:
 - Direct DB writes via repository layer (shared with API)
 
 **frontend** (Vue SPA)
-- Communicates with api-gateway through Nginx Proxy Manager
+- Served by FastAPI StaticFiles with SPA fallback (S1-10)
+- Офисный стиль: Element Plus, системные шрифты (Segoe UI), палитра #00798D
+- Communicates with api-gateway through `/api` prefix
 - Shared participant pool with search/filtering (no multi-tenancy in MVP)
 - Manual validation UI for extracted metrics
+- Лендинговая страница для клиентов с описанием функциональности
 
 ### Data Model Core Tables
 
@@ -125,6 +131,11 @@ See `.memory-base/Conventions/Development/development_guidelines.md`.
 - Structure: `components/`, `views/`, `stores/`, `services/api/`
 - Route guards by role (ADMIN/USER)
 - TypeScript/Volar (optional)
+- **UI**: Element Plus (офисный стиль), CSS tokens в `api-gateway/static/assets/theme-tokens.css`
+- **Цветовая палитра**: Primary #00798D, офисные оттенки серого
+- **Типографика**: Segoe UI, Tahoma, Arial (системные шрифты)
+- **Доступность**: WCAG AA, ru-RU локализация
+- См. `.memory-base/Conventions/Frontend/frontend-requirements.md` для деталей
 
 **Git**:
 - Branches: `main` (stable), `feature/<name>`, `fix/<name>`, `chore/<name>`
@@ -218,8 +229,22 @@ docker-compose down
 All detailed documentation is in `.memory-base/` (Russian):
 
 - **Product Overview**: Features, personas, success metrics, user flows, final report format
-- **Conventions**: Development guidelines, Git, testing (backend/frontend/fixtures/e2e/CI), UI style, theme tokens
+- **Conventions**:
+  - Development guidelines, Git, testing (backend/frontend/fixtures/e2e/CI)
+  - **Frontend**: UI style, frontend-requirements.md (указатель требований), theme tokens
 - **Tech Details**: Tech stack, architecture, data model, extraction pipeline, service boundaries, operations, storage, metric mapping, prompt for Gemini recommendations
-- **Tasks**: Project task backlog
+- **Tasks**: Project task backlog, completed tickets (S1-01 to S1-10)
 
 Refer to these files for context when implementing features or fixing bugs.
+
+## SPA Serving (S1-10 — Completed)
+
+FastAPI serves the Vue SPA with fallback routing:
+- **Static assets**: `/assets/*` → `api-gateway/static/assets/` (CSS, JS, images)
+- **API routes**: `/api/*` → FastAPI routers
+- **All other paths**: `/*` → `api-gateway/static/index.html` (SPA fallback for Vue Router)
+
+Landing page: `api-gateway/static/index.html` — клиентская страница с описанием системы (без технической информации).
+CSS tokens: `api-gateway/static/assets/theme-tokens.css` — офисный стиль, совместим с Element Plus.
+
+See `.memory-base/task/tickets/S1-10_COMPLETED.md` for implementation details.

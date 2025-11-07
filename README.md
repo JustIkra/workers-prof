@@ -25,12 +25,13 @@
 - **Redis** - кэширование
 
 ### Frontend
-- **Vue 3** - прогрессивный JavaScript фреймворк
+- **Vue 3** - прогрессивный JavaScript фреймворк (Composition API)
 - **Vite** - сборщик и dev-сервер
 - **Pinia** - управление состоянием
-- **Vue Router** - маршрутизация
-- **Naive UI** - библиотека UI компонентов
+- **Vue Router** - клиентская маршрутизация
+- **Element Plus** - библиотека UI компонентов (офисный стиль)
 - **Axios** - HTTP клиент
+- **SPA Serving** - раздача через FastAPI StaticFiles с fallback (S1-10)
 
 ### Инфраструктура
 - **Docker & Docker Compose** - контейнеризация
@@ -93,21 +94,23 @@ docker-compose up -d
 
 5. **Откройте приложение**
 
-Теперь всё доступно через **один порт** (по умолчанию 80):
+Приложение доступно на порту **9187** (или настроенном в `.env`):
 
-- **Приложение**: http://localhost
-- **API документация**: http://localhost/api/docs
-- **API Redoc**: http://localhost/api/redoc
-- **Health Check**: http://localhost/api/healthz
+- **Приложение**: http://localhost:9187
+- **API документация**: http://localhost:9187/api/docs
+- **API Redoc**: http://localhost:9187/api/redoc
+- **Health Check**: http://localhost:9187/api/healthz
 
-> 💡 Nginx автоматически маршрутизирует:
-> - `/` → Frontend (Vue)
-> - `/api/` → Backend (FastAPI)
+> 💡 FastAPI автоматически маршрутизирует (S1-10):
+> - `/` → Landing Page / Vue SPA (index.html)
+> - `/assets/*` → Static files (CSS, JS, images)
+> - `/api/*` → Backend API (FastAPI)
+> - Все остальные пути → SPA fallback (для Vue Router)
 
 ### Первый вход
 
-1. Откройте http://localhost:3000
-2. Нажмите "Зарегистрироваться"
+1. Откройте http://localhost:9187
+2. Нажмите "Зарегистрироваться" (если есть форма регистрации)
 3. Создайте аккаунт с email и паролем (минимум 8 символов)
 4. После регистрации ваш аккаунт будет в статусе "PENDING"
 
@@ -227,7 +230,7 @@ WHERE email = 'ваш@email.com';
 
 ```
 workers-prof/
-├── api-gateway/          # Backend FastAPI
+├── api-gateway/          # Backend FastAPI + SPA Serving
 │   ├── alembic/          # Миграции БД
 │   ├── app/
 │   │   ├── core/         # Конфигурация, БД, безопасность
@@ -236,9 +239,13 @@ workers-prof/
 │   │   ├── routers/      # API endpoints
 │   │   ├── services/     # Бизнес-логика
 │   │   └── repositories/ # Слой доступа к данным
+│   ├── static/           # ✨ SPA files (S1-10)
+│   │   ├── index.html    # Landing page / SPA entry
+│   │   └── assets/       # CSS, JS, images
+│   │       └── theme-tokens.css  # CSS tokens (офисный стиль)
 │   ├── seed.py           # Начальные данные
-│   └── main.py           # Точка входа
-├── frontend/             # Frontend Vue 3
+│   └── main.py           # Точка входа + StaticFiles setup
+├── frontend/             # Frontend Vue 3 (будущее)
 │   ├── src/
 │   │   ├── components/   # Vue компоненты
 │   │   ├── views/        # Страницы
@@ -246,12 +253,19 @@ workers-prof/
 │   │   ├── services/     # API клиент
 │   │   └── router/       # Vue Router
 │   └── vite.config.js
+├── .memory-base/         # 📚 Knowledge base
+│   ├── Conventions/Frontend/
+│   │   ├── ui_style.md              # UI стиль
+│   │   └── frontend-requirements.md # ⭐ Указатель требований
+│   └── task/tickets/
+│       └── S1-10_COMPLETED.md       # Документация S1-10
 ├── data/                 # Persistent volumes
 │   ├── postgres/
 │   ├── redis/
 │   └── uploads/
 ├── docker-compose.yml
 ├── .env
+├── index.md              # Индекс документации
 └── README.md
 ```
 
@@ -265,10 +279,11 @@ python -m venv venv
 source venv/bin/activate  # Windows: venv\Scripts\activate
 pip install -r requirements.txt
 
-# Настройте .env или экспортируйте переменные
-export DATABASE_URL="postgresql+asyncpg://postgres:postgres@localhost:5432/workers_prof"
-export SECRET_KEY="dev-secret-key"
-export GEMINI_API_KEY="your-key"
+# Настройте .env или экспортируйте переменные (см. .env.example)
+export POSTGRES_DSN="postgresql+asyncpg://app:app@localhost:5432/app"
+export JWT_SECRET="dev-secret-key-change-me"
+# Для включённых AI-фич требуется хотя бы один ключ
+export GEMINI_API_KEYS="key1"
 
 # Примените миграции
 alembic upgrade head
@@ -279,18 +294,31 @@ python seed.py
 # Создайте администраторскую учетную запись
 python create_admin.py admin@example.com ваш_пароль
 
-# Запустите dev сервер
-uvicorn main:app --reload --host 0.0.0.0 --port 8000
+# Запустите dev сервер (единый порт 9187)
+# Важно: фронтенд dev‑proxy настроен на этот порт
+uvicorn main:app --reload --host 0.0.0.0 --port 9187
 ```
 
 **Frontend:**
+
+На данный момент используется статичная лендинговая страница в `api-gateway/static/index.html`.
+
+Для разработки Vue SPA (в будущем):
 
 ```bash
 cd frontend
 npm install
 
 # Запустите dev сервер
-npm run dev
+# При необходимости можно переопределить целевой API (по умолчанию http://localhost:9187)
+# Vite читает VITE_API_TARGET и/или APP_PORT из переменных окружения
+VITE_API_TARGET=http://localhost:9187 npm run dev
+
+# Соберите для продакшена
+npm run build
+
+# Скопируйте dist/ в api-gateway/static/
+cp -r dist/* ../api-gateway/static/
 ```
 
 ### Создание новой миграции
@@ -302,6 +330,38 @@ alembic upgrade head
 ```
 
 ## Архитектура
+
+### SPA Serving (S1-10)
+
+FastAPI раздаёт статические файлы и Vue SPA с fallback routing:
+
+```python
+# api-gateway/main.py
+
+# Статические ресурсы (CSS, JS, изображения)
+app.mount("/assets", StaticFiles(directory="static/assets"), name="static")
+
+# SPA fallback для клиентской маршрутизации
+@app.get("/{full_path:path}")
+async def spa_fallback(request: Request, full_path: str):
+    # Если путь начинается с "api/" — это API endpoint
+    if full_path.startswith("api/"):
+        raise HTTPException(status_code=404, detail="API endpoint not found")
+
+    # Для всех остальных путей — вернуть index.html
+    return FileResponse("static/index.html")
+```
+
+**Маршрутизация:**
+- `/` → `static/index.html` (лендинг или Vue SPA)
+- `/participants`, `/reports/123` → `static/index.html` (SPA fallback)
+- `/assets/theme-tokens.css` → статический файл
+- `/api/healthz` → FastAPI router
+
+**Файлы:**
+- Лендинг: `api-gateway/static/index.html` (клиентская страница без технической информации)
+- CSS токены: `api-gateway/static/assets/theme-tokens.css` (офисный стиль, Element Plus совместимость)
+- Требования: `.memory-base/Conventions/Frontend/frontend-requirements.md`
 
 ### Модель данных
 
@@ -365,6 +425,30 @@ score_pct = Σ(metric_value × weight × 10)
 - SQL injection защита через SQLAlchemy ORM
 
 **ВАЖНО:** Измените `SECRET_KEY` в production окружении!
+
+## Документация
+
+### Ключевые документы
+
+- **index.md** — индекс всей документации проекта
+- **CLAUDE.md** — руководство для Claude Code при работе с проектом
+- **.memory-base/** — полная база знаний:
+  - `Conventions/Frontend/frontend-requirements.md` — указатель требований к фронтенду ⭐
+  - `Conventions/Frontend/ui_style.md` — офисный стиль UI
+  - `task/tickets/S1-10_COMPLETED.md` — документация выполнения SPA serving
+
+### Выполненные задачи (Sprint 1)
+
+- ✅ **S1-01**: Конфигурация окружения
+- ✅ **S1-02**: Единый порт приложения (9187)
+- ✅ **S1-03**: Профили настроек (dev/test/prod)
+- ✅ **S1-04**: Миграции БД (core tables)
+- ✅ **S1-05**: Аутентификация JWT
+- ✅ **S1-06**: CRUD участников
+- ✅ **S1-07**: Загрузка и скачивание отчётов
+- ✅ **S1-08**: Seed профессиональных деятельностей
+- ✅ **S1-09**: Схема весовых таблиц + активация
+- ✅ **S1-10**: Раздача SPA и fallback 🎉
 
 ## Лицензия
 

@@ -1,18 +1,18 @@
 """
-Tests for Alembic migrations.
+Tests for Alembic migrations against PostgreSQL.
 
-Tests AC for S1-04:
-- Migrations can be applied to empty database (upgrade)
-- Migrations can be rolled back (downgrade)
-- Key constraints are properly enforced (unique, check, foreign keys)
+Ensures migrations apply cleanly on a real PostgreSQL database,
+can be rolled back, and enforce key constraints.
 """
 
+import os
 import uuid
 from datetime import date, datetime
 
 import pytest
 from sqlalchemy import create_engine, inspect, text
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.engine import make_url
+from sqlalchemy.exc import IntegrityError, OperationalError, ProgrammingError
 from sqlalchemy.orm import Session, sessionmaker
 
 
@@ -22,20 +22,85 @@ from sqlalchemy.orm import Session, sessionmaker
 @pytest.fixture(scope="module")
 def engine():
     """
-    Create an in-memory SQLite engine for testing migrations.
+    Create a temporary PostgreSQL database for migration tests.
 
-    Note: SQLite has some limitations compared to PostgreSQL:
-    - No native UUID type (we'll use strings)
-    - Limited CHECK constraint support
-    - No TIMESTAMP WITH TIMEZONE
-
-    For full testing, use PostgreSQL test database.
+    Uses POSTGRES_DSN to connect to the server, creates an isolated
+    database for the duration of the test module, and drops it afterwards.
     """
-    # Use PostgreSQL-like syntax where possible
-    # In production tests, replace with actual PostgreSQL test DB
-    engine = create_engine("sqlite:///:memory:", echo=True)
-    yield engine
-    engine.dispose()
+    raw_dsn = os.getenv("POSTGRES_DSN")
+    if not raw_dsn:
+        pytest.skip("POSTGRES_DSN is required to run migration tests against PostgreSQL")
+
+    base_url = make_url(raw_dsn)
+    if base_url.get_backend_name() != "postgresql":
+        pytest.skip("Migration tests require a PostgreSQL DSN")
+
+    if not base_url.database:
+        pytest.skip("POSTGRES_DSN must include a database name")
+
+    try:
+        __import__("psycopg")
+    except ModuleNotFoundError as exc:  # pragma: no cover - defensive guard
+        pytest.skip(f"psycopg driver is required for migration tests: {exc}")
+
+    base_db = "".join(ch if ch.isalnum() or ch == "_" else "_" for ch in base_url.database.lower())
+    test_db_name = f"{base_db}_migrations_{uuid.uuid4().hex}"
+
+    admin_url = base_url.set(drivername="postgresql+psycopg", database="postgres")
+    admin_engine = create_engine(
+        admin_url.render_as_string(hide_password=False),
+        isolation_level="AUTOCOMMIT",
+    )
+
+    try:
+        try:
+            with admin_engine.connect() as conn:
+                conn.execute(text(f'DROP DATABASE IF EXISTS "{test_db_name}"'))
+                conn.execute(text(f'CREATE DATABASE "{test_db_name}"'))
+        except ProgrammingError as exc:
+            if "permission denied to create database" in str(exc):
+                pytest.skip(
+                    "PostgreSQL role lacks CREATE DATABASE privilege. "
+                    "Run migration tests with a superuser or pre-created test database."
+                )
+            raise
+    except OperationalError as exc:
+        pytest.skip(f"PostgreSQL server is not available for migration tests: {exc}")
+    finally:
+        admin_engine.dispose()
+
+    test_url = base_url.set(drivername="postgresql+psycopg", database=test_db_name)
+    engine = create_engine(test_url.render_as_string(hide_password=False))
+
+    try:
+        yield engine
+    finally:
+        engine.dispose()
+
+        admin_engine = create_engine(
+            admin_url.render_as_string(hide_password=False),
+            isolation_level="AUTOCOMMIT",
+        )
+        try:
+            with admin_engine.connect() as conn:
+                try:
+                    conn.execute(text(f'DROP DATABASE IF EXISTS "{test_db_name}" WITH (FORCE)'))
+                except OperationalError:
+                    # Fallback for older PostgreSQL versions without WITH (FORCE)
+                    conn.execute(
+                        text(
+                            """
+                            SELECT pg_terminate_backend(pid)
+                            FROM pg_stat_activity
+                            WHERE datname = :db_name
+                              AND pid <> pg_backend_pid()
+                            """
+                        ),
+                        {"db_name": test_db_name},
+                    )
+                    conn.execute(text(f'DROP DATABASE IF EXISTS "{test_db_name}"'))
+        finally:
+            admin_engine.dispose()
 
 
 @pytest.fixture(scope="module")
@@ -67,9 +132,10 @@ def apply_migrations(engine):
     # Create Alembic config
     alembic_cfg = Config("alembic.ini")
     # Override database URL to use test engine
-    alembic_cfg.set_main_option("sqlalchemy.url", str(engine.url))
-
+    url_value = engine.url.render_as_string(hide_password=False).replace("%", "%%")
+    alembic_cfg.set_main_option("sqlalchemy.url", url_value)
     # Run upgrade
+
     command.upgrade(alembic_cfg, "head")
 
     yield

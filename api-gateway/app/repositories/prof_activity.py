@@ -6,11 +6,13 @@ Provides read operations and idempotent seed insertion helpers.
 
 from collections.abc import Sequence
 
+from uuid import UUID
+
 from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.models import ProfActivity
+from app.db.models import ProfActivity, WeightTable
 from app.db.seeds.prof_activity import ProfActivitySeed
 
 
@@ -42,6 +44,23 @@ class ProfActivityRepository:
             ProfActivity instance or None if not found.
         """
         stmt = select(ProfActivity).where(ProfActivity.code == code)
+        result = await self.db.execute(stmt)
+        return result.scalar_one_or_none()
+
+    async def get_active_weight_table(self, prof_activity_id: UUID) -> WeightTable | None:
+        """
+        Get the active weight table for a professional activity.
+
+        Args:
+            prof_activity_id: UUID of the professional activity
+
+        Returns:
+            Active WeightTable instance or None if not found.
+        """
+        stmt = select(WeightTable).where(
+            WeightTable.prof_activity_id == prof_activity_id,
+            WeightTable.is_active == True
+        )
         result = await self.db.execute(stmt)
         return result.scalar_one_or_none()
 

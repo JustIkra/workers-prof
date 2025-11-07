@@ -8,7 +8,7 @@ Supports both online and offline migration modes.
 import asyncio
 from logging.config import fileConfig
 
-from sqlalchemy import pool
+from sqlalchemy import pool, create_engine
 from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
@@ -20,15 +20,17 @@ from app.core.config import settings
 # Import Base for metadata
 from app.db.base import Base
 
-# Import all models for autogenerate support
-# This ensures Alembic sees all tables when generating migrations
-from app.db import models  # noqa: F401
-
 # This is the Alembic Config object
 config = context.config
 
-# Override sqlalchemy.url with our settings
-config.set_main_option("sqlalchemy.url", settings.postgres_dsn)
+# Respect an explicit sqlalchemy.url set by caller (e.g., tests overriding DSN)
+# If not set, fall back to application settings
+if not context.config.get_main_option("sqlalchemy.url"):
+    config.set_main_option("sqlalchemy.url", settings.postgres_dsn)
+
+# Import all models for autogenerate support (after potential monkeypatch)
+# This ensures Alembic sees all tables when generating migrations
+from app.db import models  # noqa: F401
 
 # Interpret the config file for Python logging
 if config.config_file_name is not None:
@@ -103,6 +105,19 @@ def run_migrations_online() -> None:
 
     This is the main entry point for alembic upgrade/downgrade commands.
     """
+    url = config.get_main_option("sqlalchemy.url")
+
+    # Fallback to synchronous engine for non-async drivers (e.g., psycopg in tests)
+    if url and "+asyncpg" not in url:
+        connectable = create_engine(url, poolclass=pool.NullPool)
+
+        with connectable.connect() as connection:
+            do_run_migrations(connection)
+
+        connectable.dispose()
+        return
+
+    # Default: async migrations (e.g., postgresql+asyncpg)
     asyncio.run(run_async_migrations())
 
 

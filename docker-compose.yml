@@ -1,0 +1,106 @@
+services:
+  app:
+    build:
+      context: ./api-gateway
+    container_name: workers-prof-app
+    env_file:
+      - .env
+    environment:
+      # Hard defaults compatible with .env.example
+      APP_PORT: ${APP_PORT:-9187}
+      POSTGRES_DSN: ${POSTGRES_DSN:-postgresql+asyncpg://app:app@postgres:5432/app}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      RABBITMQ_URL: ${RABBITMQ_URL:-amqp://guest:guest@rabbitmq:5672//}
+      FILE_STORAGE: ${FILE_STORAGE:-LOCAL}
+      FILE_STORAGE_BASE: ${FILE_STORAGE_BASE:-/app/storage}
+      ENV: ${ENV:-prod}
+      # Respect host/.env with sensible default off
+      VPN_ENABLED: ${VPN_ENABLED:-0}
+    ports:
+      # Export only the single application port externally
+      - "${APP_PORT:-9187}:9187"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    volumes:
+      - reports:/app/storage
+    command: ["./docker-entrypoint.sh"]
+    restart: unless-stopped
+
+  worker:
+    build:
+      context: ./api-gateway
+    container_name: workers-prof-worker
+    env_file:
+      - .env
+    environment:
+      APP_PORT: ${APP_PORT:-9187}
+      POSTGRES_DSN: ${POSTGRES_DSN:-postgresql+asyncpg://app:app@postgres:5432/app}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      RABBITMQ_URL: ${RABBITMQ_URL:-amqp://guest:guest@rabbitmq:5672//}
+      FILE_STORAGE: ${FILE_STORAGE:-LOCAL}
+      FILE_STORAGE_BASE: ${FILE_STORAGE_BASE:-/app/storage}
+      ENV: ${ENV:-prod}
+      VPN_ENABLED: ${VPN_ENABLED:-0}
+    # Placeholder worker. Replace with Celery command when implemented.
+    command: ["python", "-c", "import time; print('Worker started (placeholder)'); time.sleep(10**9)"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    volumes:
+      - reports:/app/storage
+    healthcheck:
+      test: ["CMD-SHELL", "echo ok"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:15
+    container_name: workers-prof-postgres
+    environment:
+      POSTGRES_DB: app
+      POSTGRES_USER: app
+      POSTGRES_PASSWORD: app
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: workers-prof-redis
+    command: ["redis-server", "--appendonly", "yes"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  rabbitmq:
+    image: rabbitmq:3.13
+    container_name: workers-prof-rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+volumes:
+  db-data:
+  reports:

@@ -8,6 +8,7 @@ All endpoints require authentication (ACTIVE user).
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi.responses import HTMLResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.dependencies import get_current_active_user
@@ -21,7 +22,9 @@ from app.schemas.participant import (
     ParticipantSearchParams,
     ParticipantUpdateRequest,
 )
+from app.schemas.final_report import FinalReportResponse
 from app.services.participant import ParticipantService
+from app.services.scoring import ScoringService
 
 router = APIRouter(prefix="/participants", tags=["participants"])
 
@@ -155,3 +158,56 @@ async def delete_participant(
     if not deleted:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Participant not found")
     return MessageResponse(message="Participant deleted successfully")
+
+
+@router.get("/{participant_id}/final-report", response_model=FinalReportResponse)
+async def get_final_report(
+    participant_id: UUID,
+    activity_code: str = Query(..., description="Professional activity code"),
+    format: str = Query("json", description="Response format: 'json' or 'html'"),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """
+    Get final report for a participant (S2-04).
+
+    Returns a complete final report including:
+    - Score percentage
+    - Strengths (3-5 items)
+    - Development areas (3-5 items)
+    - Recommendations
+    - Detailed metrics table
+    - Notes about confidence and algorithm version
+
+    Query parameters:
+    - activity_code: Professional activity code (required)
+    - format: 'json' (default) or 'html'
+
+    Returns:
+    - JSON: FinalReportResponse with all report data
+    - HTML: Rendered HTML report (if format=html)
+
+    Raises:
+    - 404: Participant or activity not found
+    - 400: No scoring result found (calculate score first)
+    """
+    scoring_service = ScoringService(db)
+
+    try:
+        report_data = await scoring_service.generate_final_report(
+            participant_id=participant_id,
+            prof_activity_code=activity_code,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    if format == "html":
+        # Import here to avoid circular dependency and only when needed
+        from datetime import datetime
+        from app.services.report_template import render_final_report_html
+
+        html_content = render_final_report_html(report_data)
+        return HTMLResponse(content=html_content)
+
+    # Return JSON by default
+    return FinalReportResponse(**report_data)

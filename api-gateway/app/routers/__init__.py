@@ -2,6 +2,14 @@
 API routers.
 """
 
-from app.routers import admin, auth, participants, prof_activities, reports, weights
+from app.routers import admin, auth, participants, prof_activities, reports, weights, vpn
 
-__all__ = ["auth", "admin", "participants", "prof_activities", "reports", "weights"]
+__all__ = [
+    "auth",
+    "admin",
+    "participants",
+    "prof_activities",
+    "reports",
+    "weights",
+    "vpn",
+]

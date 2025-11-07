@@ -124,6 +124,13 @@ class ReportService:
         response = ReportResponse.model_validate(saved_report)
         return ReportUploadResponse(**response.model_dump(), etag=stored.etag)
 
+    async def get_report_by_id(self, report_id: uuid.UUID) -> Report:
+        """Get report by ID, raise 404 if not found."""
+        report = await self.repo.get_with_file_ref(report_id)
+        if not report:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Report not found")
+        return report
+
     async def get_download_context(self, report_id: uuid.UUID) -> ReportDownloadContext:
         """Resolve report and file path for download."""
         report = await self.repo.get_with_file_ref(report_id)

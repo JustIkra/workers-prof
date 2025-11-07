@@ -43,7 +43,9 @@ async def admin_cookies(
         json={"email": "weight_admin@example.com", "password": "securepassword1"},
     )
     assert response.status_code == 200
-    return dict(response.cookies)
+    cookies = dict(response.cookies)
+    client.cookies.clear()
+    return cookies
 
 
 @pytest.fixture

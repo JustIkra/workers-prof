@@ -13,6 +13,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import Participant
 
+# PostgreSQL running with default C locale does not downcase Cyrillic characters when using ILIKE.
+# We normalize case via translate() so substring searches behave consistently for Cyrillic and Latin.
+CASEFOLD_TRANSLATE_UPPER = "ABCDEFGHIJKLMNOPQRSTUVWXYZАБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ"
+CASEFOLD_TRANSLATE_LOWER = "abcdefghijklmnopqrstuvwxyzабвгдеёжзийклмнопрстуфхцчшщъыьэюя"
 
 class ParticipantRepository:
     """Repository for participant database operations."""
@@ -135,9 +139,17 @@ class ParticipantRepository:
 
         # Apply filters
         filters = []
+
+        # Prepare normalized full_name expression once to reuse across filters.
+        normalized_full_name = func.translate(
+            Participant.full_name,
+            CASEFOLD_TRANSLATE_UPPER,
+            CASEFOLD_TRANSLATE_LOWER,
+        )
+
         if query:
-            # Case-insensitive substring search
-            filters.append(Participant.full_name.ilike(f"%{query}%"))
+            normalized_query = query.casefold()
+            filters.append(normalized_full_name.like(f"%{normalized_query}%"))
         if external_id:
             # Exact match
             filters.append(Participant.external_id == external_id)

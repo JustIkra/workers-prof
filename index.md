@@ -17,7 +17,8 @@
   - `.memory-base/Conventions/Testing/e2e-matrix.md`
   - `.memory-base/Conventions/Testing/ci.md`
   - `.memory-base/Conventions/Frontend/ui_style.md`
-  - `.memory-base/Conventions/Frontend/theme-tokens.css`
+  - `.memory-base/Conventions/Frontend/frontend-requirements.md` ⭐ **Указатель требований к фронтенду**
+  - `api-gateway/static/assets/theme-tokens.css` — CSS токены темы
 
 - Тех детали
   - `.memory-base/Tech details/Tech stack/TECH_STACK.md`

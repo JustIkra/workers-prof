@@ -5,14 +5,20 @@ Single application on port 9187 (HTTP), served behind Nginx Proxy Manager (TLS/H
 Loads configuration from ROOT .env file.
 """
 
+import logging
 from contextlib import asynccontextmanager
-
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
 from pathlib import Path
 
+from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
+from sqlalchemy.exc import SQLAlchemyError
+
 from app.core.config import settings, validate_config
+from app.core.middleware import RequestContextMiddleware
+
+logger = logging.getLogger("app.lifespan")
 
 
 @asynccontextmanager
@@ -23,9 +29,7 @@ async def lifespan(app: FastAPI):
     Handles startup and shutdown events.
     """
     # Startup
-    print("="* 60)
-    print("🚀 Starting Workers Proficiency Assessment System")
-    print("=" * 60)
+    logger.info("application_starting", extra={"event": "startup"})
 
     # Validate configuration
     validate_config()
@@ -34,22 +38,18 @@ async def lifespan(app: FastAPI):
     # TODO: Initialize Redis connection
     # TODO: Initialize Celery client
 
-    print("=" * 60)
-    print(f"✓ Application ready on port {settings.app_port}")
-    print("=" * 60)
+    logger.info("application_ready", extra={"event": "ready", "port": settings.app_port})
 
     yield
 
     # Shutdown
-    print("\n" + "=" * 60)
-    print("🛑 Shutting down application")
-    print("=" * 60)
+    logger.info("application_shutting_down", extra={"event": "shutdown"})
 
     # TODO: Close database connections
     # TODO: Close Redis connections
     # TODO: Close Celery connections
 
-    print("✓ Shutdown complete")
+    logger.info("application_shutdown_complete", extra={"event": "shutdown_complete"})
 
 
 # ===== Create FastAPI Application =====
@@ -69,6 +69,9 @@ app = FastAPI(
 )
 
 
+# ===== Observability Middleware =====
+app.add_middleware(RequestContextMiddleware)
+
 # ===== CORS Middleware =====
 if settings.cors_allow_all or settings.cors_origins:
     app.add_middleware(
@@ -77,6 +80,21 @@ if settings.cors_allow_all or settings.cors_origins:
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
+    )
+
+
+# ===== Global Error Handlers =====
+@app.exception_handler(SQLAlchemyError)
+async def handle_sqlalchemy_error(request: Request, exc: SQLAlchemyError):
+    """
+    Return 503 instead of 500 when database is unavailable or schema missing.
+    Helps frontend surface actionable message instead of generic server error.
+    """
+    return JSONResponse(
+        status_code=503,
+        content={
+            "detail": "Database unavailable or schema not initialized. Please run migrations (alembic upgrade head) and verify POSTGRES_DSN points to a reachable database.",
+        },
     )
 
 
@@ -97,19 +115,9 @@ async def healthz():
     }
 
 
-# ===== Root Endpoint =====
-@app.get("/", tags=["Root"])
-async def root():
-    """
-    Root endpoint serves SPA index.html.
-    """
-    static_dir = Path(__file__).parent / "static"
-    index_file = static_dir / "index.html"
-    return FileResponse(index_file)
-
-
 # ===== Register Routers =====
-from app.routers import admin, auth, participants, prof_activities, reports, weights
+# IMPORTANT: Register API routers BEFORE StaticFiles mount
+from app.routers import admin, auth, metrics, participants, prof_activities, reports, scoring, weights, vpn
 
 app.include_router(auth.router, prefix="/api/auth", tags=["Auth"])
 app.include_router(admin.router, prefix="/api/admin", tags=["Admin"])
@@ -117,13 +125,46 @@ app.include_router(participants.router, prefix="/api")
 app.include_router(prof_activities.router, prefix="/api")
 app.include_router(reports.router, prefix="/api")
 app.include_router(weights.router, prefix="/api/admin", tags=["Weights"])
+app.include_router(metrics.router)
+app.include_router(scoring.router, prefix="/api", tags=["Scoring"])
+app.include_router(vpn.router)
 
-# TODO: Register additional routers as they are implemented
-# from app.routers import reports, metrics, weights, scoring
-# app.include_router(reports.router, prefix="/api/reports", tags=["Reports"])
-# app.include_router(metrics.router, prefix="/api/metrics", tags=["Metrics"])
-# app.include_router(weights.router, prefix="/api/weights", tags=["Weights"])
-# app.include_router(scoring.router, prefix="/api/scoring", tags=["Scoring"])
+
+# ===== Static Files & SPA Fallback =====
+# Mount static files (CSS, JS, images, etc.) from /static directory
+static_dir = Path(__file__).parent / "static"
+assets_dir = static_dir / "assets"
+
+# Mount StaticFiles for serving static assets (JS, CSS, images, etc.)
+# IMPORTANT: Mount before catch-all SPA fallback
+if assets_dir.exists():
+    app.mount("/assets", StaticFiles(directory=str(assets_dir)), name="static")
+
+
+@app.get("/{full_path:path}")
+async def spa_fallback(request: Request, full_path: str):
+    """
+    SPA fallback handler for all non-API routes.
+
+    Returns index.html for any path that doesn't start with /api,
+    allowing Vue Router (or other SPA frameworks) to handle client-side routing.
+
+    Examples:
+        - GET / -> index.html
+        - GET /participants -> index.html
+        - GET /reports/123 -> index.html
+        - GET /api/healthz -> handled by API router (not this handler)
+    """
+    # If path starts with /api, it should have been handled by API routers
+    # If we're here, it means 404 for API endpoint - let FastAPI handle it
+    if full_path.startswith("api/"):
+        # This will be caught by FastAPI's default 404 handler
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail="API endpoint not found")
+
+    # For all other paths, serve index.html for SPA routing
+    index_file = static_dir / "index.html"
+    return FileResponse(index_file)
 
 
 if __name__ == "__main__":

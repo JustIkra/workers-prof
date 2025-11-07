@@ -24,6 +24,7 @@ from app.db.models import User
 from app.db.session import get_db
 from app.schemas.report import ReportType, ReportUploadResponse
 from app.services.report import ReportService
+from app.tasks.extraction import extract_images_from_report
 
 router = APIRouter(tags=["reports"])
 
@@ -75,3 +76,38 @@ async def download_report(
         filename=context.filename,
         headers=headers,
     )
+
+
+@router.post(
+    "/reports/{report_id}/extract",
+    status_code=status.HTTP_202_ACCEPTED,
+)
+async def extract_report(
+    report_id: UUID,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+) -> dict:
+    """
+    Start extraction of images from a DOCX report.
+
+    Returns immediately with task ID. Extraction happens asynchronously.
+    Report status will be updated to EXTRACTED or FAILED when complete.
+
+    Requires active authentication.
+    """
+    service = ReportService(db)
+
+    # Verify report exists and belongs to accessible participant
+    report = await service.get_report_by_id(report_id)
+
+    # Queue extraction task
+    request_id = getattr(request.state, "request_id", None)
+    task = extract_images_from_report.delay(str(report_id), request_id=request_id)
+
+    return {
+        "report_id": str(report_id),
+        "task_id": task.id,
+        "status": "accepted",
+        "message": "Extraction task started",
+    }

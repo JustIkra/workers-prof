@@ -9,6 +9,7 @@ import uuid
 from datetime import date, datetime
 from typing import Any, Literal
 
+import sqlalchemy as sa
 from sqlalchemy import (
     BigInteger,
     Boolean,
@@ -164,6 +165,12 @@ class Report(Base):
     # Relationships
     participant: Mapped["Participant"] = relationship("Participant", back_populates="reports")
     file_ref: Mapped["FileRef"] = relationship("FileRef")
+    extracted_metrics: Mapped[list["ExtractedMetric"]] = relationship(
+        "ExtractedMetric", back_populates="report", cascade="all, delete-orphan"
+    )
+    images: Mapped[list["ReportImage"]] = relationship(
+        "ReportImage", cascade="all, delete-orphan", order_by="ReportImage.order_index"
+    )
 
     # Constraints
     __table_args__ = (
@@ -183,6 +190,50 @@ class Report(Base):
 
     def __repr__(self) -> str:
         return f"<Report(id={self.id}, participant_id={self.participant_id}, type={self.type}, status={self.status})>"
+
+
+# ===== ReportImage Table =====
+class ReportImage(Base):
+    """
+    Image extracted from a report document.
+
+    Kinds:
+    - TABLE: Image contains a table with metrics
+    - OTHER: Other types of images (charts, diagrams, etc.)
+
+    Used for OCR/Vision processing pipeline.
+    """
+
+    __tablename__ = "report_image"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    report_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("report.id", ondelete="CASCADE"), nullable=False
+    )
+    kind: Mapped[str] = mapped_column(String(20), nullable=False, default="TABLE")
+    file_ref_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("file_ref.id", ondelete="RESTRICT"), nullable=False
+    )
+    page: Mapped[int] = mapped_column(Integer, nullable=False)
+    order_index: Mapped[int] = mapped_column(Integer, nullable=False)
+
+    # Relationships
+    report: Mapped["Report"] = relationship("Report")
+    file_ref: Mapped["FileRef"] = relationship("FileRef")
+
+    # Constraints
+    __table_args__ = (
+        CheckConstraint("kind IN ('TABLE', 'OTHER')", name="report_image_kind_check"),
+        CheckConstraint("page >= 0", name="report_image_page_check"),
+        CheckConstraint("order_index >= 0", name="report_image_order_check"),
+        # Index for filtering by report
+        Index("idx_report_image_report", "report_id"),
+        # Unique constraint for ordering within a report
+        UniqueConstraint("report_id", "page", "order_index", name="report_image_order_unique"),
+    )
+
+    def __repr__(self) -> str:
+        return f"<ReportImage(id={self.id}, report_id={self.report_id}, kind={self.kind}, page={self.page})>"
 
 
 # ===== ProfActivity Table =====
@@ -266,3 +317,154 @@ class WeightTable(Base):
             f"<WeightTable(id={self.id}, prof_activity_id={self.prof_activity_id}, "
             f"version={self.version}, is_active={self.is_active})>"
         )
+
+
+# ===== MetricDef Table =====
+class MetricDef(Base):
+    """
+    Metric definition (словарь метрик).
+
+    Defines available metrics with validation ranges and metadata.
+    Used for both extraction validation and scoring calculations.
+    """
+
+    __tablename__ = "metric_def"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    code: Mapped[str] = mapped_column(String(50), unique=True, nullable=False, index=True)
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    unit: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    min_value: Mapped[float | None] = mapped_column(sa.Numeric(10, 2), nullable=True)
+    max_value: Mapped[float | None] = mapped_column(sa.Numeric(10, 2), nullable=True)
+    active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default=text("true"))
+
+    # Relationships
+    extracted_metrics: Mapped[list["ExtractedMetric"]] = relationship(
+        "ExtractedMetric",
+        back_populates="metric_def",
+        cascade="all, delete-orphan",
+    )
+
+    # Constraints
+    __table_args__ = (
+        CheckConstraint(
+            "min_value IS NULL OR max_value IS NULL OR min_value <= max_value",
+            name="metric_def_range_check",
+        ),
+        Index("ix_metric_def_active", "active"),
+    )
+
+    def __repr__(self) -> str:
+        return f"<MetricDef(id={self.id}, code={self.code}, name={self.name})>"
+
+
+# ===== ExtractedMetric Table =====
+class ExtractedMetric(Base):
+    """
+    Extracted metric value from a report.
+
+    Stores numerical values extracted from report images via OCR, LLM, or manual input.
+    Each (report_id, metric_def_id) pair is unique to prevent duplicates.
+
+    Source types:
+    - OCR: Extracted via PaddleOCR
+    - LLM: Extracted via Gemini Vision fallback
+    - MANUAL: Manually entered by user
+    """
+
+    __tablename__ = "extracted_metric"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    report_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("report.id", ondelete="CASCADE"), nullable=False
+    )
+    metric_def_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("metric_def.id", ondelete="RESTRICT"), nullable=False
+    )
+    value: Mapped[float] = mapped_column(sa.Numeric(10, 2), nullable=False)
+    source: Mapped[str] = mapped_column(String(20), nullable=False, default="OCR")
+    confidence: Mapped[float | None] = mapped_column(sa.Numeric(3, 2), nullable=True)
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    # Relationships
+    report: Mapped["Report"] = relationship("Report", back_populates="extracted_metrics")
+    metric_def: Mapped["MetricDef"] = relationship("MetricDef", back_populates="extracted_metrics")
+
+    # Constraints
+    __table_args__ = (
+        UniqueConstraint(
+            "report_id",
+            "metric_def_id",
+            name="extracted_metric_report_metric_unique",
+        ),
+        CheckConstraint(
+            "source IN ('OCR', 'LLM', 'MANUAL')",
+            name="extracted_metric_source_check",
+        ),
+        CheckConstraint(
+            "confidence IS NULL OR (confidence >= 0 AND confidence <= 1)",
+            name="extracted_metric_confidence_check",
+        ),
+        Index("ix_extracted_metric_report_id", "report_id"),
+        Index("ix_extracted_metric_metric_def_id", "metric_def_id"),
+    )
+
+    def __repr__(self) -> str:
+        return f"<ExtractedMetric(id={self.id}, report_id={self.report_id}, metric_def_id={self.metric_def_id}, value={self.value})>"
+
+
+# ===== ScoringResult Table =====
+class ScoringResult(Base):
+    """
+    Scoring result for a participant's professional fitness assessment.
+
+    Stores calculated scores, weight table version, and optional analysis data.
+    History is preserved - multiple results can exist for the same participant.
+
+    Fields:
+    - score_pct: Calculated percentage score (0-100), quantized to 0.01
+    - strengths: JSONB array of top-performing metrics
+    - dev_areas: JSONB array of development areas (low-scoring metrics)
+    - recommendations: JSONB array of recommendations
+    """
+
+    __tablename__ = "scoring_result"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    participant_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("participant.id", ondelete="CASCADE"), nullable=False
+    )
+    weight_table_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("weight_table.id", ondelete="RESTRICT"), nullable=False
+    )
+    score_pct: Mapped[float] = mapped_column(sa.Numeric(5, 2), nullable=False)
+    strengths: Mapped[list[dict[str, Any]] | None] = mapped_column(JSONB, nullable=True)
+    dev_areas: Mapped[list[dict[str, Any]] | None] = mapped_column(JSONB, nullable=True)
+    recommendations: Mapped[list[dict[str, Any]] | None] = mapped_column(JSONB, nullable=True)
+    computed_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True), nullable=False, server_default=text("now()")
+    )
+    compute_notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    # Relationships
+    participant: Mapped["Participant"] = relationship("Participant")
+    weight_table: Mapped["WeightTable"] = relationship("WeightTable")
+
+    # Constraints
+    __table_args__ = (
+        CheckConstraint(
+            "score_pct >= 0 AND score_pct <= 100",
+            name="scoring_result_score_range_check",
+        ),
+        Index("ix_scoring_result_participant_id", "participant_id"),
+        Index("ix_scoring_result_computed_at", "computed_at"),
+        Index(
+            "ix_scoring_result_participant_computed",
+            "participant_id",
+            "computed_at",
+        ),
+    )
+
+    def __repr__(self) -> str:
+        return f"<ScoringResult(id={self.id}, participant_id={self.participant_id}, score_pct={self.score_pct})>"

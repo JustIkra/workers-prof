@@ -13,7 +13,9 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 
 from app.core.config import settings
 from app.db.base import Base
+from app.db.models import User
 from app.db.session import get_db
+from app.db.seeds.prof_activity import PROF_ACTIVITY_SEED_DATA
 from main import app
 
 
@@ -123,13 +125,39 @@ async def test_db_engine():
 
     Uses the POSTGRES_DSN from settings (loaded from test_env).
     Creates all tables before tests and drops them after.
+    Also seeds prof_activity data for tests.
     """
     # Create async engine for test database
     engine = create_async_engine(settings.postgres_dsn, echo=False)
 
-    # Create all tables
+    # Create all tables and seed data
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+
+        # Seed prof_activity data
+        def seed_prof_activities(connection):
+            from sqlalchemy import text
+            for seed in PROF_ACTIVITY_SEED_DATA:
+                stmt = text(
+                    """
+                    INSERT INTO prof_activity (id, code, name, description)
+                    VALUES (:id, :code, :name, :description)
+                    ON CONFLICT (code) DO UPDATE
+                    SET name = EXCLUDED.name,
+                        description = EXCLUDED.description
+                    """
+                )
+                connection.execute(
+                    stmt,
+                    {
+                        "id": str(seed.id),
+                        "code": seed.code,
+                        "name": seed.name,
+                        "description": seed.description,
+                    },
+                )
+
+        await conn.run_sync(seed_prof_activities)
 
     yield engine
 
@@ -179,3 +207,44 @@ async def client(db_session: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
         yield ac
 
     app.dependency_overrides.clear()
+
+
+# ===== Authentication Fixtures =====
+
+
+@pytest.fixture
+async def active_user(db_session: AsyncSession) -> User:
+    """
+    Create an active test user.
+
+    Returns:
+        User instance with ACTIVE status
+    """
+    from app.services.auth import create_user
+
+    user = await create_user(db_session, "testuser@example.com", "TestPass123!")
+
+    # Activate user
+    user.status = "ACTIVE"
+    await db_session.commit()
+    await db_session.refresh(user)
+
+    return user
+
+
+@pytest.fixture
+async def active_user_token(active_user: User) -> str:
+    """
+    Generate JWT token for active test user.
+
+    Returns:
+        JWT access token string
+    """
+    from app.services.auth import create_access_token
+
+    token = create_access_token(
+        user_id=active_user.id,
+        email=active_user.email,
+        role=active_user.role
+    )
+    return token

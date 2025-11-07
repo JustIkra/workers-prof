@@ -7,7 +7,7 @@ Provides dependency functions for getting current user and checking roles.
 import uuid
 
 import jwt
-from fastapi import Cookie, Depends, HTTPException, status
+from fastapi import Cookie, Depends, Header, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import User
@@ -17,6 +17,7 @@ from app.services.auth import decode_access_token, get_user_by_id
 
 async def get_current_user(
     access_token: str | None = Cookie(default=None),
+    authorization: str | None = Header(default=None),
     db: AsyncSession = Depends(get_db),
 ) -> User:
     """
@@ -32,14 +33,21 @@ async def get_current_user(
     Raises:
         HTTPException: 401 if token is missing, invalid, or user not found
     """
-    if not access_token:
+    token = access_token
+
+    if not token and authorization:
+        scheme, _, token_value = authorization.partition(" ")
+        if scheme.lower() == "bearer" and token_value:
+            token = token_value.strip()
+
+    if not token:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Not authenticated. Please log in.",
         )
 
     try:
-        payload = decode_access_token(access_token)
+        payload = decode_access_token(token)
         user_id_str = payload.get("sub")
 
         if not user_id_str:
