@@ -58,7 +58,9 @@ class ReportService:
     ) -> ReportUploadResponse:
         """Handle report upload pipeline."""
         if not await self.repo.participant_exists(participant_id):
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Participant not found")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Participant not found"
+            )
 
         await self._validate_file(upload)
 
@@ -76,7 +78,10 @@ class ReportService:
         # Build storage key prior to saving the file
         key = self.storage.report_key(str(participant_id), str(report_id))
 
-        mime = upload.content_type or "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        mime = (
+            upload.content_type
+            or "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        )
 
         try:
             stored = await self.storage.save_report(upload, key, settings.report_max_size_bytes)
@@ -184,7 +189,7 @@ class ReportService:
     @staticmethod
     def format_etag(etag: str) -> str:
         """Wrap ETag hash in quotes for HTTP headers."""
-        return f"\"{etag}\""
+        return f'"{etag}"'
 
     @staticmethod
     def matches_etag(if_none_match: str | None, etag: str) -> bool:

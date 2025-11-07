@@ -7,14 +7,12 @@ can be rolled back, and enforce key constraints.
 
 import os
 import uuid
-from datetime import date, datetime
 
 import pytest
 from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.engine import make_url
 from sqlalchemy.exc import IntegrityError, OperationalError, ProgrammingError
-from sqlalchemy.orm import Session, sessionmaker
-
+from sqlalchemy.orm import sessionmaker
 
 # ===== Test Configuration =====
 
@@ -155,8 +153,17 @@ class TestMigrationStructure:
         inspector = inspect(engine)
         tables = inspector.get_table_names()
 
-        expected_tables = {"user", "participant", "file_ref", "report", "prof_activity", "weight_table"}
-        assert expected_tables.issubset(set(tables)), f"Missing tables: {expected_tables - set(tables)}"
+        expected_tables = {
+            "user",
+            "participant",
+            "file_ref",
+            "report",
+            "prof_activity",
+            "weight_table",
+        }
+        assert expected_tables.issubset(
+            set(tables)
+        ), f"Missing tables: {expected_tables - set(tables)}"
 
     def test_user_table_structure(self, engine):
         """User table should have correct columns and constraints."""
@@ -496,9 +503,7 @@ class TestConstraintEnforcement:
 
         with pytest.raises(IntegrityError):
             db_session.execute(
-                text(
-                    "UPDATE weight_table SET is_active = :is_active WHERE id = :id"
-                ),
+                text("UPDATE weight_table SET is_active = :is_active WHERE id = :id"),
                 {
                     "id": second_id,
                     "is_active": True,
@@ -551,12 +556,12 @@ class TestForeignKeyConstraints:
         db_session.commit()
 
         # Delete participant
-        db_session.execute(
-            text("DELETE FROM participant WHERE id = :id"), {"id": participant_id}
-        )
+        db_session.execute(text("DELETE FROM participant WHERE id = :id"), {"id": participant_id})
         db_session.commit()
 
         # Report should be deleted (cascade)
-        result = db_session.execute(text("SELECT COUNT(*) FROM report WHERE id = :id"), {"id": report_id})
+        result = db_session.execute(
+            text("SELECT COUNT(*) FROM report WHERE id = :id"), {"id": report_id}
+        )
         count = result.scalar()
         assert count == 0, "Report should be deleted when participant is deleted (CASCADE)"

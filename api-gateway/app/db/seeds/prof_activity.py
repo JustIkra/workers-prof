@@ -6,8 +6,8 @@ Provides deterministic identifiers and metadata for the `prof_activity` table.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 import uuid
+from dataclasses import dataclass
 
 
 @dataclass(frozen=True)

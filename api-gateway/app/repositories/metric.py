@@ -5,7 +5,6 @@ Handles all database operations for metric definitions and extracted metrics.
 """
 
 from decimal import Decimal
-from typing import Optional
 from uuid import UUID
 
 from sqlalchemy import select
@@ -25,10 +24,10 @@ class MetricDefRepository:
         self,
         code: str,
         name: str,
-        description: Optional[str] = None,
-        unit: Optional[str] = None,
-        min_value: Optional[Decimal] = None,
-        max_value: Optional[Decimal] = None,
+        description: str | None = None,
+        unit: str | None = None,
+        min_value: Decimal | None = None,
+        max_value: Decimal | None = None,
         active: bool = True,
     ) -> MetricDef:
         """
@@ -60,7 +59,7 @@ class MetricDefRepository:
         await self.db.refresh(metric_def)
         return metric_def
 
-    async def get_by_id(self, metric_def_id: UUID) -> Optional[MetricDef]:
+    async def get_by_id(self, metric_def_id: UUID) -> MetricDef | None:
         """
         Get a metric definition by ID.
 
@@ -73,7 +72,7 @@ class MetricDefRepository:
         result = await self.db.execute(select(MetricDef).where(MetricDef.id == metric_def_id))
         return result.scalar_one_or_none()
 
-    async def get_by_code(self, code: str) -> Optional[MetricDef]:
+    async def get_by_code(self, code: str) -> MetricDef | None:
         """
         Get a metric definition by code.
 
@@ -98,7 +97,7 @@ class MetricDefRepository:
         """
         stmt = select(MetricDef).order_by(MetricDef.code)
         if active_only:
-            stmt = stmt.where(MetricDef.active == True)
+            stmt = stmt.where(MetricDef.active is True)
 
         result = await self.db.execute(stmt)
         return list(result.scalars().all())
@@ -106,13 +105,13 @@ class MetricDefRepository:
     async def update(
         self,
         metric_def_id: UUID,
-        name: Optional[str] = None,
-        description: Optional[str] = None,
-        unit: Optional[str] = None,
-        min_value: Optional[Decimal] = None,
-        max_value: Optional[Decimal] = None,
-        active: Optional[bool] = None,
-    ) -> Optional[MetricDef]:
+        name: str | None = None,
+        description: str | None = None,
+        unit: str | None = None,
+        min_value: Decimal | None = None,
+        max_value: Decimal | None = None,
+        active: bool | None = None,
+    ) -> MetricDef | None:
         """
         Update a metric definition.
 
@@ -180,8 +179,8 @@ class ExtractedMetricRepository:
         metric_def_id: UUID,
         value: Decimal,
         source: str = "MANUAL",
-        confidence: Optional[Decimal] = None,
-        notes: Optional[str] = None,
+        confidence: Decimal | None = None,
+        notes: str | None = None,
     ) -> ExtractedMetric:
         """
         Create or update an extracted metric.
@@ -225,7 +224,7 @@ class ExtractedMetricRepository:
             await self.db.refresh(extracted_metric)
             return extracted_metric
 
-    async def get_by_id(self, extracted_metric_id: UUID) -> Optional[ExtractedMetric]:
+    async def get_by_id(self, extracted_metric_id: UUID) -> ExtractedMetric | None:
         """
         Get an extracted metric by ID.
 
@@ -244,7 +243,7 @@ class ExtractedMetricRepository:
 
     async def get_by_report_and_metric(
         self, report_id: UUID, metric_def_id: UUID
-    ) -> Optional[ExtractedMetric]:
+    ) -> ExtractedMetric | None:
         """
         Get an extracted metric by report and metric definition.
 

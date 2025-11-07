@@ -7,7 +7,6 @@ Provides endpoints for:
 """
 
 from decimal import Decimal
-from typing import Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -19,14 +18,15 @@ from app.db.models import User
 from app.db.session import get_db
 from app.services.scoring import ScoringService
 
-
 router = APIRouter(prefix="/scoring", tags=["scoring"])
 
 
 # ===== Schemas =====
 
+
 class MetricContribution(BaseModel):
     """Individual metric contribution to the score."""
+
     metric_code: str
     value: str  # Decimal as string
     weight: str  # Decimal as string
@@ -35,6 +35,7 @@ class MetricContribution(BaseModel):
 
 class MetricItem(BaseModel):
     """Metric item for strengths/dev_areas (S2-03)."""
+
     metric_code: str
     metric_name: str
     value: str  # Decimal as string
@@ -43,6 +44,7 @@ class MetricItem(BaseModel):
 
 class ScoringResponse(BaseModel):
     """Response schema for scoring calculation (S2-02, S2-03)."""
+
     scoring_result_id: str
     participant_id: str
     prof_activity_id: str
@@ -52,11 +54,16 @@ class ScoringResponse(BaseModel):
     weight_table_version: int
     details: list[MetricContribution]
     missing_metrics: list[str] = Field(default_factory=list)
-    strengths: list[MetricItem] = Field(default_factory=list, description="Top 5 high-value metrics (S2-03)")
-    dev_areas: list[MetricItem] = Field(default_factory=list, description="Top 5 low-value metrics (S2-03)")
+    strengths: list[MetricItem] = Field(
+        default_factory=list, description="Top 5 high-value metrics (S2-03)"
+    )
+    dev_areas: list[MetricItem] = Field(
+        default_factory=list, description="Top 5 low-value metrics (S2-03)"
+    )
 
 
 # ===== Endpoints =====
+
 
 @router.post("/participants/{participant_id}/calculate", response_model=ScoringResponse)
 async def calculate_participant_score(
@@ -91,7 +98,7 @@ async def calculate_participant_score(
             prof_activity_code=activity_code,
         )
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=str(e)) from e
 
     return ScoringResponse(
         scoring_result_id=result["scoring_result_id"],

@@ -7,9 +7,9 @@ from docx import Document
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
 from app.db.models import Participant, User
 from app.services.auth import create_user
-from app.core.config import settings
 
 
 def build_docx_bytes(text: str = "Sample report") -> bytes:
@@ -78,7 +78,13 @@ async def test_upload_report_success(
     response = await client.post(
         f"/api/participants/{sample_participant.id}/reports",
         data={"report_type": "REPORT_1"},
-        files={"file": ("original.docx", payload, "application/vnd.openxmlformats-officedocument.wordprocessingml.document")},
+        files={
+            "file": (
+                "original.docx",
+                payload,
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            )
+        },
         cookies=auth_cookies,
     )
 
@@ -131,7 +137,13 @@ async def test_upload_report_duplicate_returns_409(
     first = await client.post(
         f"/api/participants/{sample_participant.id}/reports",
         data={"report_type": "REPORT_1"},
-        files={"file": ("original.docx", payload, "application/vnd.openxmlformats-officedocument.wordprocessingml.document")},
+        files={
+            "file": (
+                "original.docx",
+                payload,
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            )
+        },
         cookies=auth_cookies,
     )
     assert first.status_code == 201
@@ -140,7 +152,13 @@ async def test_upload_report_duplicate_returns_409(
     second = await client.post(
         f"/api/participants/{sample_participant.id}/reports",
         data={"report_type": "REPORT_1"},
-        files={"file": ("duplicate.docx", payload, "application/vnd.openxmlformats-officedocument.wordprocessingml.document")},
+        files={
+            "file": (
+                "duplicate.docx",
+                payload,
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            )
+        },
         cookies=auth_cookies,
     )
 
@@ -164,7 +182,13 @@ async def test_upload_report_over_limit_returns_413(
     response = await client.post(
         f"/api/participants/{sample_participant.id}/reports",
         data={"report_type": "REPORT_2"},
-        files={"file": ("big.docx", oversized_payload, "application/vnd.openxmlformats-officedocument.wordprocessingml.document")},
+        files={
+            "file": (
+                "big.docx",
+                oversized_payload,
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            )
+        },
         cookies=auth_cookies,
     )
 
@@ -185,7 +209,13 @@ async def test_download_report_returns_file_with_etag(
     upload_response = await client.post(
         f"/api/participants/{sample_participant.id}/reports",
         data={"report_type": "REPORT_3"},
-        files={"file": ("original.docx", payload, "application/vnd.openxmlformats-officedocument.wordprocessingml.document")},
+        files={
+            "file": (
+                "original.docx",
+                payload,
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            )
+        },
         cookies=auth_cookies,
     )
     assert upload_response.status_code == 201
@@ -197,8 +227,8 @@ async def test_download_report_returns_file_with_etag(
     )
 
     assert download_response.status_code == 200
-    assert download_response.headers["etag"].startswith("\"")
-    assert download_response.headers["etag"].endswith("\"")
+    assert download_response.headers["etag"].startswith('"')
+    assert download_response.headers["etag"].endswith('"')
     assert "original.docx" in download_response.headers["content-disposition"]
     assert download_response.content == payload
 
@@ -226,7 +256,13 @@ async def test_upload_requires_auth(
     response = await client.post(
         f"/api/participants/{sample_participant.id}/reports",
         data={"report_type": "REPORT_1"},
-        files={"file": ("report.docx", payload, "application/vnd.openxmlformats-officedocument.wordprocessingml.document")},
+        files={
+            "file": (
+                "report.docx",
+                payload,
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            )
+        },
     )
 
     assert response.status_code == 401
@@ -246,7 +282,13 @@ async def test_download_requires_auth(
     upload_response = await client.post(
         f"/api/participants/{sample_participant.id}/reports",
         data={"report_type": "REPORT_1"},
-        files={"file": ("report.docx", payload, "application/vnd.openxmlformats-officedocument.wordprocessingml.document")},
+        files={
+            "file": (
+                "report.docx",
+                payload,
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            )
+        },
         cookies=auth_cookies,
     )
     assert upload_response.status_code == 201

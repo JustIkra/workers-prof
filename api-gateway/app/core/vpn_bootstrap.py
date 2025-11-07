@@ -5,9 +5,9 @@ import shutil
 import socket
 import subprocess
 import time
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable, Mapping, Sequence
 
 
 class WireGuardBootstrapError(RuntimeError):
@@ -167,9 +167,7 @@ def configure_split_tunnel(
 ) -> None:
     route_mode = env.get("VPN_ROUTE_MODE", "domains").strip().lower()
     if route_mode not in {"all", "domains", "cidr"}:
-        raise WireGuardBootstrapError(
-            "VPN_ROUTE_MODE must be one of: all, domains, cidr."
-        )
+        raise WireGuardBootstrapError("VPN_ROUTE_MODE must be one of: all, domains, cidr.")
 
     bypass_cidrs = _parse_csv(env.get("VPN_BYPASS_CIDRS"))
 

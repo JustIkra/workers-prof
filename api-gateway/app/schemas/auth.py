@@ -33,7 +33,9 @@ class RegisterRequest(BaseModel):
             raise ValueError("Password must contain at least one digit")
         return v
 
-    model_config = {"json_schema_extra": {"example": {"email": "user@example.com", "password": "password123"}}}
+    model_config = {
+        "json_schema_extra": {"example": {"email": "user@example.com", "password": "password123"}}
+    }
 
 
 class LoginRequest(BaseModel):
@@ -42,7 +44,9 @@ class LoginRequest(BaseModel):
     email: EmailStr = Field(..., description="User email address")
     password: str = Field(..., description="User password")
 
-    model_config = {"json_schema_extra": {"example": {"email": "user@example.com", "password": "password123"}}}
+    model_config = {
+        "json_schema_extra": {"example": {"email": "user@example.com", "password": "password123"}}
+    }
 
 
 class ApproveUserRequest(BaseModel):
@@ -97,4 +101,6 @@ class MessageResponse(BaseModel):
 
     message: str
 
-    model_config = {"json_schema_extra": {"example": {"message": "Operation completed successfully"}}}
+    model_config = {
+        "json_schema_extra": {"example": {"message": "Operation completed successfully"}}
+    }

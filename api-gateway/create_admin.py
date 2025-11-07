@@ -15,9 +15,7 @@ import secrets
 import string
 import sys
 import uuid
-from datetime import datetime, timezone
-
-from sqlalchemy.ext.asyncio import AsyncSession
+from datetime import UTC, datetime
 
 from app.db.models import User
 from app.db.session import AsyncSessionLocal
@@ -34,7 +32,7 @@ async def _create_or_update_admin(email: str, password: str) -> tuple[User, bool
     async with AsyncSessionLocal() as session:  # type: AsyncSession
         existing = await get_user_by_email(session, email)
 
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         password_hash = hash_password(password)
 
         if existing:
@@ -82,4 +80,3 @@ def main(argv: list[str]) -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main(sys.argv))
-

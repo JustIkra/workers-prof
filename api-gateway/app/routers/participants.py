@@ -14,6 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.dependencies import get_current_active_user
 from app.db.models import User
 from app.db.session import get_db
+from app.schemas.final_report import FinalReportResponse
 from app.schemas.participant import (
     MessageResponse,
     ParticipantCreateRequest,
@@ -22,7 +23,6 @@ from app.schemas.participant import (
     ParticipantSearchParams,
     ParticipantUpdateRequest,
 )
-from app.schemas.final_report import FinalReportResponse
 from app.services.participant import ParticipantService
 from app.services.scoring import ScoringService
 
@@ -199,11 +199,10 @@ async def get_final_report(
             prof_activity_code=activity_code,
         )
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=str(e)) from e
 
     if format == "html":
         # Import here to avoid circular dependency and only when needed
-        from datetime import datetime
         from app.services.report_template import render_final_report_html
 
         html_content = render_final_report_html(report_data)

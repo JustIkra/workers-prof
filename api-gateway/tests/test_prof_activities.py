@@ -17,7 +17,6 @@ from app.db.seeds.prof_activity import PROF_ACTIVITY_SEED_DATA
 from app.services.auth import create_user
 from app.services.prof_activity import ProfActivityService
 
-
 # ===== Helper Fixtures =====
 
 

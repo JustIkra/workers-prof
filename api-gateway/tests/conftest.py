@@ -3,9 +3,7 @@ Pytest configuration and shared fixtures for api-gateway tests.
 """
 
 import os
-from collections.abc import AsyncGenerator
-from pathlib import Path
-from typing import Any, Generator
+from collections.abc import AsyncGenerator, Generator
 
 import pytest
 from httpx import ASGITransport, AsyncClient
@@ -14,8 +12,8 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from app.core.config import settings
 from app.db.base import Base
 from app.db.models import User
-from app.db.session import get_db
 from app.db.seeds.prof_activity import PROF_ACTIVITY_SEED_DATA
+from app.db.session import get_db
 from main import app
 
 
@@ -137,6 +135,7 @@ async def test_db_engine():
         # Seed prof_activity data
         def seed_prof_activities(connection):
             from sqlalchemy import text
+
             for seed in PROF_ACTIVITY_SEED_DATA:
                 stmt = text(
                     """
@@ -243,8 +242,6 @@ async def active_user_token(active_user: User) -> str:
     from app.services.auth import create_access_token
 
     token = create_access_token(
-        user_id=active_user.id,
-        email=active_user.email,
-        role=active_user.role
+        user_id=active_user.id, email=active_user.email, role=active_user.role
     )
     return token

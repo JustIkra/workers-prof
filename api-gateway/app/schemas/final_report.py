@@ -74,13 +74,17 @@ class FinalReportResponse(BaseModel):
     dev_areas: list[DevAreaItem] = Field(default_factory=list, description="3-5 development areas")
 
     # Recommendations
-    recommendations: list[RecommendationItem] = Field(default_factory=list, description="Learning recommendations")
+    recommendations: list[RecommendationItem] = Field(
+        default_factory=list, description="Learning recommendations"
+    )
 
     # Metrics appendix
     metrics: list[MetricDetail] = Field(default_factory=list, description="Full metrics table")
 
     # Notes
-    notes: str | None = Field(None, description="Notes about OCR confidence, algorithm version, etc.")
+    notes: str | None = Field(
+        None, description="Notes about OCR confidence, algorithm version, etc."
+    )
 
     # Template version for HTML rendering
     template_version: str = Field(default="1.0.0", description="Report template version")

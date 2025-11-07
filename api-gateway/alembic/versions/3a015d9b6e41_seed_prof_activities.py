@@ -7,18 +7,18 @@ Create Date: 2025-11-05 12:00:00.000000
 Adds initial professional activities for S1-08 with idempotent upsert.
 """
 
-from typing import Sequence, Union
+from collections.abc import Sequence
 
 import sqlalchemy as sa
-from alembic import op
 
+from alembic import op
 from app.db.seeds.prof_activity import PROF_ACTIVITY_SEED_DATA
 
 # revision identifiers, used by Alembic.
 revision: str = "3a015d9b6e41"
-down_revision: Union[str, None] = "097c8293450b"
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+down_revision: str | None = "097c8293450b"
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:

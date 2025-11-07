@@ -8,37 +8,128 @@
 """
 import asyncio
 import sys
-from pathlib import Path
 from decimal import Decimal
+from pathlib import Path
 
 # Добавляем путь к модулям приложения
 sys.path.insert(0, str(Path(__file__).parent))
 
-from app.db.session import AsyncSessionLocal
-from app.repositories.participant import ParticipantRepository
-from app.repositories.prof_activity import ProfActivityRepository
-from app.repositories.metric import MetricDefRepository
-from app.schemas.participant import ParticipantCreateRequest
-from app.schemas.metric import MetricDefCreateRequest
-from app.db.models import ProfActivity, WeightTable, MetricDef
 from sqlalchemy import select
 
+from app.db.models import WeightTable
+from app.db.session import AsyncSessionLocal
+from app.repositories.metric import MetricDefRepository
+from app.repositories.participant import ParticipantRepository
+from app.repositories.prof_activity import ProfActivityRepository
+from app.schemas.metric import MetricDefCreateRequest
+from app.schemas.participant import ParticipantCreateRequest
 
 # Определения метрик из примера расчёта
 METRICS = [
-    MetricDefCreateRequest(code="communicability", name="Коммуникабельность", unit="балл", min_value=Decimal("0"), max_value=Decimal("10"), active=True),
-    MetricDefCreateRequest(code="teamwork", name="Командность", unit="балл", min_value=Decimal("0"), max_value=Decimal("10"), active=True),
-    MetricDefCreateRequest(code="low_conflict", name="Конфликтность (низкая)", unit="балл", min_value=Decimal("0"), max_value=Decimal("10"), active=True),
-    MetricDefCreateRequest(code="team_soul", name="Роль «Душа команды» (Белбин)", unit="балл", min_value=Decimal("0"), max_value=Decimal("10"), active=True),
-    MetricDefCreateRequest(code="organization", name="Организованность", unit="балл", min_value=Decimal("0"), max_value=Decimal("10"), active=True),
-    MetricDefCreateRequest(code="responsibility", name="Ответственность", unit="балл", min_value=Decimal("0"), max_value=Decimal("10"), active=True),
-    MetricDefCreateRequest(code="nonverbal_logic", name="Невербальная логика", unit="балл", min_value=Decimal("0"), max_value=Decimal("10"), active=True),
-    MetricDefCreateRequest(code="info_processing", name="Обработка информации", unit="балл", min_value=Decimal("0"), max_value=Decimal("10"), active=True),
-    MetricDefCreateRequest(code="complex_problem_solving", name="Комплексное решение проблем", unit="балл", min_value=Decimal("0"), max_value=Decimal("10"), active=True),
-    MetricDefCreateRequest(code="morality_normativity", name="Моральность / Нормативность", unit="балл", min_value=Decimal("0"), max_value=Decimal("10"), active=True),
-    MetricDefCreateRequest(code="stress_resistance", name="Стрессоустойчивость", unit="балл", min_value=Decimal("0"), max_value=Decimal("10"), active=True),
-    MetricDefCreateRequest(code="leadership", name="Лидерство", unit="балл", min_value=Decimal("0"), max_value=Decimal("10"), active=True),
-    MetricDefCreateRequest(code="vocabulary", name="Лексика", unit="балл", min_value=Decimal("0"), max_value=Decimal("10"), active=True),
+    MetricDefCreateRequest(
+        code="communicability",
+        name="Коммуникабельность",
+        unit="балл",
+        min_value=Decimal("0"),
+        max_value=Decimal("10"),
+        active=True,
+    ),
+    MetricDefCreateRequest(
+        code="teamwork",
+        name="Командность",
+        unit="балл",
+        min_value=Decimal("0"),
+        max_value=Decimal("10"),
+        active=True,
+    ),
+    MetricDefCreateRequest(
+        code="low_conflict",
+        name="Конфликтность (низкая)",
+        unit="балл",
+        min_value=Decimal("0"),
+        max_value=Decimal("10"),
+        active=True,
+    ),
+    MetricDefCreateRequest(
+        code="team_soul",
+        name="Роль «Душа команды» (Белбин)",
+        unit="балл",
+        min_value=Decimal("0"),
+        max_value=Decimal("10"),
+        active=True,
+    ),
+    MetricDefCreateRequest(
+        code="organization",
+        name="Организованность",
+        unit="балл",
+        min_value=Decimal("0"),
+        max_value=Decimal("10"),
+        active=True,
+    ),
+    MetricDefCreateRequest(
+        code="responsibility",
+        name="Ответственность",
+        unit="балл",
+        min_value=Decimal("0"),
+        max_value=Decimal("10"),
+        active=True,
+    ),
+    MetricDefCreateRequest(
+        code="nonverbal_logic",
+        name="Невербальная логика",
+        unit="балл",
+        min_value=Decimal("0"),
+        max_value=Decimal("10"),
+        active=True,
+    ),
+    MetricDefCreateRequest(
+        code="info_processing",
+        name="Обработка информации",
+        unit="балл",
+        min_value=Decimal("0"),
+        max_value=Decimal("10"),
+        active=True,
+    ),
+    MetricDefCreateRequest(
+        code="complex_problem_solving",
+        name="Комплексное решение проблем",
+        unit="балл",
+        min_value=Decimal("0"),
+        max_value=Decimal("10"),
+        active=True,
+    ),
+    MetricDefCreateRequest(
+        code="morality_normativity",
+        name="Моральность / Нормативность",
+        unit="балл",
+        min_value=Decimal("0"),
+        max_value=Decimal("10"),
+        active=True,
+    ),
+    MetricDefCreateRequest(
+        code="stress_resistance",
+        name="Стрессоустойчивость",
+        unit="балл",
+        min_value=Decimal("0"),
+        max_value=Decimal("10"),
+        active=True,
+    ),
+    MetricDefCreateRequest(
+        code="leadership",
+        name="Лидерство",
+        unit="балл",
+        min_value=Decimal("0"),
+        max_value=Decimal("10"),
+        active=True,
+    ),
+    MetricDefCreateRequest(
+        code="vocabulary",
+        name="Лексика",
+        unit="балл",
+        min_value=Decimal("0"),
+        max_value=Decimal("10"),
+        active=True,
+    ),
 ]
 
 # Веса для профдеятельности "Организация и проведение совещаний"
@@ -101,7 +192,7 @@ async def main():
                     unit=metric_def.unit,
                     min_value=metric_def.min_value,
                     max_value=metric_def.max_value,
-                    active=metric_def.active
+                    active=metric_def.active,
                 )
                 print(f"   ✓ Создана метрика '{metric_def.name}'")
                 metric_map[metric_def.code] = created
@@ -111,7 +202,7 @@ async def main():
         participant_data = ParticipantCreateRequest(
             full_name="Батура Александр Александрович",
             birth_date="1985-06-15",
-            external_id="BATURA_AA_001"
+            external_id="BATURA_AA_001",
         )
 
         # Проверяем, существует ли участник
@@ -123,7 +214,7 @@ async def main():
             participant = await participant_repo.create(
                 full_name=participant_data.full_name,
                 birth_date=participant_data.birth_date,
-                external_id=participant_data.external_id
+                external_id=participant_data.external_id,
             )
             print(f"   ✓ Создан участник: {participant.full_name} (ID: {participant.id})")
 
@@ -146,7 +237,7 @@ async def main():
         result = await session.execute(
             select(WeightTable)
             .where(WeightTable.prof_activity_id == prof_activity.id)
-            .where(WeightTable.is_active == True)
+            .where(WeightTable.is_active is True)
         )
         active_table = result.scalar_one_or_none()
 
@@ -158,18 +249,17 @@ async def main():
             weights_json = []
             for code, weight in WEIGHTS.items():
                 metric = metric_map[code]
-                weights_json.append({
-                    "metric_code": metric.code,
-                    "metric_name": metric.name,
-                    "weight": str(weight)  # Decimal -> str для JSON
-                })
+                weights_json.append(
+                    {
+                        "metric_code": metric.code,
+                        "metric_name": metric.name,
+                        "weight": str(weight),  # Decimal -> str для JSON
+                    }
+                )
 
             # Создаём новую весовую таблицу
             weight_table = WeightTable(
-                prof_activity_id=prof_activity.id,
-                version=1,
-                is_active=True,
-                weights=weights_json
+                prof_activity_id=prof_activity.id, version=1, is_active=True, weights=weights_json
             )
             session.add(weight_table)
             await session.flush()
@@ -177,29 +267,31 @@ async def main():
 
         # 5. Выводим сводку
         print("\n✅ Тестовые данные готовы!")
-        print(f"\n📊 Сводка:")
+        print("\n📊 Сводка:")
         print(f"   • Участник: {participant.full_name} (ID: {participant.id})")
         print(f"   • Профдеятельность: {prof_activity.name} (код: {prof_activity.code})")
         print(f"   • Весовая таблица: версия {weight_table.version}, {len(WEIGHTS)} метрик")
-        print(f"   • Ожидаемый результат: ~72%")
+        print("   • Ожидаемый результат: ~72%")
 
-        print(f"\n📁 Файлы отчётов для загрузки:")
+        print("\n📁 Файлы отчётов для загрузки:")
         report_files = [
             ".memory-base/Product Overview/User story/Batura_A.A._Biznes-Profil_Otchyot_dlya_respondenta_1718107.docx",
             ".memory-base/Product Overview/User story/Batura_A.A._Biznes-Profil_Otchyot_po_kompetentsiyam_1718107.docx",
-            ".memory-base/Product Overview/User story/Batura_A.A._Biznes-Profil_Biznes-otchyot_1718107.docx"
+            ".memory-base/Product Overview/User story/Batura_A.A._Biznes-Profil_Biznes-otchyot_1718107.docx",
         ]
         for i, file in enumerate(report_files, 1):
             print(f"   {i}. {Path(file).name}")
 
-        print(f"\n🔗 Следующие шаги:")
-        print(f"   1. Загрузите три отчёта через API:")
-        print(f"      curl -X POST http://localhost:9187/api/participants/{participant.id}/reports \\")
-        print(f"           -H 'Authorization: Bearer <token>' \\")
-        print(f"           -F 'file=@path/to/report.docx' \\")
-        print(f"           -F 'report_type=REPORT_1'")
-        print(f"   2. Реализуйте сервис расчёта (S2-02)")
-        print(f"   3. Запустите расчёт через API и сравните с эталоном (72%)")
+        print("\n🔗 Следующие шаги:")
+        print("   1. Загрузите три отчёта через API:")
+        print(
+            f"      curl -X POST http://localhost:9187/api/participants/{participant.id}/reports \\"
+        )
+        print("           -H 'Authorization: Bearer <token>' \\")
+        print("           -F 'file=@path/to/report.docx' \\")
+        print("           -F 'report_type=REPORT_1'")
+        print("   2. Реализуйте сервис расчёта (S2-02)")
+        print("   3. Запустите расчёт через API и сравните с эталоном (72%)")
 
         await session.commit()
 

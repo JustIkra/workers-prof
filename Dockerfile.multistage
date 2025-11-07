@@ -1,0 +1,78 @@
+# syntax=docker/dockerfile:1.6
+
+#
+# Stage 1: Build Frontend (Vue SPA)
+#
+FROM node:20-alpine AS frontend-builder
+
+WORKDIR /frontend
+
+# Copy package files and install dependencies
+COPY frontend/package*.json ./
+RUN npm ci --prefer-offline --no-audit
+
+# Copy frontend source and build
+COPY frontend/ ./
+# Override outDir for Docker build to output to ./dist instead of ../api-gateway/static
+RUN npm run build -- --outDir ./dist
+
+#
+# Stage 2: Build Backend with Frontend Assets
+#
+FROM python:3.12-slim AS backend
+
+# Build arguments for metadata
+ARG BUILD_DATE
+ARG GIT_SHA
+
+# Labels
+LABEL org.opencontainers.image.created="${BUILD_DATE}" \
+      org.opencontainers.image.revision="${GIT_SHA}" \
+      org.opencontainers.image.title="Workers Prof API Gateway" \
+      org.opencontainers.image.description="Professional competency assessment system"
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    APP_HOME=/app
+
+WORKDIR ${APP_HOME}
+
+# System dependencies (curl for healthcheck)
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Python dependencies first (better layer caching)
+COPY api-gateway/requirements.txt ./
+RUN pip install --upgrade pip \
+    && pip install -r requirements.txt
+
+# Copy backend application code
+COPY api-gateway/ ./
+
+# Copy built frontend from frontend-builder stage
+COPY --from=frontend-builder /frontend/dist/ ./static/
+
+# Create storage directory for file uploads
+RUN mkdir -p /app/storage
+
+# Make entrypoint script executable
+RUN chmod +x /app/docker-entrypoint.sh || true
+
+# Expose internal app port
+EXPOSE 9187
+
+# Default environment variables
+ENV ENV=prod \
+    APP_PORT=9187 \
+    FILE_STORAGE_BASE=/app/storage
+
+# Healthcheck
+HEALTHCHECK --interval=10s --timeout=3s --retries=5 \
+    CMD curl -fsS http://127.0.0.1:${APP_PORT}/api/healthz || exit 1
+
+# Default command
+CMD ["python", "main.py"]

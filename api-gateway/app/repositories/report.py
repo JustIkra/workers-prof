@@ -4,7 +4,6 @@ Repository for report and file_ref operations.
 
 from __future__ import annotations
 
-from typing import Optional
 from uuid import UUID
 
 from sqlalchemy import select
@@ -28,7 +27,7 @@ class ReportRepository:
 
     async def get_by_participant_and_type(
         self, participant_id: UUID, report_type: str
-    ) -> Optional[Report]:
+    ) -> Report | None:
         """Get report for participant by type."""
         stmt = (
             select(Report)
@@ -48,13 +47,9 @@ class ReportRepository:
         await self.db.refresh(report, attribute_names=["file_ref"])
         return report
 
-    async def get_with_file_ref(self, report_id: UUID) -> Optional[Report]:
+    async def get_with_file_ref(self, report_id: UUID) -> Report | None:
         """Get report by ID with joined file reference."""
-        stmt = (
-            select(Report)
-            .options(selectinload(Report.file_ref))
-            .where(Report.id == report_id)
-        )
+        stmt = select(Report).options(selectinload(Report.file_ref)).where(Report.id == report_id)
         result = await self.db.execute(stmt)
         return result.scalar_one_or_none()
 

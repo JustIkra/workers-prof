@@ -9,7 +9,6 @@ from typing import Any
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
-
 # Template directory path
 TEMPLATE_DIR = Path(__file__).parent.parent / "templates"
 
@@ -45,7 +44,7 @@ def render_final_report_html(report_data: dict[str, Any]) -> str:
     env = get_jinja_env()
 
     # Get template version from data (default to 1.0.0)
-    template_version = report_data.get("template_version", "1.0.0")
+    report_data.get("template_version", "1.0.0")
 
     # For now, we only have version 1.0.0
     # In future, could select template based on version

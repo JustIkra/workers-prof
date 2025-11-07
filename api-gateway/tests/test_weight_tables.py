@@ -12,7 +12,7 @@ from httpx import AsyncClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.models import ProfActivity, WeightTable, User
+from app.db.models import ProfActivity, User, WeightTable
 from app.services.auth import create_user
 from app.services.prof_activity import ProfActivityService
 
@@ -124,8 +124,7 @@ async def test_upload_weight_table_invalid_sum_rejected(
 
     assert response.status_code == 422
     assert any(
-        "Sum of weights must equal 1.0" in error["msg"]
-        for error in response.json()["detail"]
+        "Sum of weights must equal 1.0" in error["msg"] for error in response.json()["detail"]
     )
 
 
@@ -189,9 +188,7 @@ async def test_activate_second_weight_table_rejected(
 
     # Confirm DB still has single active record
     result = await db_session.execute(
-        select(WeightTable)
-        .join(ProfActivity)
-        .where(ProfActivity.code == "meeting_facilitation")
+        select(WeightTable).join(ProfActivity).where(ProfActivity.code == "meeting_facilitation")
     )
     tables = list(result.scalars().all())
     assert any(table.is_active for table in tables)

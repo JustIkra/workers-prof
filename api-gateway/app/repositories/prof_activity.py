@@ -5,7 +5,6 @@ Provides read operations and idempotent seed insertion helpers.
 """
 
 from collections.abc import Sequence
-
 from uuid import UUID
 
 from sqlalchemy import select
@@ -58,8 +57,7 @@ class ProfActivityRepository:
             Active WeightTable instance or None if not found.
         """
         stmt = select(WeightTable).where(
-            WeightTable.prof_activity_id == prof_activity_id,
-            WeightTable.is_active == True
+            WeightTable.prof_activity_id == prof_activity_id, WeightTable.is_active is True
         )
         result = await self.db.execute(stmt)
         return result.scalar_one_or_none()

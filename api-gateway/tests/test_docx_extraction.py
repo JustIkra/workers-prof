@@ -11,17 +11,20 @@ Tests cover:
 import io
 import uuid
 import zipfile
-from datetime import datetime, timezone
 from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 from PIL import Image
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.models import Report, FileRef, ReportImage, Participant
-from app.services.docx_extraction import DocxImageExtractor, ExtractedImage, InvalidDocxError, ImageExtractionError
+from app.db.models import FileRef, Participant, Report, ReportImage
+from app.services.docx_extraction import (
+    DocxImageExtractor,
+    ExtractedImage,
+    InvalidDocxError,
+)
 
 
 def create_test_docx_with_images(path: Path, num_images: int = 2) -> None:
@@ -32,36 +35,45 @@ def create_test_docx_with_images(path: Path, num_images: int = 2) -> None:
         path: Where to save the DOCX file
         num_images: Number of test images to embed
     """
-    with zipfile.ZipFile(path, 'w', zipfile.ZIP_DEFLATED) as docx_zip:
+    with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED) as docx_zip:
         # Add minimal DOCX structure
-        docx_zip.writestr('[Content_Types].xml', '''<?xml version="1.0" encoding="UTF-8"?>
+        docx_zip.writestr(
+            "[Content_Types].xml",
+            """<?xml version="1.0" encoding="UTF-8"?>
 <Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
   <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
   <Default Extension="xml" ContentType="application/xml"/>
   <Default Extension="png" ContentType="image/png"/>
-</Types>''')
+</Types>""",
+        )
 
-        docx_zip.writestr('_rels/.rels', '''<?xml version="1.0" encoding="UTF-8"?>
+        docx_zip.writestr(
+            "_rels/.rels",
+            """<?xml version="1.0" encoding="UTF-8"?>
 <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
   <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
-</Relationships>''')
+</Relationships>""",
+        )
 
-        docx_zip.writestr('word/document.xml', '''<?xml version="1.0" encoding="UTF-8"?>
+        docx_zip.writestr(
+            "word/document.xml",
+            """<?xml version="1.0" encoding="UTF-8"?>
 <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
   <w:body>
     <w:p><w:t>Test document with images</w:t></w:p>
   </w:body>
-</w:document>''')
+</w:document>""",
+        )
 
         # Add test images to word/media/
         for i in range(num_images):
             # Create a simple test image
-            img = Image.new('RGB', (100, 100), color=(255, 0, 0))
+            img = Image.new("RGB", (100, 100), color=(255, 0, 0))
             img_bytes = io.BytesIO()
-            img.save(img_bytes, format='PNG')
+            img.save(img_bytes, format="PNG")
             img_bytes.seek(0)
 
-            docx_zip.writestr(f'word/media/image{i+1}.png', img_bytes.read())
+            docx_zip.writestr(f"word/media/image{i+1}.png", img_bytes.read())
 
 
 class TestDocxImageExtractor:
@@ -81,7 +93,7 @@ class TestDocxImageExtractor:
         assert images[0].order_index == 0
         assert images[1].order_index == 1
         assert images[2].order_index == 2
-        assert all(img.format == 'PNG' for img in images)
+        assert all(img.format == "PNG" for img in images)
         assert all(img.page == 0 for img in images)  # DOCX has no page concept
         assert all(img.size_bytes > 0 for img in images)
 
@@ -119,9 +131,9 @@ class TestDocxImageExtractor:
         extractor = DocxImageExtractor()
 
         # Create a test JPEG image
-        img = Image.new('RGB', (50, 50), color=(0, 255, 0))
+        img = Image.new("RGB", (50, 50), color=(0, 255, 0))
         jpeg_bytes = io.BytesIO()
-        img.save(jpeg_bytes, format='JPEG')
+        img.save(jpeg_bytes, format="JPEG")
         jpeg_data = jpeg_bytes.getvalue()
 
         # Convert to PNG
@@ -129,7 +141,7 @@ class TestDocxImageExtractor:
 
         # Verify it's valid PNG
         with Image.open(io.BytesIO(png_data)) as result_img:
-            assert result_img.format == 'PNG'
+            assert result_img.format == "PNG"
             assert result_img.size == (50, 50)
 
     def test_convert_to_png__rgba_image__handles_transparency(self):
@@ -137,9 +149,9 @@ class TestDocxImageExtractor:
         extractor = DocxImageExtractor()
 
         # Create RGBA image with transparency
-        img = Image.new('RGBA', (50, 50), color=(0, 0, 255, 128))
+        img = Image.new("RGBA", (50, 50), color=(0, 0, 255, 128))
         rgba_bytes = io.BytesIO()
-        img.save(rgba_bytes, format='PNG')
+        img.save(rgba_bytes, format="PNG")
         rgba_data = rgba_bytes.getvalue()
 
         # Convert (should convert to RGB with white background)
@@ -147,8 +159,8 @@ class TestDocxImageExtractor:
 
         # Verify it's valid PNG and RGB mode
         with Image.open(io.BytesIO(png_data)) as result_img:
-            assert result_img.format == 'PNG'
-            assert result_img.mode == 'RGB'
+            assert result_img.format == "PNG"
+            assert result_img.mode == "RGB"
 
 
 @pytest.mark.asyncio
@@ -212,7 +224,7 @@ class TestReportImageExtraction:
         await db_session.commit()
 
         # Mock settings for task
-        with patch('app.tasks.extraction.settings') as mock_settings:
+        with patch("app.tasks.extraction.settings") as mock_settings:
             mock_settings.postgres_dsn = settings.postgres_dsn
             mock_settings.file_storage_base = str(tmp_path / "storage")
 
@@ -292,7 +304,7 @@ class TestReportImageExtraction:
         await db_session.commit()
 
         # Mock settings for task
-        with patch('app.tasks.extraction.settings') as mock_settings:
+        with patch("app.tasks.extraction.settings") as mock_settings:
             mock_settings.postgres_dsn = settings.postgres_dsn
             mock_settings.file_storage_base = str(tmp_path / "storage")
 
@@ -364,7 +376,7 @@ class TestReportImageExtraction:
         await db_session.commit()
 
         # Execute extraction
-        with patch('app.tasks.extraction.settings') as mock_settings:
+        with patch("app.tasks.extraction.settings") as mock_settings:
             mock_settings.postgres_dsn = settings.postgres_dsn
             mock_settings.file_storage_base = str(tmp_path / "storage")
             extract_images_from_report(str(report_id))

@@ -62,12 +62,12 @@ async def get_current_user(
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail=f"Invalid token: {str(e)}",
-        )
-    except ValueError:
+        ) from e
+    except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid token: malformed user ID",
-        )
+        ) from e
 
     # Get user from database
     user = await get_user_by_id(db, user_id)

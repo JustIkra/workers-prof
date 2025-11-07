@@ -39,7 +39,7 @@ async def upload_weight_table(
     try:
         return await service.upload_weight_table(payload)
     except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
 
 @router.get(
@@ -64,7 +64,7 @@ async def list_weight_tables(
     try:
         return await service.list_weight_tables(prof_activity_code=prof_activity_code)
     except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
 
 @router.post(
@@ -87,4 +87,4 @@ async def activate_weight_table(
     try:
         return await service.activate_weight_table(weight_table_id)
     except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc

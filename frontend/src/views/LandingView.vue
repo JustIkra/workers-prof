@@ -6,15 +6,24 @@
         <div class="logo-large">
           <span class="logo-icon">ЦМ</span>
         </div>
-        <h1 class="hero-title">Цифровая модель управления компетенциями</h1>
+        <h1 class="hero-title">
+          Цифровая модель управления компетенциями
+        </h1>
         <p class="hero-subtitle">
           Профессиональная система оценки пригодности и развития персонала
         </p>
         <div class="hero-actions">
-          <el-button type="primary" size="large" @click="router.push('/login')">
+          <el-button
+            type="primary"
+            size="large"
+            @click="router.push('/login')"
+          >
             Войти в систему
           </el-button>
-          <el-button size="large" @click="router.push('/register')">
+          <el-button
+            size="large"
+            @click="router.push('/register')"
+          >
             Зарегистрироваться
           </el-button>
         </div>
@@ -24,11 +33,15 @@
     <!-- Features Section -->
     <section class="features">
       <div class="container">
-        <h2 class="section-title">Возможности системы</h2>
+        <h2 class="section-title">
+          Возможности системы
+        </h2>
         <div class="features-grid">
           <div class="feature-card">
             <div class="feature-icon">
-              <el-icon :size="40"><Document /></el-icon>
+              <el-icon :size="40">
+                <Document />
+              </el-icon>
             </div>
             <h3>Автоматическая обработка отчётов</h3>
             <p>
@@ -39,7 +52,9 @@
 
           <div class="feature-card">
             <div class="feature-icon">
-              <el-icon :size="40"><DataAnalysis /></el-icon>
+              <el-icon :size="40">
+                <DataAnalysis />
+              </el-icon>
             </div>
             <h3>Расчёт профессиональной пригодности</h3>
             <p>
@@ -50,7 +65,9 @@
 
           <div class="feature-card">
             <div class="feature-icon">
-              <el-icon :size="40"><TrendCharts /></el-icon>
+              <el-icon :size="40">
+                <TrendCharts />
+              </el-icon>
             </div>
             <h3>Персонализированные рекомендации</h3>
             <p>
@@ -61,7 +78,9 @@
 
           <div class="feature-card">
             <div class="feature-icon">
-              <el-icon :size="40"><User /></el-icon>
+              <el-icon :size="40">
+                <User />
+              </el-icon>
             </div>
             <h3>Управление участниками</h3>
             <p>
@@ -72,7 +91,9 @@
 
           <div class="feature-card">
             <div class="feature-icon">
-              <el-icon :size="40"><SetUp /></el-icon>
+              <el-icon :size="40">
+                <SetUp />
+              </el-icon>
             </div>
             <h3>Гибкие весовые коэффициенты</h3>
             <p>
@@ -83,7 +104,9 @@
 
           <div class="feature-card">
             <div class="feature-icon">
-              <el-icon :size="40"><Finished /></el-icon>
+              <el-icon :size="40">
+                <Finished />
+              </el-icon>
             </div>
             <h3>Итоговые отчёты</h3>
             <p>
@@ -98,28 +121,44 @@
     <!-- Process Section -->
     <section class="process">
       <div class="container">
-        <h2 class="section-title">Как это работает</h2>
+        <h2 class="section-title">
+          Как это работает
+        </h2>
         <div class="process-steps">
           <div class="process-step">
-            <div class="step-number">1</div>
+            <div class="step-number">
+              1
+            </div>
             <h3>Загрузка данных</h3>
             <p>Загрузите отчёты участников в систему</p>
           </div>
-          <div class="process-arrow">→</div>
+          <div class="process-arrow">
+            →
+          </div>
           <div class="process-step">
-            <div class="step-number">2</div>
+            <div class="step-number">
+              2
+            </div>
             <h3>Извлечение метрик</h3>
             <p>Автоматическое распознавание показателей</p>
           </div>
-          <div class="process-arrow">→</div>
+          <div class="process-arrow">
+            →
+          </div>
           <div class="process-step">
-            <div class="step-number">3</div>
+            <div class="step-number">
+              3
+            </div>
             <h3>Расчёт оценки</h3>
             <p>Вычисление профессиональной пригодности</p>
           </div>
-          <div class="process-arrow">→</div>
+          <div class="process-arrow">
+            →
+          </div>
           <div class="process-step">
-            <div class="step-number">4</div>
+            <div class="step-number">
+              4
+            </div>
             <h3>Рекомендации</h3>
             <p>Получение персонализированных советов</p>
           </div>
@@ -130,30 +169,62 @@
     <!-- Benefits Section -->
     <section class="benefits">
       <div class="container">
-        <h2 class="section-title">Преимущества</h2>
+        <h2 class="section-title">
+          Преимущества
+        </h2>
         <div class="benefits-grid">
           <div class="benefit-item">
-            <el-icon :size="24" color="#00798D"><CircleCheck /></el-icon>
+            <el-icon
+              :size="24"
+              color="#00798D"
+            >
+              <CircleCheck />
+            </el-icon>
             <span>Автоматизация оценки персонала</span>
           </div>
           <div class="benefit-item">
-            <el-icon :size="24" color="#00798D"><CircleCheck /></el-icon>
+            <el-icon
+              :size="24"
+              color="#00798D"
+            >
+              <CircleCheck />
+            </el-icon>
             <span>Объективность и прозрачность критериев</span>
           </div>
           <div class="benefit-item">
-            <el-icon :size="24" color="#00798D"><CircleCheck /></el-icon>
+            <el-icon
+              :size="24"
+              color="#00798D"
+            >
+              <CircleCheck />
+            </el-icon>
             <span>Сокращение времени на обработку данных</span>
           </div>
           <div class="benefit-item">
-            <el-icon :size="24" color="#00798D"><CircleCheck /></el-icon>
+            <el-icon
+              :size="24"
+              color="#00798D"
+            >
+              <CircleCheck />
+            </el-icon>
             <span>Централизованное хранение информации</span>
           </div>
           <div class="benefit-item">
-            <el-icon :size="24" color="#00798D"><CircleCheck /></el-icon>
+            <el-icon
+              :size="24"
+              color="#00798D"
+            >
+              <CircleCheck />
+            </el-icon>
             <span>Поддержка нескольких типов отчётов</span>
           </div>
           <div class="benefit-item">
-            <el-icon :size="24" color="#00798D"><CircleCheck /></el-icon>
+            <el-icon
+              :size="24"
+              color="#00798D"
+            >
+              <CircleCheck />
+            </el-icon>
             <span>Версионирование весовых коэффициентов</span>
           </div>
         </div>
@@ -166,10 +237,17 @@
         <h2>Готовы начать?</h2>
         <p>Зарегистрируйтесь в системе и получите доступ к функционалу оценки компетенций</p>
         <div class="cta-actions">
-          <el-button type="primary" size="large" @click="router.push('/register')">
+          <el-button
+            type="primary"
+            size="large"
+            @click="router.push('/register')"
+          >
             Зарегистрироваться
           </el-button>
-          <el-button size="large" @click="router.push('/login')">
+          <el-button
+            size="large"
+            @click="router.push('/login')"
+          >
             Войти
           </el-button>
         </div>

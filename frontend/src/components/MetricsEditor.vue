@@ -12,8 +12,18 @@
           Редактировать
         </el-button>
         <div v-else>
-          <el-button size="small" @click="cancelEditing">Отмена</el-button>
-          <el-button type="primary" size="small" @click="saveMetrics" :loading="saving">
+          <el-button
+            size="small"
+            @click="cancelEditing"
+          >
+            Отмена
+          </el-button>
+          <el-button
+            type="primary"
+            size="small"
+            :loading="saving"
+            @click="saveMetrics"
+          >
             Сохранить
           </el-button>
         </div>
@@ -25,8 +35,8 @@
       type="error"
       :title="error"
       closable
-      @close="error = null"
       style="margin-bottom: 16px;"
+      @close="error = null"
     />
 
     <el-alert
@@ -68,7 +78,10 @@
               style="width: 100%;"
               placeholder="Введите значение"
             />
-            <div v-if="metricDef.description" class="metric-description">
+            <div
+              v-if="metricDef.description"
+              class="metric-description"
+            >
               {{ metricDef.description }}
             </div>
           </el-form-item>
@@ -76,7 +89,10 @@
       </el-row>
     </el-form>
 
-    <div v-if="metrics && metrics.length > 0" class="metrics-info">
+    <div
+      v-if="metrics && metrics.length > 0"
+      class="metrics-info"
+    >
       <el-divider />
       <div class="info-row">
         <span class="info-label">Источник данных:</span>
@@ -90,7 +106,10 @@
           {{ getSourceLabel(source) }}
         </el-tag>
       </div>
-      <div class="info-row" v-if="lastUpdated">
+      <div
+        v-if="lastUpdated"
+        class="info-row"
+      >
         <span class="info-label">Последнее обновление:</span>
         <span>{{ formatDate(lastUpdated) }}</span>
       </div>

@@ -16,6 +16,12 @@ Follow Python 3.12 conventions with 4-space indentation. Use `ruff` as the autho
 ## Testing Guidelines
 Tests use `pytest` with async support; discovery targets files named `test_*.py` and classes beginning with `Test`. Mark integration cases with `@pytest.mark.integration` and run them explicitly (`pytest -m integration`) to avoid external dependencies during quick checks. Aim for meaningful coverage on `app/` packages and document new markers in `pytest.ini` if introduced.
 
+**CRITICAL**: Never ignore or skip failing tests. If tests fail:
+1. Fix the root cause (bugs, missing fixtures, incorrect assertions)
+2. Update test expectations if requirements changed (with justification)
+3. If absolutely blocked, create a separate ticket and document the issue
+4. Do NOT use `--ignore`, `pytest.mark.skip`, or modify `pytest.ini` to hide failures
+
 ## Commit & Pull Request Guidelines
 The project follows Conventional Commits (`type(scope): description`), as seen in recent history (`feat(foundation)`, `chore(security)`). Keep summaries imperative and under 72 characters. Pull requests should describe user impact, list key tests (`pytest`, `ruff`, `black --check`), and reference related issues. Include screenshots or HTTP examples when modifying API responses. Ensure migrations are included and documented whenever database schemas change.
 

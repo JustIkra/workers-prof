@@ -9,21 +9,21 @@ import logging
 import threading
 import time
 import uuid
-from datetime import datetime, timezone
-from typing import Any, Coroutine, Optional
+from collections.abc import Coroutine
+from datetime import UTC, datetime
+from typing import Any
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
-from sqlalchemy.orm import sessionmaker, selectinload
+from sqlalchemy.orm import selectinload, sessionmaker
 
 from app.core.celery_app import celery_app
 from app.core.config import Settings
 from app.core.logging import log_context
-from app.db.models import FileRef, Report, ReportImage
+from app.db.models import FileRef, Report
 from app.repositories.report_image import ReportImageRepository
 from app.services.docx_extraction import DocxExtractionError, DocxImageExtractor
 from app.services.storage import LocalReportStorage
-
 
 logger = logging.getLogger(__name__)
 
@@ -45,8 +45,8 @@ AsyncSessionLocal = sessionmaker(
 
 
 # Background loop for nested execution (tests running inside existing loop)
-_TASK_LOOP: Optional[asyncio.AbstractEventLoop] = None
-_TASK_LOOP_THREAD: Optional[threading.Thread] = None
+_TASK_LOOP: asyncio.AbstractEventLoop | None = None
+_TASK_LOOP_THREAD: threading.Thread | None = None
 _TASK_LOOP_LOCK = threading.Lock()
 
 
@@ -214,7 +214,7 @@ def extract_images_from_report(self, report_id: str, request_id: str | None = No
 
                 # 5. Update report status
                 report.status = "EXTRACTED"
-                report.extracted_at = datetime.now(timezone.utc)
+                report.extracted_at = datetime.now(UTC)
                 report.extract_error = None
 
                 await session.commit()

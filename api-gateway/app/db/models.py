@@ -7,7 +7,7 @@ Based on data-model.md ER diagram.
 
 import uuid
 from datetime import date, datetime
-from typing import Any, Literal
+from typing import Any
 
 import sqlalchemy as sa
 from sqlalchemy import (
@@ -20,8 +20,8 @@ from sqlalchemy import (
     Integer,
     String,
     Text,
-    text,
     UniqueConstraint,
+    text,
 )
 from sqlalchemy.dialects.postgresql import JSONB, TIMESTAMP, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -59,9 +59,7 @@ class User(Base):
     # Constraints
     __table_args__ = (
         CheckConstraint("role IN ('ADMIN', 'USER')", name="user_role_check"),
-        CheckConstraint(
-            "status IN ('PENDING', 'ACTIVE', 'DISABLED')", name="user_status_check"
-        ),
+        CheckConstraint("status IN ('PENDING', 'ACTIVE', 'DISABLED')", name="user_status_check"),
     )
 
     def __repr__(self) -> str:
@@ -128,7 +126,9 @@ class FileRef(Base):
     )
 
     def __repr__(self) -> str:
-        return f"<FileRef(id={self.id}, storage={self.storage}, bucket={self.bucket}, key={self.key})>"
+        return (
+            f"<FileRef(id={self.id}, storage={self.storage}, bucket={self.bucket}, key={self.key})>"
+        )
 
 
 # ===== Report Table =====
@@ -174,9 +174,7 @@ class Report(Base):
 
     # Constraints
     __table_args__ = (
-        CheckConstraint(
-            "type IN ('REPORT_1', 'REPORT_2', 'REPORT_3')", name="report_type_check"
-        ),
+        CheckConstraint("type IN ('REPORT_1', 'REPORT_2', 'REPORT_3')", name="report_type_check"),
         CheckConstraint(
             "status IN ('UPLOADED', 'EXTRACTED', 'FAILED')", name="report_status_check"
         ),
@@ -280,9 +278,7 @@ class WeightTable(Base):
     )
     version: Mapped[int] = mapped_column(Integer, nullable=False)
     weights: Mapped[list[dict[str, Any]]] = mapped_column(JSONB, nullable=False)
-    metadata_json: Mapped[dict[str, Any] | None] = mapped_column(
-        "metadata", JSONB, nullable=True
-    )
+    metadata_json: Mapped[dict[str, Any] | None] = mapped_column("metadata", JSONB, nullable=True)
     is_active: Mapped[bool] = mapped_column(
         Boolean,
         nullable=False,
@@ -295,7 +291,9 @@ class WeightTable(Base):
         server_default=text("now()"),
     )
 
-    prof_activity: Mapped["ProfActivity"] = relationship("ProfActivity", back_populates="weight_tables")
+    prof_activity: Mapped["ProfActivity"] = relationship(
+        "ProfActivity", back_populates="weight_tables"
+    )
 
     __table_args__ = (
         UniqueConstraint(
@@ -337,7 +335,9 @@ class MetricDef(Base):
     unit: Mapped[str | None] = mapped_column(String(50), nullable=True)
     min_value: Mapped[float | None] = mapped_column(sa.Numeric(10, 2), nullable=True)
     max_value: Mapped[float | None] = mapped_column(sa.Numeric(10, 2), nullable=True)
-    active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default=text("true"))
+    active: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=True, server_default=text("true")
+    )
 
     # Relationships
     extracted_metrics: Mapped[list["ExtractedMetric"]] = relationship(

@@ -17,6 +17,17 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from app.core.config import settings, validate_config
 from app.core.middleware import RequestContextMiddleware
+from app.routers import (
+    admin,
+    auth,
+    metrics,
+    participants,
+    prof_activities,
+    reports,
+    scoring,
+    vpn,
+    weights,
+)
 
 logger = logging.getLogger("app.lifespan")
 
@@ -117,8 +128,6 @@ async def healthz():
 
 # ===== Register Routers =====
 # IMPORTANT: Register API routers BEFORE StaticFiles mount
-from app.routers import admin, auth, metrics, participants, prof_activities, reports, scoring, weights, vpn
-
 app.include_router(auth.router, prefix="/api/auth", tags=["Auth"])
 app.include_router(admin.router, prefix="/api/admin", tags=["Admin"])
 app.include_router(participants.router, prefix="/api")
@@ -160,6 +169,7 @@ async def spa_fallback(request: Request, full_path: str):
     if full_path.startswith("api/"):
         # This will be caught by FastAPI's default 404 handler
         from fastapi import HTTPException
+
         raise HTTPException(status_code=404, detail="API endpoint not found")
 
     # For all other paths, serve index.html for SPA routing

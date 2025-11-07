@@ -105,7 +105,9 @@ async def list_metric_defs(
     """
     repo = MetricDefRepository(db)
     metrics = await repo.list_all(active_only=active_only)
-    return MetricDefListResponse(items=[MetricDefResponse.model_validate(m) for m in metrics], total=len(metrics))
+    return MetricDefListResponse(
+        items=[MetricDefResponse.model_validate(m) for m in metrics], total=len(metrics)
+    )
 
 
 @router.get("/metric-defs/{metric_def_id}", response_model=MetricDefResponse)
@@ -124,7 +126,9 @@ async def get_metric_def(
     repo = MetricDefRepository(db)
     metric_def = await repo.get_by_id(metric_def_id)
     if not metric_def:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Metric definition not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Metric definition not found"
+        )
     return MetricDefResponse.model_validate(metric_def)
 
 
@@ -155,7 +159,9 @@ async def update_metric_def(
         active=request.active,
     )
     if not metric_def:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Metric definition not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Metric definition not found"
+        )
     return MetricDefResponse.model_validate(metric_def)
 
 
@@ -177,7 +183,9 @@ async def delete_metric_def(
     repo = MetricDefRepository(db)
     success = await repo.delete(metric_def_id)
     if not success:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Metric definition not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Metric definition not found"
+        )
     return MessageResponse(message="Metric definition deleted successfully")
 
 
@@ -211,7 +219,11 @@ async def list_extracted_metrics(
     )
 
 
-@router.post("/reports/{report_id}/metrics", response_model=ExtractedMetricResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/reports/{report_id}/metrics",
+    response_model=ExtractedMetricResponse,
+    status_code=status.HTTP_201_CREATED,
+)
 async def create_or_update_extracted_metric(
     report_id: UUID,
     request: ExtractedMetricCreateRequest,
@@ -245,7 +257,9 @@ async def create_or_update_extracted_metric(
     metric_def_repo = MetricDefRepository(db)
     metric_def = await metric_def_repo.get_by_id(request.metric_def_id)
     if not metric_def:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Metric definition not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Metric definition not found"
+        )
 
     # Validate value against metric_def range
     if metric_def.min_value is not None and request.value < metric_def.min_value:
@@ -354,7 +368,9 @@ async def update_extracted_metric(
     repo = ExtractedMetricRepository(db)
     extracted_metric = await repo.get_by_report_and_metric(report_id, metric_def_id)
     if not extracted_metric:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Extracted metric not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Extracted metric not found"
+        )
 
     # Validate value against metric_def range
     metric_def = extracted_metric.metric_def
@@ -395,5 +411,7 @@ async def delete_extracted_metric(
     repo = ExtractedMetricRepository(db)
     success = await repo.delete(extracted_metric_id)
     if not success:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Extracted metric not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Extracted metric not found"
+        )
     return MessageResponse(message="Extracted metric deleted successfully")

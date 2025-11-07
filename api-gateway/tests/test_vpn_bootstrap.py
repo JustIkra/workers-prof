@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import List
 
 import pytest
 
@@ -73,13 +72,15 @@ def test_bootstrap_from_env_calls_helper(monkeypatch: pytest.MonkeyPatch, tmp_pa
     assert configured["route"] == fake_default_route()
 
 
-def test_ensure_wireguard_up_skips_when_interface_ready(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_ensure_wireguard_up_skips_when_interface_ready(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     cfg = tmp_path / "wg0.conf"
     cfg.write_text("[Interface]\n")
 
     monkeypatch.setattr(vpn.shutil, "which", lambda name: f"/usr/bin/{name}")
 
-    calls: List[List[str]] = []
+    calls: list[list[str]] = []
 
     def fake_run(cmd, capture_output=True, text=True):
         calls.append(cmd)
@@ -96,13 +97,15 @@ def test_ensure_wireguard_up_skips_when_interface_ready(monkeypatch: pytest.Monk
     assert calls and calls[0][0] == "ip"
 
 
-def test_ensure_wireguard_up_invokes_wg_quick(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_ensure_wireguard_up_invokes_wg_quick(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     cfg = tmp_path / "wg0.conf"
     cfg.write_text("[Interface]\n")
 
     monkeypatch.setattr(vpn.shutil, "which", lambda name: f"/usr/bin/{name}")
 
-    calls: List[List[str]] = []
+    calls: list[list[str]] = []
     ip_invocations = 0
 
     def fake_run(cmd, capture_output=True, text=True):
@@ -125,7 +128,9 @@ def test_ensure_wireguard_up_invokes_wg_quick(monkeypatch: pytest.MonkeyPatch, t
     assert ip_invocations >= 2
 
 
-def test_ensure_wireguard_up_raises_when_wg_quick_fails(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_ensure_wireguard_up_raises_when_wg_quick_fails(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     cfg = tmp_path / "wg0.conf"
     cfg.write_text("[Interface]\n")
 

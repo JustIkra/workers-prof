@@ -13,8 +13,8 @@ from app.schemas.vpn import (
     InterfaceStatus,
     RouteEntry,
     VpnHealthStatus,
-    WireGuardOverview,
     VpnPeer,
+    WireGuardOverview,
 )
 from app.services import vpn_health as service
 from main import app

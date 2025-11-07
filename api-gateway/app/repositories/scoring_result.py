@@ -5,7 +5,6 @@ Handles all database operations for scoring results.
 """
 
 from decimal import Decimal
-from typing import Optional
 from uuid import UUID
 
 from sqlalchemy import select
@@ -26,10 +25,10 @@ class ScoringResultRepository:
         participant_id: UUID,
         weight_table_id: UUID,
         score_pct: Decimal,
-        strengths: Optional[list[dict]] = None,
-        dev_areas: Optional[list[dict]] = None,
-        recommendations: Optional[list[dict]] = None,
-        compute_notes: Optional[str] = None,
+        strengths: list[dict] | None = None,
+        dev_areas: list[dict] | None = None,
+        recommendations: list[dict] | None = None,
+        compute_notes: str | None = None,
     ) -> ScoringResult:
         """
         Create a new scoring result.
@@ -60,7 +59,7 @@ class ScoringResultRepository:
         await self.db.refresh(scoring_result)
         return scoring_result
 
-    async def get_by_id(self, scoring_result_id: UUID) -> Optional[ScoringResult]:
+    async def get_by_id(self, scoring_result_id: UUID) -> ScoringResult | None:
         """
         Get a scoring result by ID.
 
@@ -107,7 +106,7 @@ class ScoringResultRepository:
 
     async def get_latest_by_participant_and_weight_table(
         self, participant_id: UUID, weight_table_id: UUID
-    ) -> Optional[ScoringResult]:
+    ) -> ScoringResult | None:
         """
         Get the latest scoring result for a participant and weight table.
 

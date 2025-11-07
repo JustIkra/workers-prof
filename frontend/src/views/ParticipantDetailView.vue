@@ -1,14 +1,25 @@
 <template>
   <app-layout>
-    <div class="participant-detail" v-loading="loading">
+    <div
+      v-loading="loading"
+      class="participant-detail"
+    >
       <!-- Participant Info Card -->
-      <el-card v-if="participant" class="detail-card">
+      <el-card
+        v-if="participant"
+        class="detail-card"
+      >
         <template #header>
           <div class="card-header">
             <h2>{{ participant.full_name }}</h2>
             <div class="header-actions">
-              <el-button @click="router.back()">Назад</el-button>
-              <el-button type="primary" @click="showScoringDialog = true">
+              <el-button @click="router.back()">
+                Назад
+              </el-button>
+              <el-button
+                type="primary"
+                @click="showScoringDialog = true"
+              >
                 <el-icon><TrendCharts /></el-icon>
                 Рассчитать пригодность
               </el-button>
@@ -16,8 +27,13 @@
           </div>
         </template>
 
-        <el-descriptions :column="2" border>
-          <el-descriptions-item label="ФИО">{{ participant.full_name }}</el-descriptions-item>
+        <el-descriptions
+          :column="2"
+          border
+        >
+          <el-descriptions-item label="ФИО">
+            {{ participant.full_name }}
+          </el-descriptions-item>
           <el-descriptions-item label="Дата рождения">
             {{ participant.birth_date || 'Не указана' }}
           </el-descriptions-item>
@@ -35,42 +51,68 @@
         <template #header>
           <div class="section-header">
             <h3>Отчёты</h3>
-            <el-button type="primary" @click="showUploadDialog = true">
+            <el-button
+              type="primary"
+              @click="showUploadDialog = true"
+            >
               <el-icon><Upload /></el-icon>
               Загрузить отчёт
             </el-button>
           </div>
         </template>
 
-        <el-table :data="reports" stripe v-loading="loadingReports">
-          <el-table-column prop="report_type" label="Тип" width="120">
+        <el-table
+          v-loading="loadingReports"
+          :data="reports"
+          stripe
+        >
+          <el-table-column
+            prop="report_type"
+            label="Тип"
+            width="120"
+          >
             <template #default="{ row }">
               <el-tag>{{ formatReportType(row.report_type) }}</el-tag>
             </template>
           </el-table-column>
-          <el-table-column prop="status" label="Статус" width="150">
+          <el-table-column
+            prop="status"
+            label="Статус"
+            width="150"
+          >
             <template #default="{ row }">
               <el-tag :type="getStatusType(row.status)">
                 {{ formatStatus(row.status) }}
               </el-tag>
             </template>
           </el-table-column>
-          <el-table-column prop="created_at" label="Дата загрузки" width="180">
+          <el-table-column
+            prop="created_at"
+            label="Дата загрузки"
+            width="180"
+          >
             <template #default="{ row }">
               {{ formatDate(row.created_at) }}
             </template>
           </el-table-column>
-          <el-table-column label="Действия" width="400" fixed="right">
+          <el-table-column
+            label="Действия"
+            width="400"
+            fixed="right"
+          >
             <template #default="{ row }">
-              <el-button size="small" @click="downloadReport(row.id)">
+              <el-button
+                size="small"
+                @click="downloadReport(row.id)"
+              >
                 <el-icon><Download /></el-icon>
                 Скачать
               </el-button>
               <el-button
                 size="small"
                 type="primary"
-                @click="extractMetrics(row.id)"
                 :disabled="row.status === 'EXTRACTED'"
+                @click="extractMetrics(row.id)"
               >
                 <el-icon><DataAnalysis /></el-icon>
                 Извлечь метрики
@@ -83,7 +125,11 @@
                 <el-icon><View /></el-icon>
                 Метрики
               </el-button>
-              <el-button size="small" type="danger" @click="confirmDeleteReport(row)">
+              <el-button
+                size="small"
+                type="danger"
+                @click="confirmDeleteReport(row)"
+              >
                 <el-icon><Delete /></el-icon>
                 Удалить
               </el-button>
@@ -91,11 +137,17 @@
           </el-table-column>
         </el-table>
 
-        <el-empty v-if="!reports.length && !loadingReports" description="Нет загруженных отчётов" />
+        <el-empty
+          v-if="!reports.length && !loadingReports"
+          description="Нет загруженных отчётов"
+        />
       </el-card>
 
       <!-- Scoring Results Section -->
-      <el-card class="section-card" v-if="scoringResults.length > 0">
+      <el-card
+        v-if="scoringResults.length > 0"
+        class="section-card"
+      >
         <template #header>
           <h3>История оценок пригодности</h3>
         </template>
@@ -112,33 +164,56 @@
               <div class="scoring-result">
                 <div class="score-value">
                   <span class="score-number">{{ result.score_pct }}%</span>
-                  <el-progress :percentage="result.score_pct" :status="getScoreStatus(result.score_pct)" />
+                  <el-progress
+                    :percentage="result.score_pct"
+                    :status="getScoreStatus(result.score_pct)"
+                  />
                 </div>
                 <div class="score-details">
                   <div class="score-section">
                     <h5>Сильные стороны:</h5>
                     <ul v-if="result.strengths && result.strengths.length">
-                      <li v-for="(strength, idx) in result.strengths" :key="idx">
+                      <li
+                        v-for="(strength, idx) in result.strengths"
+                        :key="idx"
+                      >
                         <strong>{{ strength.metric_name }}</strong> — {{ formatFromApi(strength.value) }}
                         (вес {{ formatFromApi(strength.weight, 2) }})
                       </li>
                     </ul>
-                    <el-empty v-else description="Нет данных" :image-size="60" />
+                    <el-empty
+                      v-else
+                      description="Нет данных"
+                      :image-size="60"
+                    />
                   </div>
                   <div class="score-section">
                     <h5>Зоны развития:</h5>
                     <ul v-if="result.dev_areas && result.dev_areas.length">
-                      <li v-for="(area, idx) in result.dev_areas" :key="idx">
+                      <li
+                        v-for="(area, idx) in result.dev_areas"
+                        :key="idx"
+                      >
                         <strong>{{ area.metric_name }}</strong> — {{ formatFromApi(area.value) }}
                         (вес {{ formatFromApi(area.weight, 2) }})
                       </li>
                     </ul>
-                    <el-empty v-else description="Нет данных" :image-size="60" />
+                    <el-empty
+                      v-else
+                      description="Нет данных"
+                      :image-size="60"
+                    />
                   </div>
-                  <div class="score-section" v-if="result.recommendations && result.recommendations.length">
+                  <div
+                    v-if="result.recommendations && result.recommendations.length"
+                    class="score-section"
+                  >
                     <h5>Рекомендации:</h5>
                     <ul>
-                      <li v-for="(rec, idx) in result.recommendations" :key="idx">
+                      <li
+                        v-for="(rec, idx) in result.recommendations"
+                        :key="idx"
+                      >
                         {{ rec }}
                       </li>
                     </ul>
@@ -151,16 +226,44 @@
       </el-card>
 
       <!-- Upload Dialog -->
-      <el-dialog v-model="showUploadDialog" title="Загрузить отчёт" width="500px">
-        <el-form ref="uploadFormRef" :model="uploadForm" :rules="uploadRules" label-position="top">
-          <el-form-item label="Тип отчёта" prop="report_type">
-            <el-select v-model="uploadForm.report_type" placeholder="Выберите тип" style="width: 100%">
-              <el-option label="Отчёт 1" value="REPORT_1" />
-              <el-option label="Отчёт 2" value="REPORT_2" />
-              <el-option label="Отчёт 3" value="REPORT_3" />
+      <el-dialog
+        v-model="showUploadDialog"
+        title="Загрузить отчёт"
+        width="500px"
+      >
+        <el-form
+          ref="uploadFormRef"
+          :model="uploadForm"
+          :rules="uploadRules"
+          label-position="top"
+        >
+          <el-form-item
+            label="Тип отчёта"
+            prop="report_type"
+          >
+            <el-select
+              v-model="uploadForm.report_type"
+              placeholder="Выберите тип"
+              style="width: 100%"
+            >
+              <el-option
+                label="Отчёт 1"
+                value="REPORT_1"
+              />
+              <el-option
+                label="Отчёт 2"
+                value="REPORT_2"
+              />
+              <el-option
+                label="Отчёт 3"
+                value="REPORT_3"
+              />
             </el-select>
           </el-form-item>
-          <el-form-item label="Файл (DOCX)" prop="file">
+          <el-form-item
+            label="Файл (DOCX)"
+            prop="file"
+          >
             <el-upload
               ref="uploadRef"
               :auto-upload="false"
@@ -169,30 +272,50 @@
               :on-change="handleFileChange"
               :file-list="fileList"
             >
-              <el-button type="primary">Выбрать файл</el-button>
+              <el-button type="primary">
+                Выбрать файл
+              </el-button>
               <template #tip>
-                <div class="el-upload__tip">Только файлы DOCX, максимум 20 МБ</div>
+                <div class="el-upload__tip">
+                  Только файлы DOCX, максимум 20 МБ
+                </div>
               </template>
             </el-upload>
           </el-form-item>
         </el-form>
         <template #footer>
-          <el-button @click="showUploadDialog = false">Отмена</el-button>
-          <el-button type="primary" :loading="uploading" @click="handleUpload">
+          <el-button @click="showUploadDialog = false">
+            Отмена
+          </el-button>
+          <el-button
+            type="primary"
+            :loading="uploading"
+            @click="handleUpload"
+          >
             Загрузить
           </el-button>
         </template>
       </el-dialog>
 
       <!-- Scoring Dialog -->
-      <el-dialog v-model="showScoringDialog" title="Рассчитать профессиональную пригодность" width="500px">
-        <el-form :model="scoringForm" label-position="top">
-          <el-form-item label="Профессиональная область" required>
+      <el-dialog
+        v-model="showScoringDialog"
+        title="Рассчитать профессиональную пригодность"
+        width="500px"
+      >
+        <el-form
+          :model="scoringForm"
+          label-position="top"
+        >
+          <el-form-item
+            label="Профессиональная область"
+            required
+          >
             <el-select
               v-model="scoringForm.activityCode"
+              v-loading="loadingActivities"
               placeholder="Выберите область"
               style="width: 100%"
-              v-loading="loadingActivities"
             >
               <el-option
                 v-for="activity in profActivities"
@@ -223,12 +346,14 @@
           />
         </el-form>
         <template #footer>
-          <el-button @click="showScoringDialog = false">Отмена</el-button>
+          <el-button @click="showScoringDialog = false">
+            Отмена
+          </el-button>
           <el-button
             type="primary"
             :loading="calculating"
-            @click="calculateScoring"
             :disabled="!scoringForm.activityCode || reports.length === 0"
+            @click="calculateScoring"
           >
             Рассчитать
           </el-button>
@@ -236,7 +361,12 @@
       </el-dialog>
 
       <!-- Metrics Dialog -->
-      <el-dialog v-model="showMetricsDialog" title="Метрики отчёта" width="90%" top="5vh">
+      <el-dialog
+        v-model="showMetricsDialog"
+        title="Метрики отчёта"
+        width="90%"
+        top="5vh"
+      >
         <MetricsEditor
           v-if="currentReportId"
           :report-id="currentReportId"
