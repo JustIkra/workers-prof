@@ -65,6 +65,7 @@ def test_env(clean_env: None) -> dict[str, str]:
         "POSTGRES_DSN": "postgresql+asyncpg://test:test@localhost:5432/test_db",
         "REDIS_URL": "redis://localhost:6379/1",
         "RABBITMQ_URL": "amqp://guest:guest@localhost:5672//",
+        "GEMINI_API_KEYS": "test_dummy_key_for_testing",
     }
 
     # Apply to os.environ
@@ -85,6 +86,7 @@ def dev_env(clean_env: None) -> dict[str, str]:
         "ENV": "dev",
         "JWT_SECRET": "dev_secret_key",
         "POSTGRES_DSN": "postgresql+asyncpg://dev:dev@localhost:5432/dev_db",
+        "GEMINI_API_KEYS": "dev_dummy_key_for_testing",
     }
 
     os.environ.update(env)
@@ -104,6 +106,7 @@ def ci_env(clean_env: None) -> dict[str, str]:
         "ENV": "ci",
         "JWT_SECRET": "ci_secret_key",
         "POSTGRES_DSN": "postgresql+asyncpg://ci:ci@localhost:5432/ci_db",
+        "GEMINI_API_KEYS": "ci_dummy_key_for_testing",
     }
 
     os.environ.update(env)

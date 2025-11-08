@@ -92,6 +92,7 @@ jobs:
           JWT_SECRET: test_secret_key_for_testing_only
           POSTGRES_DSN: "postgresql+asyncpg://test:test@localhost:5432/test_db"
           REDIS_URL: "redis://localhost:6379/0"
+          GEMINI_API_KEYS: "test_dummy_key_for_ci"
         run: |
           pytest -v --cov=app --cov-report=xml --cov-report=html --cov-report=term-missing --cov-fail-under=60
 
@@ -205,6 +206,7 @@ jobs:
             -e ENV=test \
             -e JWT_SECRET=test_secret \
             -e POSTGRES_DSN=postgresql+asyncpg://test:test@localhost/test \
+            -e GEMINI_API_KEYS=test_dummy_key \
             workers-prof:test
 
           # Wait for app to start
