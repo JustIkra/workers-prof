@@ -44,6 +44,7 @@ ignore = [
 [tool.ruff.lint.per-file-ignores]
 "__init__.py" = ["F401"]  # unused imports in __init__.py
 "tests/*" = ["B011"]  # assert False warnings
+"tests/conftest.py" = ["E402"]  # module level imports after .env loading
 
 [tool.ruff.lint.isort]
 known-first-party = ["app"]

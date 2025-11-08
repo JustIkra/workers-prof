@@ -4,6 +4,23 @@ Pytest configuration and shared fixtures for api-gateway tests.
 
 import os
 from collections.abc import AsyncGenerator, Generator
+from pathlib import Path
+
+
+def _load_test_env() -> None:
+    """Load environment variables before importing app modules."""
+    from dotenv import load_dotenv
+
+    env_path = Path(__file__).parent.parent.parent / ".env"
+    if env_path.exists():
+        load_dotenv(env_path, override=False)
+    else:
+        env_path_local = Path(__file__).parent.parent / ".env"
+        if env_path_local.exists():
+            load_dotenv(env_path_local, override=False)
+
+
+_load_test_env()
 
 import pytest
 from httpx import ASGITransport, AsyncClient
@@ -126,7 +143,10 @@ async def test_db_engine():
     Also seeds prof_activity data for tests.
     """
     # Create async engine for test database
-    engine = create_async_engine(settings.postgres_dsn, echo=False)
+    # Use READ COMMITTED isolation to see committed changes immediately
+    engine = create_async_engine(
+        settings.postgres_dsn, echo=False, isolation_level="READ COMMITTED"
+    )
 
     # Create all tables and seed data
     async with engine.begin() as conn:

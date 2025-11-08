@@ -154,6 +154,9 @@ async def participant_with_full_data(db_session):
     # Activate weight table
     await weight_service.activate_weight_table(weight_table_response.id)
 
+    # Commit changes to make weight table available
+    await db_session.commit()
+
     # Now calculate score
     scoring_service = ScoringService(db_session)
     await scoring_service.calculate_score(

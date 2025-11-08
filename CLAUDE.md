@@ -1,250 +1,80 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+Guidance for Claude Code (claude.ai/code) when working inside this repository. Every instruction below reflects the **current** code layout so you do not rely on non-existent services.
 
-## Project Overview
+## Repository At A Glance
+- `api-gateway/`: FastAPI project plus Celery tasks. Important folders: `app/core` (settings, Celery bootstrap), `app/routers`, `app/services`, `app/repositories`, `app/tasks`, `app/db`, `tests/`.
+- `frontend/`: Vue 3 SPA (Vite, Pinia, Element Plus). Served by FastAPI via `StaticFiles`.
+- `.memory-base/`: Source of product docs (user stories, extraction prompts, architecture). Reference it instead of guessing requirements.
 
-Professional competency assessment system that:
-- Extracts numerical metrics from DOCX reports containing images/tables/charts via OCR (PaddleOCR) and AI fallback (Gemini Vision)
-- Calculates professional fitness scores using weighted metric tables
-- Generates personalized recommendations for career development
-- Manages participants, reports, and multi-version weight tables with full audit trail
+There is **no separate ai-request-sender repo or Flower deployment**. Celery workers import `api-gateway/app` code directly (`app/core/celery_app.py`).
 
-**Critical constraint**: Only extract NUMERICAL values from table cells/bar chart labels. Never use symbolic ratings like "++", "+", "-", "--".
+## Backend Stack & Commands
+- Python 3.11/3.12, FastAPI, SQLAlchemy 2 (async), Alembic, Pydantic v2, Celery (Redis/RabbitMQ), pytest + httpx.
+- Run dev API: `cd api-gateway && uvicorn main:app --reload --port 8000`.
+- Run Celery locally: `cd api-gateway && celery -A app.core.celery_app.celery_app worker -l info`.
+- Tests: `cd api-gateway && pytest`; lint: `ruff check app tests`; migrations: `alembic upgrade head`.
 
-## Tech Stack
+## Architecture Summary
+See `.memory-base/Tech details/infrastructure/*.md` for diagrams.
 
-**Backend**: Python 3.11, FastAPI, Pydantic v2, SQLAlchemy (async), PostgreSQL 15+, Alembic migrations
+1. User uploads `.docx` via FastAPI (`app/routers/reports.py`). File metadata stored in `FileRef`, physical file saved under `/app/storage` (LOCAL by default).
+2. API enqueues Celery task (`app/tasks/extraction.py::extract_images_from_report`) to extract tables-as-images → OCR → metric values.
+3. Extracted metrics live in `extracted_metric`. Scoring (`app/services/scoring.py`) pulls them together with `WeightTable` (weights stored as JSONB on the table record) to produce `scoring_result` plus strengths/dev areas.
+4. Final reports are exposed via participants router and HTML renderer (`app/services/report_template.py`).
 
-**AI/OCR**: PaddleOCR + PP-Structure (local), Gemini API (fallback for complex tables), python-docx, OpenCV, Pillow
+## Data Model Highlights (see `app/db/models.py`)
+- `user`, `participant`, `file_ref`, `report`, `report_image`, `metric_def`, `extracted_metric`, `prof_activity`, `weight_table`, `scoring_result`.
+- `weight_table.weights` is JSON (list of `{metric_code, weight}`); there is **no** `weight_row` table.
+- There are no `recommendation_def`/`recommendation_result` tables today; recommendations are stored directly on `scoring_result.recommendations` (JSONB).
 
-**Task Queue**: Celery workers (queues: ocr, normalize, vision), RabbitMQ broker, Redis backend, Flower monitoring
+## DOCX → Metric Pipeline (authoritative spec)
+Reference `.memory-base/Tech details/infrastructure/extraction-pipeline.md`, `.memory-base/Tech details/infrastructure/metric-mapping.md`, `.memory-base/Tech details/infrastructure/prompt-gemini-recommendations.md`.
 
-**Frontend**: Vue 3 (Composition API), Pinia, Element Plus (офисный стиль), Vite
+1. **Image extraction** (`app/services/docx_extraction.py`, `app/tasks/extraction.py`): unzip DOCX, pull `word/media/*` images, store as `ReportImage` + PNG snapshots under `/app/storage/reports/...`.
+2. **Pre-process**: OpenCV/Pillow (contrast, deskew, resize). Bar charts are sliced into row ROIs.
+3. **Local OCR**: PaddleOCR + PP-Structure. Collect `(text, bbox, confidence)` and keep only numeric tokens matching `^(?:10|[1-9])([,.][0-9])?$` within [1, 10]. Ignore legends, axes (“1…10”), and symbolic ratings (`++`, `--`, `+`, `-`).
+4. **Normalization**: Map header/label text to `MetricDef.code` via YAML config (see `metric-mapping.md`). Convert comma decimals to `Decimal`, validate ranges, and compute aggregate confidence.
+5. **Quality gates**: expected metric count per report, confidence ≥ 0.8, value ranges. Failed checks trigger Gemini fallback.
+6. **Gemini Vision fallback**: send cropped ROI through queue `vision` with strict JSON prompt (see `.memory-base/Tech details/infrastructure/prompt-gemini-recommendations.md`). Reject responses that exceed ranges or schema; retry or flag for manual validation.
+7. **Persist**: write to `extracted_metric` with `source` (`OCR` or `LLM`) and `confidence`; keep audit logs free of PII (store only IDs/paths).
+8. **Manual validation UI**: The frontend surfaces values plus images for human review. Never auto-fill uncertain data without flagging it.
 
-**SPA Serving**: FastAPI StaticFiles + fallback для клиентской маршрутизации (S1-10)
+## Gemini Usage Rules
+- Only send cropped table/bar regions—mask PII when possible.
+- Enforce numeric-only outputs (range 1–10). Strip text like «Зона интерпретации», «Низкая», percentage signs, etc., **before** handing data to the model.
+- Validate JSON on return; if parsing fails, re-issue the prompt or route to manual review rather than guessing.
+- Rate-limit via Celery queue `vision`; do not call Gemini directly from request handlers.
 
-**Storage**: Local volume (default), MinIO (optional S3-compatible)
+## Scoring Flow (`app/services/scoring.py`)
+1. Resolve `ProfActivity` by code and fetch its active `WeightTable`. Validate that the sum of weights equals `Decimal('1.0')`.
+2. Load `ExtractedMetric` values (latest per metric) and ensure every metric in the weight table exists; otherwise raise `ValueError` (“Missing extracted metrics…”).
+3. Compute `score_pct = Σ(value × weight) × 10` with `Decimal` quantized to `0.01`.
+4. Generate strengths/dev areas by sorting metric values; persist `ScoringResult` (history is append-only).
+5. Final report endpoint (`app/routers/participants.py#get_final_report`) uses `ScoringService.generate_final_report` to build JSON/HTML payloads.
 
-**Infrastructure**: Docker Compose, Nginx Proxy Manager (TLS at prof.labs-edu.ru)
+## FastAPI Routers
+- Auth: `app/routers/auth.py` (JWT login/register/refresh, ADMIN approval flow).
+- Participants & Reports: `app/routers/participants.py`, `app/routers/reports.py` (CRUD, uploads, final reports).
+- Metrics/Weights/Activities: `app/routers/metrics.py`, `weights.py`, `prof_activities.py`.
+- Scoring: `app/routers/scoring.py` (calculate scores, preview results).
+- Admin/VPN/VPN health: `app/routers/admin.py`, `vpn.py`.
 
-**Testing**: pytest + httpx (backend), Vitest + Playwright (frontend)
+Always wire dependencies through `app.core.dependencies` (DB session, current user). Do not instantiate sessions manually inside routers.
 
-## Key Architecture
+## Frontend Notes
+- Vite + Vue 3 (Composition API), Pinia stores per domain (`src/stores`).
+- Axios client is under `src/api/client.js` with `/api` base URL and 401 redirect to `/login`.
+- Element Plus with ru locale is initialised in `src/main.js`. UI tokens live in `api-gateway/static/assets/theme-tokens.css`.
 
-### Service Boundaries
+## Testing Expectations
+- Backend tests live in `api-gateway/tests/` (pytest, async fixtures). Respect markers defined in `pyproject.toml`.
+- Use Celery eager mode + SQLite/Temp storage fixtures supplied in `tests/conftest.py` (do not spin up external services unless running docker-compose integration tests).
+- Never skip failing tests without following the escalation path described in `AGENTS.md`.
 
-**api-gateway** (FastAPI)
-- REST API for participants, reports, weights, scoring
-- JWT authentication (OAuth2 Password), role-based access (ADMIN/USER)
-- Orchestrates Celery tasks for extraction pipeline
-- Returns downloadable DOCX reports and final assessment reports
-- **SPA serving**: StaticFiles для `/assets`, fallback на `index.html` для всех не-`/api` путей (S1-10)
+## Style & Process
+- Python formatting: `black` (line length 100) + `ruff`. Keep type hints.
+- Conventional Commits (`feat(scope): ...`).
+- Config comes from root `.env`. `app/core/config.py` already enforces required settings (JWT secret, Postgres, Gemini keys). Update `.env.example` if you add new variables.
 
-**ai-request-sender** (Celery workers)
-- Consumes queues: `ocr`, `normalize`, `vision`
-- Runs PaddleOCR locally; fallback to Gemini Vision for low-confidence cases
-- Direct DB writes via repository layer (shared with API)
-
-**frontend** (Vue SPA)
-- Served by FastAPI StaticFiles with SPA fallback (S1-10)
-- Офисный стиль: Element Plus, системные шрифты (Segoe UI), палитра #00798D
-- Communicates with api-gateway through `/api` prefix
-- Shared participant pool with search/filtering (no multi-tenancy in MVP)
-- Manual validation UI for extracted metrics
-- Лендинговая страница для клиентов с описанием функциональности
-
-### Data Model Core Tables
-
-See `.memory-base/Tech details/infrastructure/data-model.md` for full ER diagram.
-
-**user**: id, email, password_hash, role (ADMIN|USER), status (PENDING|ACTIVE|DISABLED)
-**participant**: id, full_name, birth_date, external_id
-**file_ref**: storage (LOCAL|MINIO), bucket, key, mime, size_bytes
-**report**: participant_id, type (REPORT_1|2|3), status (UPLOADED|EXTRACTED|FAILED), file_ref_id
-**report_image**: report_id, kind (TABLE|OTHER), file_ref_id, page, order_index
-**metric_def**: code (unique), name, unit, min_value, max_value, active
-**extracted_metric**: report_id, metric_def_id, value, source (OCR|LLM), confidence
-**prof_activity**: code, name, description
-**weight_table**: prof_activity_id, version, is_active, uploaded_by — only ONE active per activity
-**weight_row**: weight_table_id, metric_def_id, weight — sum of weights = 1.0 (validated)
-**scoring_result**: participant_id, weight_table_id, score_pct, strengths/dev_areas/recommendations (JSONB)
-**recommendation_def**: filters by metric/score ranges, text, link_url
-**recommendation_result**: links scoring_result to recommendation_def
-
-### Extraction Pipeline Flow
-
-See `.memory-base/Tech details/infrastructure/extraction-pipeline.md` for detailed steps.
-
-1. **Parse .docx** → extract images → save as `report_image` (kind=TABLE)
-2. **Preprocess**: OpenCV contrast/binarization, normalize DPI
-3. **Local OCR**: PaddleOCR + PP-Structure for table detection, extract text with bboxes
-4. **Normalize**: Map row headers to `metric_def.code`, filter only numeric labels in range [1,10]
-   - Regex: `^(?:10|[1-9])([,.][0-9])?$`
-   - **Forbidden**: tokens with "+", "-", "%", axis labels ("1…10"), zone text ("НИЗКАЯ", "ВЫСОКАЯ")
-5. **Quality check**: min_confidence threshold (e.g., 0.8); expected metric count; value ranges
-6. **Fallback**: On low confidence → Gemini Vision with structured JSON prompt
-7. **Save**: `extracted_metric` (value, source, confidence)
-8. **Manual validation UI**: Display extracted values with image overlay, allow edits
-
-**Bar chart extraction**:
-- Ignore legends/axes; work in per-row ROI: [left label] + [bar] + [numeric tag]
-- Cluster rows by Y-coordinate, pick highest-confidence digit per row
-- Filter bottom 15% of image to exclude axis "1..10"
-
-### Scoring Calculation
-
-1. Retrieve active `weight_table` for chosen `prof_activity`
-2. Compute weighted sum: `score_pct = Σ(metric_value × weight) × 10` (metrics in [1,10], weights sum to 1.0)
-3. Generate strengths (top metrics), development areas (low metrics), recommendations (filtered by `recommendation_def`)
-4. Save `scoring_result` with JSONB fields; historical results retained (append-only)
-
-### REST API Key Endpoints
-
-See `.memory-base/Tech details/infrastructure/service-boundaries.md`.
-
-- `POST /auth/register`, `POST /auth/login`
-- `GET/POST /participants`, `GET/PUT/DELETE /participants/{id}`
-- `GET /participants?query=...&page=...&size=...` — search/filter
-- `POST /participants/{id}/reports` — upload .docx
-- `GET /reports/{id}/download` — stream original file
-- `POST /reports/{id}/extract`, `GET /reports/{id}/metrics`
-- `GET/POST /weights`, `POST /weights/{id}/activate`
-- `POST /participants/{id}/score?activity=CODE`
-- `POST /reports/{id}/recommendations`
-- `GET /participants/{id}/final-report`
-
-## Development Guidelines
-
-See `.memory-base/Conventions/Development/development_guidelines.md`.
-
-**Backend**:
-- Layered architecture: `api/routers → services → repositories → models/schemas`
-- Pydantic v2 for request/response schemas; DTOs ≠ ORM models
-- Async I/O (asyncpg/SQLAlchemy async, httpx async)
-- PEP8, Black formatter, Ruff linter, mypy types (optional)
-- Config via Pydantic Settings and environment variables (`.env` local only, never commit secrets)
-- Map exceptions to HTTP errors via `HTTPException` or custom handlers
-
-**Frontend**:
-- Composition API, Pinia stores
-- Structure: `components/`, `views/`, `stores/`, `services/api/`
-- Route guards by role (ADMIN/USER)
-- TypeScript/Volar (optional)
-- **UI**: Element Plus (офисный стиль), CSS tokens в `api-gateway/static/assets/theme-tokens.css`
-- **Цветовая палитра**: Primary #00798D, офисные оттенки серого
-- **Типографика**: Segoe UI, Tahoma, Arial (системные шрифты)
-- **Доступность**: WCAG AA, ru-RU локализация
-- См. `.memory-base/Conventions/Frontend/frontend-requirements.md` для деталей
-
-**Git**:
-- Branches: `main` (stable), `feature/<name>`, `fix/<name>`, `chore/<name>`
-- Conventional Commits: `feat(scope):`, `fix(scope):`, `chore/build/docs/refactor/test/perf`
-- PR requires description, test checklist, no direct pushes to main
-
-## Testing Strategy
-
-See `.memory-base/Conventions/Testing/testing_guidelines.md`.
-
-**Levels**:
-- **Unit**: functions/services, no external deps, ≤200ms per test
-- **Integration**: DB/repositories/HTTP API (local containers), Celery eager mode
-- **E2E**: Playwright for critical flows (login → approve → upload → score → download)
-
-**Coverage targets** (MVP):
-- Backend overall ≥60%, critical modules (auth, scoring) ≥80%
-- E2E: 4 key scenarios, p95 ≤60s
-
-**Determinism rules**:
-- Freeze time/random/uuid with fixtures
-- Mock all external calls (Gemini, external HTTP)
-- Celery default: `task_always_eager=True`
-- Temp directory for file storage (not real MinIO)
-- Test naming: `test_<unit>__<context>__<expected>`
-- Structure: Arrange / Act / Assert (AAA)
-
-**Critical edge cases**:
-- Low DPI/compressed images, non-standard fonts
-- Bar charts without grid, only numeric labels; symbols "++/+/−/--" ignored
-- Corrupt/partial DOCX, duplicate uploads
-- Weight sum ≠1.0, missing active weight table
-
-**Files**:
-- Backend tests: `.memory-base/Conventions/Testing/backend.md`
-- Frontend tests: `.memory-base/Conventions/Testing/frontend.md`
-- Fixtures: `.memory-base/Conventions/Testing/fixtures.md`
-- E2E matrix: `.memory-base/Conventions/Testing/e2e-matrix.md`
-- CI gates: `.memory-base/Conventions/Testing/ci.md`
-
-## Common Commands
-
-*(Note: Actual implementation not yet present; these are anticipated based on tech stack)*
-
-```bash
-# Backend
-cd api-gateway  # or ai-request-sender
-pip install -r requirements.txt
-alembic upgrade head              # Run migrations
-uvicorn main:app --reload         # Start API dev server
-celery -A tasks worker -l info    # Start Celery worker
-pytest tests/                     # Run backend tests
-pytest --cov=app tests/           # Run with coverage
-ruff check .                      # Lint
-black .                           # Format
-
-# Frontend
-cd frontend
-npm install
-npm run dev                       # Start Vite dev server
-npm run test:unit                 # Vitest unit tests
-npm run test:e2e                  # Playwright E2E tests
-npm run build                     # Build for production
-
-# Infrastructure
-docker-compose up -d              # Start all services
-docker-compose logs -f api-gateway
-docker-compose down
-```
-
-## Security & Access Control
-
-- **Roles**: ADMIN (approve users, upload weights), USER (view/upload reports)
-- **Registration flow**: User registers → status=PENDING → ADMIN approves → status=ACTIVE
-- **Personal data**: Only ACTIVE users access participant data
-- **File storage**: Local volume by default (`reports/{participant_id}/{report_id}/...`); MinIO optional
-- **Secrets**: Never commit `.env`; use environment variables in containers
-- **OCR privacy**: Process locally; external Gemini calls only on fallback (minimize PII exposure)
-
-## Important Constraints
-
-1. **Numeric extraction only**: Extract numbers from table cells/bar labels in range [1,10]. Reject symbolic ratings ("++", "+", "-", "--").
-2. **Filter noise**: Exclude axis labels ("1…10"), zone text ("НИЗКАЯ", "ВЫСОКАЯ"), tokens with "+/-/%".
-3. **Weight validation**: Sum of weights in `weight_table` must equal 1.0; enforce via service layer and/or DB constraint.
-4. **Single active table**: Per `prof_activity`, only one `weight_table` can have `is_active=true`.
-5. **Audit trail**: Historical `scoring_result` entries retained; old weight tables archived, not deleted.
-6. **Locale**: Russian language text, comma as decimal separator (e.g., "7,6" → 7.6).
-
-## Knowledge Base Structure
-
-All detailed documentation is in `.memory-base/` (Russian):
-
-- **Product Overview**: Features, personas, success metrics, user flows, final report format
-- **Conventions**:
-  - Development guidelines, Git, testing (backend/frontend/fixtures/e2e/CI)
-  - **Frontend**: UI style, frontend-requirements.md (указатель требований), theme tokens
-- **Tech Details**: Tech stack, architecture, data model, extraction pipeline, service boundaries, operations, storage, metric mapping, prompt for Gemini recommendations
-- **Tasks**: Project task backlog, completed tickets (S1-01 to S1-10)
-
-Refer to these files for context when implementing features or fixing bugs.
-
-## SPA Serving (S1-10 — Completed)
-
-FastAPI serves the Vue SPA with fallback routing:
-- **Static assets**: `/assets/*` → `api-gateway/static/assets/` (CSS, JS, images)
-- **API routes**: `/api/*` → FastAPI routers
-- **All other paths**: `/*` → `api-gateway/static/index.html` (SPA fallback for Vue Router)
-
-Landing page: `api-gateway/static/index.html` — клиентская страница с описанием системы (без технической информации).
-CSS tokens: `api-gateway/static/assets/theme-tokens.css` — офисный стиль, совместим с Element Plus.
-
-See `.memory-base/task/tickets/S1-10_COMPLETED.md` for implementation details.
+Following these guidelines keeps Claude aligned with the actual code so nothing “phantom” is referenced.

@@ -12,7 +12,7 @@ from uuid import uuid4
 
 import pytest
 
-from app.db.models import Report, WeightTable
+from app.db.models import Report
 from app.repositories.metric import ExtractedMetricRepository, MetricDefRepository
 from app.repositories.participant import ParticipantRepository
 from app.repositories.prof_activity import ProfActivityRepository
@@ -109,6 +109,8 @@ async def participant_with_metrics(db_session):
 @pytest.fixture
 async def weight_table_with_batura_weights(db_session, participant_with_metrics):
     """Create a weight table with weights from the Batura A.A. example."""
+    from app.db.models import WeightTable
+
     _, metric_defs = participant_with_metrics
 
     # Get prof activity
@@ -126,33 +128,32 @@ async def weight_table_with_batura_weights(db_session, participant_with_metrics)
     if existing:
         return prof_activity, existing
 
-    # Create weight table with Batura A.A. weights
-    weights_data = {
-        "communicability": Decimal("0.18"),
-        "teamwork": Decimal("0.10"),
-        "low_conflict": Decimal("0.07"),
-        "team_soul": Decimal("0.08"),
-        "organization": Decimal("0.08"),
-        "responsibility": Decimal("0.07"),
-        "nonverbal_logic": Decimal("0.10"),
-        "info_processing": Decimal("0.05"),
-        "complex_problem_solving": Decimal("0.05"),
-        "morality_normativity": Decimal("0.10"),
-        "stress_resistance": Decimal("0.05"),
-        "leadership": Decimal("0.04"),
-        "vocabulary": Decimal("0.03"),
-    }
-
-    weights_json = []
-    for code, weight in weights_data.items():
-        metric = metric_defs[code]
-        weights_json.append(
-            {"metric_code": metric.code, "metric_name": metric.name, "weight": str(weight)}
-        )
+    # Create weight table directly (not via service) to stay in same session
+    weights_data = [
+        {"metric_code": "communicability", "weight": "0.18"},
+        {"metric_code": "teamwork", "weight": "0.10"},
+        {"metric_code": "low_conflict", "weight": "0.07"},
+        {"metric_code": "team_soul", "weight": "0.08"},
+        {"metric_code": "organization", "weight": "0.08"},
+        {"metric_code": "responsibility", "weight": "0.07"},
+        {"metric_code": "nonverbal_logic", "weight": "0.10"},
+        {"metric_code": "info_processing", "weight": "0.05"},
+        {"metric_code": "complex_problem_solving", "weight": "0.05"},
+        {"metric_code": "morality_normativity", "weight": "0.10"},
+        {"metric_code": "stress_resistance", "weight": "0.05"},
+        {"metric_code": "leadership", "weight": "0.04"},
+        {"metric_code": "vocabulary", "weight": "0.03"},
+    ]
 
     weight_table = WeightTable(
-        prof_activity_id=prof_activity.id, version=1, is_active=True, weights=weights_json
+        id=uuid4(),
+        prof_activity_id=prof_activity.id,
+        version=1,
+        weights=weights_data,
+        is_active=True,  # Directly set as active
+        metadata_json={"source": "test_fixture"},
     )
+
     db_session.add(weight_table)
     await db_session.commit()
     await db_session.refresh(weight_table)
@@ -427,9 +428,9 @@ async def test_strengths_dev_areas__stable_sorting__same_values_sorted_by_code(
 
     # Check they are sorted alphabetically by metric_code
     codes_with_2_5 = [item["metric_code"] for item in metrics_with_2_5]
-    assert codes_with_2_5 == sorted(codes_with_2_5), (
-        f"Metrics with same value should be sorted by code. Got: {codes_with_2_5}"
-    )
+    assert codes_with_2_5 == sorted(
+        codes_with_2_5
+    ), f"Metrics with same value should be sorted by code. Got: {codes_with_2_5}"
 
 
 @pytest.mark.asyncio
@@ -503,9 +504,9 @@ async def test_strengths_dev_areas__max_five_elements__enforced(
     )
 
     # Explicit check for ≤5 constraint
-    assert len(result["strengths"]) <= 5, (
-        f"Strengths must have ≤5 elements, got {len(result['strengths'])}"
-    )
-    assert len(result["dev_areas"]) <= 5, (
-        f"Dev areas must have ≤5 elements, got {len(result['dev_areas'])}"
-    )
+    assert (
+        len(result["strengths"]) <= 5
+    ), f"Strengths must have ≤5 elements, got {len(result['strengths'])}"
+    assert (
+        len(result["dev_areas"]) <= 5
+    ), f"Dev areas must have ≤5 elements, got {len(result['dev_areas'])}"

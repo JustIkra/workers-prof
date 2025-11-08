@@ -111,6 +111,7 @@ class WeightTableRepository:
     async def activate(self, weight_table: WeightTable) -> WeightTable:
         """Mark given weight table as active."""
         weight_table.is_active = True
+        await self.db.flush()  # Ensure change is written to DB before commit
         await self.db.commit()
         await self.db.refresh(weight_table)
         return weight_table

@@ -97,7 +97,7 @@ class MetricDefRepository:
         """
         stmt = select(MetricDef).order_by(MetricDef.code)
         if active_only:
-            stmt = stmt.where(MetricDef.active is True)
+            stmt = stmt.where(MetricDef.active)
 
         result = await self.db.execute(stmt)
         return list(result.scalars().all())

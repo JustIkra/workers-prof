@@ -69,9 +69,9 @@ class TestMigrationContent:
         # Check that all core tables are created
         expected_tables = ["user", "participant", "file_ref", "report", "prof_activity"]
         for table in expected_tables:
-            assert f'"{table}"' in upgrade_source or f"'{table}'" in upgrade_source, (
-                f"Table '{table}' should be created in upgrade()"
-            )
+            assert (
+                f'"{table}"' in upgrade_source or f"'{table}'" in upgrade_source
+            ), f"Table '{table}' should be created in upgrade()"
 
     def test_downgrade_drops_all_core_tables(self, migration_file):
         """
@@ -86,9 +86,9 @@ class TestMigrationContent:
         # Check that all core tables are dropped
         expected_tables = ["user", "participant", "file_ref", "report", "prof_activity"]
         for table in expected_tables:
-            assert f'"{table}"' in downgrade_source or f"'{table}'" in downgrade_source, (
-                f"Table '{table}' should be dropped in downgrade()"
-            )
+            assert (
+                f'"{table}"' in downgrade_source or f"'{table}'" in downgrade_source
+            ), f"Table '{table}' should be dropped in downgrade()"
 
     def test_upgrade_creates_indexes(self, migration_file):
         """Verify that indexes are created."""
@@ -141,6 +141,6 @@ class TestMigrationContent:
 
         # Check for specific unique constraints
         assert "email" in upgrade_source, "Email unique constraint should exist"
-        assert "file_ref_location_unique" in upgrade_source, (
-            "File location unique constraint should exist"
-        )
+        assert (
+            "file_ref_location_unique" in upgrade_source
+        ), "File location unique constraint should exist"
