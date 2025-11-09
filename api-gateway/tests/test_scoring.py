@@ -1,9 +1,10 @@
 """
-Tests for scoring service and API (S2-02, S2-03).
+Tests for scoring service and API (S2-02, S2-03, S2-06).
 
 Verifies:
 - Correct calculation of professional fitness scores (S2-02)
 - Generation of strengths and development areas (S2-03)
+- Scoring history retrieval for participants (S2-06)
 """
 
 from datetime import date
@@ -510,3 +511,158 @@ async def test_strengths_dev_areas__max_five_elements__enforced(
     assert (
         len(result["dev_areas"]) <= 5
     ), f"Dev areas must have ≤5 elements, got {len(result['dev_areas'])}"
+
+
+# ===== S2-06: Scoring History Tests =====
+
+
+@pytest.mark.asyncio
+async def test_api_get_scoring_history__with_multiple_results__returns_200_sorted_desc(
+    client,
+    db_session,
+    participant_with_metrics,
+    weight_table_with_batura_weights,
+    active_user_token,
+):
+    """
+    Test API endpoint for scoring history retrieval (S2-06).
+
+    Verifies:
+    - Returns 200 with list of scoring results
+    - Results are sorted by created_at DESC
+    - Contains all required fields
+    """
+    participant, _ = participant_with_metrics
+    prof_activity, _ = weight_table_with_batura_weights
+
+    # Create multiple scoring results
+    scoring_service = ScoringService(db_session)
+
+    # First calculation
+    result1 = await scoring_service.calculate_score(
+        participant_id=participant.id, prof_activity_code=prof_activity.code
+    )
+
+    # Second calculation
+    result2 = await scoring_service.calculate_score(
+        participant_id=participant.id, prof_activity_code=prof_activity.code
+    )
+
+    # Get scoring history
+    response = await client.get(
+        f"/api/scoring/participants/{participant.id}/scores",
+        cookies={"access_token": active_user_token},
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+
+    assert "items" in data
+    assert isinstance(data["items"], list)
+    assert len(data["items"]) >= 2
+
+    # Verify sorting: most recent first
+    first_item = data["items"][0]
+    second_item = data["items"][1]
+
+    # Most recent result should be first (result2)
+    assert first_item["id"] == str(result2["scoring_result_id"])
+    assert second_item["id"] == str(result1["scoring_result_id"])
+
+    # Verify structure of first item
+    assert first_item["participant_id"] == str(participant.id)
+    assert first_item["prof_activity_code"] == prof_activity.code
+    assert first_item["prof_activity_name"] == prof_activity.name
+    assert Decimal(str(first_item["score_pct"])) == Decimal("71.25")
+    assert "strengths" in first_item
+    assert "dev_areas" in first_item
+    assert "recommendations" in first_item
+    assert "created_at" in first_item
+
+    # Verify ISO 8601 datetime format
+    assert "T" in first_item["created_at"]
+
+
+@pytest.mark.asyncio
+async def test_api_get_scoring_history__with_limit__respects_limit(
+    client,
+    db_session,
+    participant_with_metrics,
+    weight_table_with_batura_weights,
+    active_user_token,
+):
+    """
+    Test that limit parameter is respected (S2-06).
+    """
+    participant, _ = participant_with_metrics
+    prof_activity, _ = weight_table_with_batura_weights
+
+    # Create 5 scoring results
+    scoring_service = ScoringService(db_session)
+    for _ in range(5):
+        await scoring_service.calculate_score(
+            participant_id=participant.id, prof_activity_code=prof_activity.code
+        )
+
+    # Get history with limit=3
+    response = await client.get(
+        f"/api/scoring/participants/{participant.id}/scores",
+        params={"limit": 3},
+        cookies={"access_token": active_user_token},
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+
+    assert len(data["items"]) == 3
+
+
+@pytest.mark.asyncio
+async def test_api_get_scoring_history__no_results__returns_empty_list(
+    client, db_session, participant_with_metrics, active_user_token
+):
+    """
+    Test that empty list is returned when participant has no scoring results (S2-06).
+    """
+    participant, _ = participant_with_metrics
+
+    response = await client.get(
+        f"/api/scoring/participants/{participant.id}/scores",
+        cookies={"access_token": active_user_token},
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+
+    assert "items" in data
+    assert data["items"] == []
+
+
+@pytest.mark.asyncio
+async def test_api_get_scoring_history__participant_not_found__returns_404(
+    client, active_user_token
+):
+    """
+    Test that 404 is returned for non-existent participant (S2-06).
+    """
+    non_existent_id = uuid4()
+
+    response = await client.get(
+        f"/api/scoring/participants/{non_existent_id}/scores",
+        cookies={"access_token": active_user_token},
+    )
+
+    assert response.status_code == 404
+    assert "not found" in response.json()["detail"].lower()
+
+
+@pytest.mark.asyncio
+async def test_api_get_scoring_history__unauthorized__returns_401(client, participant_with_metrics):
+    """
+    Test that unauthorized requests are rejected (S2-06).
+    """
+    participant, _ = participant_with_metrics
+
+    response = await client.get(f"/api/scoring/participants/{participant.id}/scores")
+
+    assert response.status_code == 401

@@ -67,12 +67,12 @@
           stripe
         >
           <el-table-column
-            prop="report_type"
+            prop="type"
             label="Тип"
             width="120"
           >
             <template #default="{ row }">
-              <el-tag>{{ formatReportType(row.report_type) }}</el-tag>
+              <el-tag>{{ formatReportType(row.type) }}</el-tag>
             </template>
           </el-table-column>
           <el-table-column
@@ -218,6 +218,27 @@
                       </li>
                     </ul>
                   </div>
+                </div>
+                <div
+                  v-if="result.prof_activity_code"
+                  class="final-report-actions"
+                >
+                  <el-button
+                    type="info"
+                    size="small"
+                    @click="viewFinalReportJSON(result)"
+                  >
+                    <el-icon><DocumentCopy /></el-icon>
+                    Просмотреть JSON
+                  </el-button>
+                  <el-button
+                    type="primary"
+                    size="small"
+                    @click="downloadFinalReportHTML(result)"
+                  >
+                    <el-icon><Download /></el-icon>
+                    Скачать HTML
+                  </el-button>
                 </div>
               </div>
             </el-card>
@@ -387,12 +408,13 @@ import {
   DataAnalysis,
   View,
   Delete,
-  TrendCharts
+  TrendCharts,
+  DocumentCopy
 } from '@element-plus/icons-vue'
 import AppLayout from '@/components/AppLayout.vue'
 import MetricsEditor from '@/components/MetricsEditor.vue'
 import { useParticipantsStore } from '@/stores'
-import { reportsApi, profActivitiesApi, scoringApi } from '@/api'
+import { reportsApi, profActivitiesApi, scoringApi, participantsApi } from '@/api'
 import { formatFromApi } from '@/utils/numberFormat'
 
 const router = useRouter()
@@ -499,12 +521,11 @@ const loadParticipant = async () => {
 const loadReports = async () => {
   loadingReports.value = true
   try {
-    // API endpoint для получения списка отчётов участника
-    // Пока используем заглушку, т.к. endpoint может быть не реализован
-    reports.value = []
-    ElMessage.info('Функция загрузки списка отчётов будет доступна после реализации соответствующего API')
+    const response = await participantsApi.getReports(route.params.id)
+    reports.value = response.items || []
   } catch (error) {
     console.error('Error loading reports:', error)
+    ElMessage.error('Ошибка загрузки списка отчётов')
   } finally {
     loadingReports.value = false
   }
@@ -513,7 +534,7 @@ const loadReports = async () => {
 const loadScoringResults = async () => {
   try {
     const response = await scoringApi.getHistory(route.params.id)
-    scoringResults.value = response.results || []
+    scoringResults.value = response.items || []
   } catch (error) {
     console.error('Error loading scoring results:', error)
   }
@@ -605,7 +626,7 @@ const handleMetricsUpdated = () => {
 
 const confirmDeleteReport = (report) => {
   ElMessageBox.confirm(
-    `Вы уверены, что хотите удалить отчёт "${formatReportType(report.report_type)}"?`,
+    `Вы уверены, что хотите удалить отчёт "${formatReportType(report.type)}"?`,
     'Подтверждение удаления',
     {
       confirmButtonText: 'Удалить',
@@ -637,6 +658,7 @@ const calculateScoring = async () => {
     // Добавляем новый результат в начало списка
     scoringResults.value.unshift({
       id: result.scoring_result_id,
+      prof_activity_code: result.prof_activity_code || scoringForm.activityCode,
       prof_activity_name: result.prof_activity_name,
       score_pct: parseFloat(result.score_pct),
       strengths: result.strengths || [],
@@ -654,6 +676,67 @@ const calculateScoring = async () => {
     ElMessage.error(errorMessage)
   } finally {
     calculating.value = false
+  }
+}
+
+// Final Report
+const viewFinalReportJSON = async (result) => {
+  if (!result.prof_activity_code) {
+    ElMessage.warning('Код профессиональной деятельности не найден')
+    return
+  }
+
+  try {
+    const reportData = await scoringApi.getFinalReport(
+      route.params.id,
+      result.prof_activity_code,
+      'json'
+    )
+
+    // Открываем JSON в новой вкладке
+    const jsonStr = JSON.stringify(reportData, null, 2)
+    const blob = new Blob([jsonStr], { type: 'application/json' })
+    const url = window.URL.createObjectURL(blob)
+    window.open(url, '_blank')
+    window.URL.revokeObjectURL(url)
+
+    ElMessage.success('Отчёт JSON открыт в новой вкладке')
+  } catch (error) {
+    console.error('Error viewing final report JSON:', error)
+    const errorMessage = error.response?.data?.detail || 'Ошибка загрузки финального отчёта'
+    ElMessage.error(errorMessage)
+  }
+}
+
+const downloadFinalReportHTML = async (result) => {
+  if (!result.prof_activity_code) {
+    ElMessage.warning('Код профессиональной деятельности не найден')
+    return
+  }
+
+  try {
+    const htmlContent = await scoringApi.getFinalReport(
+      route.params.id,
+      result.prof_activity_code,
+      'html'
+    )
+
+    // Скачиваем HTML файл
+    const blob = new Blob([htmlContent], { type: 'text/html' })
+    const url = window.URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.setAttribute('download', `final_report_${result.prof_activity_code}_${new Date().toISOString().split('T')[0]}.html`)
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    window.URL.revokeObjectURL(url)
+
+    ElMessage.success('Отчёт HTML скачан')
+  } catch (error) {
+    console.error('Error downloading final report HTML:', error)
+    const errorMessage = error.response?.data?.detail || 'Ошибка загрузки финального отчёта'
+    ElMessage.error(errorMessage)
   }
 }
 
@@ -746,6 +829,15 @@ onMounted(async () => {
   margin-bottom: 8px;
   color: #606266;
   line-height: 1.5;
+}
+
+.final-report-actions {
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid #EBEEF5;
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
 }
 
 @media (max-width: 768px) {

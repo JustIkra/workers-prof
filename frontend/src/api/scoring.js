@@ -20,9 +20,12 @@ export const scoringApi = {
   /**
    * Получить историю оценок участника
    * @param {string} participantId - UUID
+   * @param {number} limit - Максимальное количество результатов (по умолчанию 10)
    */
-  async getHistory(participantId) {
-    const response = await apiClient.get(`/participants/${participantId}/scores`)
+  async getHistory(participantId, limit = 10) {
+    const response = await apiClient.get(`/scoring/participants/${participantId}/scores`, {
+      params: { limit }
+    })
     return response.data
   },
 
@@ -62,7 +65,7 @@ export const scoringApi = {
       config.responseType = 'text'
     }
 
-    const response = await apiClient.get(`/api/participants/${participantId}/final-report`, config)
+    const response = await apiClient.get(`/participants/${participantId}/final-report`, config)
     return format === 'html' ? response.data : response.data
   }
 }
