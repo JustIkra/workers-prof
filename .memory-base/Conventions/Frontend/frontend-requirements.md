@@ -51,6 +51,9 @@ font-family: 'Segoe UI', Tahoma, Arial, -apple-system, system-ui, sans-serif;
 --line-height-base: 1.5;
 ```
 
+Источник токенов темы
+- Хранить CSS‑токены темы в `frontend/public/assets/theme-tokens.css` и подключать через `/assets/theme-tokens.css`.
+
 ### 1.4 Компоновка
 - **Header**: 64px высота, логотип + название
 - **Sidebar**: 240px ширина, вертикальное меню слева

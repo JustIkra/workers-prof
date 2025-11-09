@@ -53,6 +53,17 @@ class ReportRepository:
         result = await self.db.execute(stmt)
         return result.scalar_one_or_none()
 
+    async def get_all_by_participant(self, participant_id: UUID) -> list[Report]:
+        """Get all reports for a participant."""
+        stmt = (
+            select(Report)
+            .options(selectinload(Report.file_ref))
+            .where(Report.participant_id == participant_id)
+            .order_by(Report.uploaded_at.desc())
+        )
+        result = await self.db.execute(stmt)
+        return list(result.scalars().all())
+
     async def delete(self, report: Report) -> None:
         """Delete report and commit."""
         await self.db.delete(report)

@@ -1,35 +1,36 @@
-План выполнения (единый порт 9187, NPM TLS, VPN+Gemini)
+Актуальный план (после чистки завершённых спринтов)
 
 Цель
-- Запустить приложение за Nginx Proxy Manager: один внешний порт 9187 (HTTP внутри), TLS терминация на NPM.
-- Реализовать ядро (Auth/Participants/Reports/Weights/Scoring), SPA, OCR-стаб, AI (Gemini с пулом ключей), VPN (WireGuard в контейнере).
+- Разблокировать финальные отчёты в UI и довести критический путь E2E до «зелёного».
+- Реализовать полноценный OCR→Нормализация→Gemini пайплайн по правилам `.memory-base`.
+- Довести VPN split‑tunnel и наблюдаемость.
 
-Фазы (спринты)
-- Sprint 1 (Foundation, 9187, ядро CRUD)
-  - Каркас приложения, единый `.env`, порт 9187, профили конфигурации.
-  - Миграции базовых сущностей; Auth (PENDING→ACTIVE); Участники; Загрузка `.docx`.
-  - Весовые таблицы (JSON, валидация, активация); SPA раздаётся из FastAPI; Compose (один порт).
-- Sprint 2 (Scoring + Final Report)
-  - Метрики (ручной ввод), сервис расчёта `score_pct`, генерация strengths/dev_areas.
-  - Endpoint итогового отчёта (JSON) + HTML-шаблон (PDF позже); UI: ввод и расчёт.
-- Sprint 3 (Extraction stub + Observability + CI)
-  - Задача parse `.docx` → `word/media/*` артефакты; stub извлечения; логирование и CI.
-  - E2E (минимум): login → approve → upload → manual metrics → score → final JSON.
-- Sprint 4 (AI + VPN)
-  - Gemini клиент с пулом ключей, лимитирование, circuit-breaker, наблюдаемость.
-  - WireGuard внутри контейнера, split‑tunnel на домены Gemini, health endpoint.
+Этап A — Final Report UI + History (быстрые фиксы)
+1) Загрузка списка отчётов на UI (без заглушек)
+2) Кнопки финального отчёта (JSON/HTML) + фиксы клиента API
+3) `GET /api/participants/{id}/scores` — история расчётов
+4) E2E сценарии 9–10 (просмотр JSON/скачивание HTML)
 
-Принципы
-- Один `.env` в корне (основной), без секретов в VCS. Порт `9187`.
-- Детерминизм в тестах (внешние вызовы замоканы, Celery eager); Decimal для расчётов.
-- Безопасность: JWT cookie Secure/HttpOnly (за NPM), PII не логировать.
+Этап B — OCR и нормализация
+1) PaddleOCR + PP‑Structure: извлечение числовых меток (ROI, фильтры, min_conf=0.8)
+2) Нормализация/маппинг в MetricDef по YAML (RU‑формат, валидация)
+3) Маркировка неоднозначностей для ручной валидации в UI
 
-Deliverables по фазам
-- S1: Запуск SPA+API на `:9187`, базовые CRUD/Upload/Weights, базовые тесты.
-- S2: Расчёт + итоговый отчёт JSON/HTML, UI для метрик/результатов.
-- S3: Stub OCR pipeline, наблюдаемость, CI, минимальные E2E.
-- S4: Gemini (pool), VPN WireGuard (split‑tunnel), health, защита конфигов.
+Этап C — Gemini Vision и рекомендации
+1) Vision fallback: строгая схема JSON, отбрасывание вне диапазона, PII‑safe кропы
+2) Пул ключей + лимитирование + ретраи (OFFLINE в тестах)
+3) Генерация рекомендаций (строгий JSON, ≤5/секцию)
 
-Риски и зависимости
-- Ключи Gemini и VPN конфиг поставляет оператор; без них AI/VPN будут выключены.
-- Объём `.docx` может требовать поднятия `client_max_body_size` на NPM.
+Этап D — VPN и Observability
+1) WireGuard entrypoint + split‑tunnel на `generativelanguage.googleapis.com`
+2) `/api/vpn/health` — дополнить метриками стабильности при необходимости
+3) Логи и метрики: `request_id`, Celery тайминги/ретраи, per‑key счётчики Gemini
+
+Инварианты и тестирование
+- OFFLINE режим в `test/ci`; Celery eager; детерминированность времени.
+- Покрытие backend ≥60%; критичные модули ≥80%.
+- E2E с артефактами на падениях (видео/скриншоты).
+
+Риски/зависимости
+- Ключи Gemini и конфиг WireGuard нужны для этапов C/D; без них — заглушки и OFFLINE‑моки.
+- Производительность OCR может потребовать нормализации разрешения (см. `extraction-pipeline.md`).

@@ -10,7 +10,7 @@
 - ⚖️ Система весовых таблиц для различных профессиональных деятельностей
 - 🤖 Генерация рекомендаций с использованием Gemini API
 - 📈 Расчет профессиональной пригодности на основе взвешенных метрик
-- 🎨 Современный UI на основе Vue 3 и Naive UI
+- 🎨 Современный UI на основе Vue 3 и Element Plus
 
 ## Технологический стек
 
@@ -252,11 +252,11 @@ workers-prof/
 │   │   ├── routers/      # API endpoints
 │   │   ├── services/     # Бизнес-логика
 │   │   └── repositories/ # Слой доступа к данным
-│   ├── static/           # ✨ SPA files (S1-10)
-│   │   ├── index.html    # Landing page / SPA entry
-│   │   └── assets/       # CSS, JS, images
-│   │       └── theme-tokens.css  # CSS tokens (офисный стиль)
-│   ├── seed.py           # Начальные данные
+│   ├── static/           # ✨ SPA files (production build output)
+│   │   ├── index.html    # SPA entry
+│   │   └── assets/       # CSS, JS, images (копируются из frontend/dist)
+│   │       # Источник CSS-токенов темы: frontend/public/assets/theme-tokens.css
+│   ├── setup_test_data.py  # Начальные данные/фикстуры для локалки
 │   └── main.py           # Точка входа + StaticFiles setup
 ├── frontend/             # Frontend Vue 3 (будущее)
 │   ├── src/
@@ -302,7 +302,7 @@ export GEMINI_API_KEYS="key1"
 alembic upgrade head
 
 # Загрузите начальные данные
-python seed.py
+python setup_test_data.py
 
 # Создайте администраторскую учетную запись
 python create_admin.py admin@example.com ваш_пароль
@@ -314,9 +314,7 @@ uvicorn main:app --reload --host 0.0.0.0 --port 9187
 
 **Frontend:**
 
-На данный момент используется статичная лендинговая страница в `api-gateway/static/index.html`.
-
-Для разработки Vue SPA (в будущем):
+Vue 3 SPA разрабатывается отдельно, а затем раздаётся через FastAPI StaticFiles.
 
 ```bash
 cd frontend
@@ -368,12 +366,12 @@ async def spa_fallback(request: Request, full_path: str):
 **Маршрутизация:**
 - `/` → `static/index.html` (лендинг или Vue SPA)
 - `/participants`, `/reports/123` → `static/index.html` (SPA fallback)
-- `/assets/theme-tokens.css` → статический файл
+- `/assets/theme-tokens.css` → статический файл (источник: `frontend/public/assets/theme-tokens.css`)
 - `/api/healthz` → FastAPI router
 
 **Файлы:**
 - Лендинг: `api-gateway/static/index.html` (клиентская страница без технической информации)
-- CSS токены: `api-gateway/static/assets/theme-tokens.css` (офисный стиль, Element Plus совместимость)
+- CSS токены: `frontend/public/assets/theme-tokens.css` (в продакшене доступны как `/assets/theme-tokens.css`)
 - Требования: `.memory-base/Conventions/Frontend/frontend-requirements.md`
 
 ### Модель данных
@@ -404,28 +402,45 @@ score_pct = Σ(metric_value × weight × 10)
 
 ### Интеграция с Gemini API
 
-Система использует Gemini API для генерации персонализированных рекомендаций на основе:
-- Общего score_pct
-- Сильных сторон (метрики >= 8)
-- Зон развития (метрики <= 4)
+Система использует Gemini API для генерации персонализированных рекомендаций и (в дальнейшем) для Vision‑fallback при извлечении чисел из изображений отчётов.
+- Основа: общий score_pct, сильные стороны, зоны развития
+- Модели по умолчанию: `gemini-2.5-flash` (text/vision), настраивается через `.env`
+- В `test/ci` внешняя сеть отключена (OFFLINE), вызовы мокируются
 
-Модель: `gemini-2.0-flash-exp` (можно изменить в .env)
+### Быстрые примеры API
+
+Финальный отчёт участника (JSON/HTML):
+
+```bash
+# JSON
+curl -H "Authorization: Bearer <TOKEN>" \
+  "http://localhost:9187/api/participants/<PARTICIPANT_ID>/final-report?activity_code=<CODE>&format=json"
+
+# HTML
+curl -H "Authorization: Bearer <TOKEN>" \
+  "http://localhost:9187/api/participants/<PARTICIPANT_ID>/final-report?activity_code=<CODE>&format=html" \
+  -o final_report.html
+```
 
 ## Конфигурация
 
-### Переменные окружения
+### Переменные окружения (единый `.env` в корне)
 
-См. `.env.example` для полного списка. Основные:
+Полная политика и примеры: `.memory-base/Conventions/Development/env-configuration.md` и `.env.example`.
 
-| Переменная | Описание | По умолчанию |
-|-----------|----------|--------------|
-| `SECRET_KEY` | JWT secret (ВАЖНО: изменить!) | - |
-| `GEMINI_API_KEY` | Gemini API ключ | - |
-| `DATABASE_URL` | PostgreSQL connection string | auto |
-| `REDIS_URL` | Redis connection string | auto |
-| `DEBUG` | Debug режим | false |
-| `API_PORT` | Порт API | 8000 |
-| `FRONTEND_PORT` | Порт Frontend | 3000 |
+Основные переменные:
+- `APP_PORT` — порт API (по умолчанию 9187)
+- `ENV` — профиль `dev|test|ci|prod` (в `test/ci` включается детерминизм и OFFLINE)
+- `JWT_SECRET` — секрет подписи JWT (обязательно изменить в prod)
+- `POSTGRES_DSN` — строка подключения к PostgreSQL (async)
+- `REDIS_URL` — строка подключения к Redis
+- `RABBITMQ_URL` — адрес брокера для Celery
+- `GEMINI_API_KEYS` — CSV‑список ключей Gemini
+- `AI_RECOMMENDATIONS_ENABLED`, `AI_VISION_FALLBACK_ENABLED` — флаги AI‑фич
+- `VPN_*` — настройки WireGuard при необходимости
+
+Проверка загрузки настроек:
+`cd api-gateway && python -c "from app.core.config import settings; print(settings.model_dump())"`
 
 ## Безопасность
 
@@ -443,25 +458,25 @@ score_pct = Σ(metric_value × weight × 10)
 
 ### Ключевые документы
 
-- **index.md** — индекс всей документации проекта
-- **CLAUDE.md** — руководство для Claude Code при работе с проектом
-- **.memory-base/** — полная база знаний:
-  - `Conventions/Frontend/frontend-requirements.md` — указатель требований к фронтенду ⭐
-  - `Conventions/Frontend/ui_style.md` — офисный стиль UI
-  - `task/tickets/S1-10_COMPLETED.md` — документация выполнения SPA serving
+- `index.md` — индекс документации и быстрые ссылки
+- `.memory-base/Conventions/Development/env-configuration.md` — политика единого .env
+- `.memory-base/Tech details/infrastructure/extraction-pipeline.md` — пайплайн извлечения метрик
+- `.memory-base/Conventions/Frontend/frontend-requirements.md` — требования к фронтенду
+- E2E статус и быстрые правки:
+  - `e2e/docs/EXECUTIVE_SUMMARY_FINAL_REPORTS.md`
+  - `e2e/docs/FINAL_REPORT_DATA_FLOW.md`
+  - `e2e/docs/FINAL_REPORT_FUNCTIONALITY_ANALYSIS.md`
+  - `e2e/docs/QUICK_FIX_CHECKLIST.md`
 
-### Выполненные задачи (Sprint 1)
+### Ближайшие шаги (Roadmap)
 
-- ✅ **S1-01**: Конфигурация окружения
-- ✅ **S1-02**: Единый порт приложения (9187)
-- ✅ **S1-03**: Профили настроек (dev/test/prod)
-- ✅ **S1-04**: Миграции БД (core tables)
-- ✅ **S1-05**: Аутентификация JWT
-- ✅ **S1-06**: CRUD участников
-- ✅ **S1-07**: Загрузка и скачивание отчётов
-- ✅ **S1-08**: Seed профессиональных деятельностей
-- ✅ **S1-09**: Схема весовых таблиц + активация
-- ✅ **S1-10**: Раздача SPA и fallback 🎉
+- Final Report UI: список отчётов без заглушек, кнопки «Просмотреть JSON/Скачать HTML»
+- Scoring History API: `GET /api/participants/{id}/scores`
+- OCR → Нормализация → Gemini Vision fallback по правилам из `.memory-base`
+- VPN WireGuard: split‑tunnel на домены Gemini + `/api/vpn/health`
+- Observability/CI/E2E: счётчики per‑key Gemini; E2E сценарии 9–10
+
+Подробности: `.memory-base/task/backlog.md`, план: `.memory-base/task/plan.md`, тикеты: `.memory-base/task/tickets/` (S2‑04, S2‑06, AI‑0x, VPN‑0x)
 
 ## Лицензия
 

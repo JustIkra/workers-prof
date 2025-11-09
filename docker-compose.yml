@@ -71,6 +71,8 @@ services:
       POSTGRES_DB: app
       POSTGRES_USER: app
       POSTGRES_PASSWORD: app
+    ports:
+      - "5432:5432"
     volumes:
       - db-data:/var/lib/postgresql/data
     healthcheck:
@@ -83,6 +85,8 @@ services:
   redis:
     image: redis:7-alpine
     container_name: workers-prof-redis
+    ports:
+      - "6379:6379"
     command: ["redis-server", "--appendonly", "yes"]
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
@@ -94,6 +98,8 @@ services:
   rabbitmq:
     image: rabbitmq:3.13
     container_name: workers-prof-rabbitmq
+    ports:
+      - "5672:5672"
     healthcheck:
       test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
       interval: 10s

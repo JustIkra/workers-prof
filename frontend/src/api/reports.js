@@ -69,5 +69,14 @@ export const reportsApi = {
   async getMetrics(reportId) {
     const response = await apiClient.get(`/reports/${reportId}/metrics`)
     return response.data
+  },
+
+  /**
+   * Get all reports for a participant
+   * @param {string} participantId - UUID
+   */
+  async getList(participantId) {
+    const response = await apiClient.get(`/participants/${participantId}/reports`)
+    return response.data
   }
 }

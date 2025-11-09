@@ -49,5 +49,14 @@ export const participantsApi = {
   async delete(participantId) {
     const response = await apiClient.delete(`/participants/${participantId}`)
     return response.data
+  },
+
+  /**
+   * Получить список отчётов участника
+   * @param {string} participantId - UUID
+   */
+  async getReports(participantId) {
+    const response = await apiClient.get(`/participants/${participantId}/reports`)
+    return response.data
   }
 }

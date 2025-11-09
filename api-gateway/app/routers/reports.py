@@ -22,11 +22,33 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.dependencies import get_current_active_user
 from app.db.models import User
 from app.db.session import get_db
-from app.schemas.report import ReportType, ReportUploadResponse
+from app.schemas.report import ReportListResponse, ReportResponse, ReportType, ReportUploadResponse
 from app.services.report import ReportService
 from app.tasks.extraction import extract_images_from_report
 
 router = APIRouter(tags=["reports"])
+
+
+@router.get(
+    "/participants/{participant_id}/reports",
+    response_model=ReportListResponse,
+)
+async def get_participant_reports(
+    participant_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+) -> ReportListResponse:
+    """
+    Get all reports for a participant.
+
+    Returns list of reports with their current status (UPLOADED, EXTRACTED, FAILED).
+
+    Requires active authentication.
+    """
+    service = ReportService(db)
+    reports = await service.get_participant_reports(participant_id)
+    items = [ReportResponse.model_validate(r) for r in reports]
+    return ReportListResponse(items=items, total=len(items))
 
 
 @router.post(

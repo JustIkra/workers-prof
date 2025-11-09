@@ -60,3 +60,10 @@ class ReportUploadResponse(ReportResponse):
     """Response for successful report upload."""
 
     etag: str = Field(..., description="Content hash for If-None-Match headers")
+
+
+class ReportListResponse(BaseModel):
+    """List of reports for a participant."""
+
+    items: list[ReportResponse]
+    total: int

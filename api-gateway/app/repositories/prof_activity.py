@@ -62,6 +62,75 @@ class ProfActivityRepository:
         result = await self.db.execute(stmt)
         return result.scalar_one_or_none()
 
+    async def create(self, code: str, name: str, description: str | None = None) -> ProfActivity:
+        """
+        Create a new professional activity.
+
+        Args:
+            code: Unique activity code
+            name: Activity name
+            description: Optional description
+
+        Returns:
+            Created ProfActivity instance
+        """
+        prof_activity = ProfActivity(code=code, name=name, description=description)
+        self.db.add(prof_activity)
+        await self.db.commit()
+        await self.db.refresh(prof_activity)
+        return prof_activity
+
+    async def update(
+        self, prof_activity_id: UUID, name: str | None = None, description: str | None = None
+    ) -> ProfActivity | None:
+        """
+        Update a professional activity.
+
+        Args:
+            prof_activity_id: UUID of the activity to update
+            name: Optional new name
+            description: Optional new description
+
+        Returns:
+            Updated ProfActivity instance or None if not found
+        """
+        stmt = select(ProfActivity).where(ProfActivity.id == prof_activity_id)
+        result = await self.db.execute(stmt)
+        prof_activity = result.scalar_one_or_none()
+
+        if not prof_activity:
+            return None
+
+        if name is not None:
+            prof_activity.name = name
+        if description is not None:
+            prof_activity.description = description
+
+        await self.db.commit()
+        await self.db.refresh(prof_activity)
+        return prof_activity
+
+    async def delete(self, prof_activity_id: UUID) -> bool:
+        """
+        Delete a professional activity.
+
+        Args:
+            prof_activity_id: UUID of the activity to delete
+
+        Returns:
+            True if deleted, False if not found
+        """
+        stmt = select(ProfActivity).where(ProfActivity.id == prof_activity_id)
+        result = await self.db.execute(stmt)
+        prof_activity = result.scalar_one_or_none()
+
+        if not prof_activity:
+            return False
+
+        await self.db.delete(prof_activity)
+        await self.db.commit()
+        return True
+
     async def seed_defaults(self, seeds: Sequence[ProfActivitySeed]) -> None:
         """
         Upsert default professional activities.

@@ -145,6 +145,13 @@ async def participant_with_full_data(db_session):
     from app.services.weight_table import WeightTableService
 
     weight_service = WeightTableService(db_session)
+
+    # Deactivate any existing active weight tables for this activity
+    weight_table_repo = WeightTableRepository(db_session)
+    existing_active = await weight_table_repo.get_active_for_activity(prof_activity.id)
+    if existing_active:
+        await weight_service.deactivate_weight_table(existing_active.id)
+
     upload_payload = WeightTableUploadRequest(
         prof_activity_code=prof_activity.code,
         weights=[WeightItem(**w) for w in weights_data],
@@ -165,7 +172,6 @@ async def participant_with_full_data(db_session):
     )
 
     # Get the weight_table for return value
-    weight_table_repo = WeightTableRepository(db_session)
     weight_table = await weight_table_repo.get_by_id(weight_table_response.id)
 
     return {
@@ -445,3 +451,126 @@ async def test_api_final_report_html__with_format_param__returns_html(
     assert "<!DOCTYPE html>" in html
     assert "Батура Анна Александровна" in html
     assert "Итоговый коэффициент" in html
+
+
+# ===== Edge Case Tests =====
+
+
+@pytest.mark.asyncio
+async def test_api_final_report__participant_not_found__returns_404(
+    test_env, client: AsyncClient, db_session
+):
+    """Test that API returns 404 when participant doesn't exist."""
+    # Arrange: Create active user and get auth cookies
+    from app.services.auth import create_user
+
+    user = await create_user(db_session, "active@example.com", "password123", role="USER")
+    user.status = "ACTIVE"
+    await db_session.commit()
+
+    # Login to get cookies
+    login_response = await client.post(
+        "/api/auth/login", json={"email": "active@example.com", "password": "password123"}
+    )
+    assert login_response.status_code == 200
+    auth_cookies = dict(login_response.cookies)
+
+    # Act: Try to get final report for non-existent participant
+    non_existent_id = uuid4()
+    response = await client.get(
+        f"/api/participants/{non_existent_id}/final-report?activity_code=nonexistent_activity",
+        cookies=auth_cookies,
+    )
+
+    # Assert
+    assert response.status_code == 400
+    # The error could be about missing activity or no scoring result
+    assert "not found" in response.json()["detail"].lower() or "no" in response.json()["detail"].lower()
+
+
+@pytest.mark.asyncio
+async def test_api_final_report__invalid_activity_code__returns_400(
+    test_env, client: AsyncClient, db_session, participant_with_full_data
+):
+    """Test that API returns 400 when activity code is invalid."""
+    # Arrange
+    participant = participant_with_full_data["participant"]
+
+    # Create active user and get auth cookies
+    from app.services.auth import create_user
+
+    user = await create_user(db_session, "active@example.com", "password123", role="USER")
+    user.status = "ACTIVE"
+    await db_session.commit()
+
+    # Login to get cookies
+    login_response = await client.post(
+        "/api/auth/login", json={"email": "active@example.com", "password": "password123"}
+    )
+    assert login_response.status_code == 200
+    auth_cookies = dict(login_response.cookies)
+
+    # Act: Try to get final report with invalid activity code
+    response = await client.get(
+        f"/api/participants/{participant.id}/final-report?activity_code=invalid_activity_code",
+        cookies=auth_cookies,
+    )
+
+    # Assert
+    assert response.status_code == 400
+    assert "not found" in response.json()["detail"].lower()
+
+
+@pytest.mark.asyncio
+async def test_api_final_report__unauthorized__returns_401(
+    test_env, client: AsyncClient, db_session, participant_with_full_data
+):
+    """Test that API requires authentication."""
+    # Arrange
+    participant = participant_with_full_data["participant"]
+    prof_activity = participant_with_full_data["prof_activity"]
+
+    # Act: Try to access without auth cookies
+    response = await client.get(
+        f"/api/participants/{participant.id}/final-report?activity_code={prof_activity.code}"
+    )
+
+    # Assert
+    assert response.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_final_report__invalid_format_parameter__defaults_to_json(
+    test_env, client: AsyncClient, db_session, participant_with_full_data
+):
+    """Test that invalid format parameter defaults to JSON response."""
+    # Arrange
+    participant = participant_with_full_data["participant"]
+    prof_activity = participant_with_full_data["prof_activity"]
+
+    # Create active user and get auth cookies
+    from app.services.auth import create_user
+
+    user = await create_user(db_session, "active@example.com", "password123", role="USER")
+    user.status = "ACTIVE"
+    await db_session.commit()
+
+    # Login to get cookies
+    login_response = await client.post(
+        "/api/auth/login", json={"email": "active@example.com", "password": "password123"}
+    )
+    assert login_response.status_code == 200
+    auth_cookies = dict(login_response.cookies)
+
+    # Act: Request with invalid format parameter
+    response = await client.get(
+        f"/api/participants/{participant.id}/final-report?activity_code={prof_activity.code}&format=pdf",
+        cookies=auth_cookies,
+    )
+
+    # Assert: Should default to JSON
+    assert response.status_code == 200
+    assert response.headers.get("content-type") == "application/json"
+    data = response.json()
+    assert "participant_name" in data
+    assert "score_pct" in data

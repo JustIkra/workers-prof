@@ -90,10 +90,12 @@ async def test_list_prof_activities__returns_seeded_items(
     assert response.status_code == 200
     data = response.json()
 
-    assert len(data) == len(PROF_ACTIVITY_SEED_DATA)
+    # API returns ProfActivityListResponse with 'activities' field
+    activities = data["activities"]
+    assert len(activities) == len(PROF_ACTIVITY_SEED_DATA)
 
     expected = {seed.code: seed for seed in PROF_ACTIVITY_SEED_DATA}
-    for item in data:
+    for item in activities:
         seed = expected[item["code"]]
         assert item["name"] == seed.name
         assert item["description"] == seed.description

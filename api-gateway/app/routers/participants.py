@@ -14,14 +14,18 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.dependencies import get_current_active_user
 from app.db.models import User
 from app.db.session import get_db
+from app.repositories.scoring_result import ScoringResultRepository
 from app.schemas.final_report import FinalReportResponse
 from app.schemas.participant import (
     MessageResponse,
+    MetricItem,
     ParticipantCreateRequest,
     ParticipantListResponse,
     ParticipantResponse,
     ParticipantSearchParams,
     ParticipantUpdateRequest,
+    ScoringHistoryItem,
+    ScoringHistoryResponse,
 )
 from app.services.participant import ParticipantService
 from app.services.scoring import ScoringService
@@ -210,3 +214,78 @@ async def get_final_report(
 
     # Return JSON by default
     return FinalReportResponse(**report_data)
+
+
+@router.get("/{participant_id}/scores", response_model=ScoringHistoryResponse)
+async def get_participant_scoring_history(
+    participant_id: UUID,
+    limit: int = Query(10, ge=1, le=100, description="Maximum number of results to return"),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+) -> ScoringHistoryResponse:
+    """
+    Get scoring history for a participant.
+
+    Returns list of scoring results ordered by computed_at DESC.
+
+    Query parameters:
+    - limit: Maximum number of results (default: 10, max: 100)
+
+    Returns:
+    - List of scoring results with activity info, scores, strengths, dev_areas
+    - Each result includes prof_activity_code for generating final reports
+
+    Raises:
+    - 404: Participant not found
+    """
+    # Verify participant exists
+    participant_service = ParticipantService(db)
+    participant = await participant_service.get_participant(participant_id)
+    if not participant:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Participant not found")
+
+    # Get scoring history
+    scoring_repo = ScoringResultRepository(db)
+    results = await scoring_repo.list_by_participant(participant_id, limit=limit)
+
+    # Transform to response format
+    history_items = []
+    for result in results:
+        # Navigate to prof_activity through weight_table
+        prof_activity = result.weight_table.prof_activity
+
+        # Transform strengths/dev_areas if present
+        strengths = None
+        if result.strengths:
+            strengths = [MetricItem(**item) for item in result.strengths]
+
+        dev_areas = None
+        if result.dev_areas:
+            dev_areas = [MetricItem(**item) for item in result.dev_areas]
+
+        # Extract recommendations (stored as list of dicts or strings)
+        recommendations = None
+        if result.recommendations:
+            # Handle both old format (list of strings) and new format (list of dicts)
+            if isinstance(result.recommendations, list):
+                if result.recommendations and isinstance(result.recommendations[0], dict):
+                    # New format: extract 'text' field from each dict
+                    recommendations = [rec.get("text", str(rec)) for rec in result.recommendations]
+                else:
+                    # Old format: already list of strings
+                    recommendations = result.recommendations
+
+        history_items.append(
+            ScoringHistoryItem(
+                id=result.id,
+                prof_activity_code=prof_activity.code,
+                prof_activity_name=prof_activity.name,
+                score_pct=float(result.score_pct),
+                strengths=strengths,
+                dev_areas=dev_areas,
+                recommendations=recommendations,
+                created_at=result.computed_at,
+            )
+        )
+
+    return ScoringHistoryResponse(results=history_items, total=len(history_items))

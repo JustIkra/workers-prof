@@ -92,11 +92,13 @@ class ScoringResultRepository:
         Returns:
             List of ScoringResult instances, ordered by computed_at DESC
         """
+        from app.db.models import WeightTable
+
         result = await self.db.execute(
             select(ScoringResult)
             .options(
                 selectinload(ScoringResult.participant),
-                selectinload(ScoringResult.weight_table),
+                selectinload(ScoringResult.weight_table).selectinload(WeightTable.prof_activity),
             )
             .where(ScoringResult.participant_id == participant_id)
             .order_by(ScoringResult.computed_at.desc())

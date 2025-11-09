@@ -136,6 +136,14 @@ class ReportService:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Report not found")
         return report
 
+    async def get_participant_reports(self, participant_id: uuid.UUID) -> list[Report]:
+        """Get all reports for a participant."""
+        if not await self.repo.participant_exists(participant_id):
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Participant not found"
+            )
+        return await self.repo.get_all_by_participant(participant_id)
+
     async def get_download_context(self, report_id: uuid.UUID) -> ReportDownloadContext:
         """Resolve report and file path for download."""
         report = await self.repo.get_with_file_ref(report_id)
