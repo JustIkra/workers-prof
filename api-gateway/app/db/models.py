@@ -364,12 +364,11 @@ class ExtractedMetric(Base):
     """
     Extracted metric value from a report.
 
-    Stores numerical values extracted from report images via OCR, LLM, or manual input.
+    Stores numerical values extracted from report images via LLM or manual input.
     Each (report_id, metric_def_id) pair is unique to prevent duplicates.
 
     Source types:
-    - OCR: Extracted via PaddleOCR
-    - LLM: Extracted via Gemini Vision fallback
+    - LLM: Extracted via Gemini Vision
     - MANUAL: Manually entered by user
     """
 

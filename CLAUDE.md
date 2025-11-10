@@ -45,7 +45,7 @@ workers-prof/
 ### Backend
 - **Python 3.11/3.12**, FastAPI 0.120.3, SQLAlchemy 2 (async), Alembic, Pydantic v2
 - **Celery** (Redis/RabbitMQ), **pytest** + httpx for testing
-- **PaddleOCR** for table extraction, **Gemini API** for recommendations and vision fallback
+- **Gemini API** for vision-based table extraction and recommendations
 - **PostgreSQL 15+** (JSONB support), **Redis 7** (cache)
 
 ### Frontend
@@ -226,12 +226,11 @@ See `.memory-base/Tech details/infrastructure/extraction-pipeline.md` for full s
    - Unzip DOCX, extract `word/media/*` images
    - Store as `ReportImage` + PNG snapshots
    - Pre-process: OpenCV (contrast, deskew, resize)
-   - **Local OCR**: PaddleOCR + PP-Structure
-     - Extract numeric tokens matching `^(?:10|[1-9])([,.][0-9])?$` (range 1-10)
+   - **Gemini Vision**: send cropped table/bar ROIs via queue `vision` with strict JSON schema
+     - Accept only numeric tokens `^(?:10|[1-9])([,.][0-9])?$` (range 1-10)
      - Map labels to `MetricDef.code` via YAML config
-     - Quality gates: confidence ≥ 0.8, expected metric count
-   - **Gemini Vision fallback**: Send cropped ROI through queue `vision` if OCR fails quality checks
-   - Persist to `extracted_metric` with `source` (OCR/LLM) and `confidence`
+     - Quality gates: expected metric count, schema validation
+   - Persist to `extracted_metric` with `source` (LLM) and `confidence`
 
 3. **Scoring** (`app/services/scoring.py`):
    - Resolve `ProfActivity` by code, fetch active `WeightTable`
@@ -367,7 +366,7 @@ See `.memory-base/Conventions/Testing/` for detailed guidelines.
 
 **Models:**
 - Text (recommendations): `gemini-2.5-flash` (configurable via `GEMINI_MODEL_TEXT`)
-- Vision (OCR fallback): `gemini-2.5-flash` (configurable via `GEMINI_MODEL_VISION`)
+- Vision (primary): `gemini-2.5-flash` (configurable via `GEMINI_MODEL_VISION`)
 
 **Prompts:** See `.memory-base/Tech details/infrastructure/prompt-gemini-recommendations.md`
 
@@ -463,7 +462,7 @@ pytest tests/test_auth.py::test_login_success -v -s
 
 - **Weight tables**: Sum of weights MUST equal `Decimal('1.0')`
 - **Metric values**: Must be in range 1-10 (inclusive), stored as `Decimal`
-- **OCR tokens**: Only numeric `^(?:10|[1-9])([,.][0-9])?$`, ignore legends/axes
+- **Numeric tokens**: Only numeric `^(?:10|[1-9])([,.][0-9])?$`, ignore legends/axes
 - **Gemini prompts**: Strict JSON schema validation, reject out-of-range responses
 - **Test isolation**: Use fixtures from `conftest.py`, no external services in unit tests
 - **No phantom services**: NO separate ai-request-sender, NO Flower, NO weight_row table

@@ -30,7 +30,11 @@ test.describe('User Registration', () => {
     // 9. Click the "Зарегистрироваться" button to submit the form
     await page.getByRole('button', { name: 'Зарегистрироваться' }).click();
 
-    // Verify successful registration - user is redirected to login page with pending approval message
+    // 10. Verify success message appears (toast notification)
+    await expect(page.getByText('Регистрация успешна! Ожидайте одобрения администратора.')).toBeVisible();
+
+    // 11. Verify redirect to login page with pending approval alert
+    await expect(page).toHaveURL(/\/login\?message=pending/);
     await expect(page.getByText('Ваш аккаунт ожидает одобрения администратором.')).toBeVisible();
   });
 });

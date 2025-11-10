@@ -1,18 +1,21 @@
 """
-Scoring service for calculating professional fitness scores (S2-02, S2-03).
+Scoring service for calculating professional fitness scores (S2-02, S2-03, AI-03).
 
 Implements:
 - Formula: score_pct = Σ(value × weight) × 10
 - Strengths/dev_areas generation (S2-03)
+- AI recommendations generation (AI-03)
 
 With Decimal precision and quantization to 0.01.
 """
 
 from decimal import ROUND_HALF_UP, Decimal
+from typing import Union
 from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.clients import GeminiClient, GeminiPoolClient
 from app.repositories.metric import ExtractedMetricRepository
 from app.repositories.prof_activity import ProfActivityRepository
 from app.repositories.scoring_result import ScoringResultRepository
@@ -21,8 +24,11 @@ from app.repositories.scoring_result import ScoringResultRepository
 class ScoringService:
     """Service for calculating professional fitness scores."""
 
-    def __init__(self, db: AsyncSession):
+    def __init__(
+        self, db: AsyncSession, gemini_client: Union[GeminiClient, GeminiPoolClient, None] = None
+    ):
         self.db = db
+        self.gemini_client = gemini_client
         self.extracted_metric_repo = ExtractedMetricRepository(db)
         self.prof_activity_repo = ProfActivityRepository(db)
         self.scoring_result_repo = ScoringResultRepository(db)
@@ -130,13 +136,53 @@ class ScoringService:
             extracted_metrics=extracted_metrics,
         )
 
-        # 9. Save scoring result to database
+        # 9. Generate AI recommendations (AI-03) if enabled
+        recommendations = None
+        if self.gemini_client is not None:
+            from app.services.recommendations import generate_recommendations
+
+            # Prepare metrics for recommendations generator
+            metrics_for_recommendations = []
+            for metric_code, weight in weights_map.items():
+                value = metrics_map[metric_code]
+                metric_def = next(
+                    (m.metric_def for m in extracted_metrics if m.metric_def.code == metric_code),
+                    None,
+                )
+
+                if metric_def:
+                    metrics_for_recommendations.append(
+                        {
+                            "code": metric_code,
+                            "name": metric_def.name,
+                            "unit": metric_def.unit or "балл",
+                            "value": float(value),
+                            "weight": float(weight),
+                        }
+                    )
+
+            # Generate recommendations (async, may return None on failure)
+            recommendations_data = await generate_recommendations(
+                gemini_client=self.gemini_client,
+                metrics=metrics_for_recommendations,
+                score_pct=float(score_pct),
+                prof_activity_code=prof_activity_code,
+                prof_activity_name=prof_activity.name,
+                weight_table_version=weight_table.version,
+            )
+
+            # Extract recommendations list if generation succeeded
+            if recommendations_data:
+                recommendations = recommendations_data.get("recommendations", [])
+
+        # 10. Save scoring result to database
         scoring_result = await self.scoring_result_repo.create(
             participant_id=participant_id,
             weight_table_id=weight_table.id,
             score_pct=score_pct,
             strengths=strengths,
             dev_areas=dev_areas,
+            recommendations=recommendations,
             compute_notes=f"Calculated using weight table version {weight_table.version}",
         )
 
@@ -150,6 +196,7 @@ class ScoringService:
             "prof_activity_name": prof_activity.name,
             "strengths": strengths,
             "dev_areas": dev_areas,
+            "recommendations": recommendations,
         }
 
     def _generate_strengths_and_dev_areas(

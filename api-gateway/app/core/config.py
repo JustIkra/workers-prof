@@ -126,7 +126,7 @@ class Settings(BaseSettings):
         default=True, description="Enable AI-generated recommendations"
     )
     ai_vision_fallback_enabled: bool = Field(
-        default=True, description="Enable Gemini Vision fallback for OCR"
+        default=True, description="Enable Gemini Vision processing pipeline"
     )
 
     # ===== Computed Properties =====

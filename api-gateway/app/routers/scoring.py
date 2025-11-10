@@ -1,20 +1,24 @@
 """
-Scoring API router (S2-02, S2-03, S2-06).
+Scoring API router (S2-02, S2-03, S2-06, AI-03).
 
 Provides endpoints for:
 - Calculating professional fitness scores (S2-02)
 - Generating strengths and development areas (S2-03)
+- Generating AI recommendations (AI-03)
 - Fetching scoring history for participants (S2-06)
 """
 
 from decimal import Decimal
+from typing import Union
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.clients import GeminiClient, GeminiPoolClient
 from app.core.dependencies import get_current_active_user
+from app.core.gemini_factory import get_gemini_client
 from app.db.models import User
 from app.db.session import get_db
 from app.repositories.participant import ParticipantRepository
@@ -46,7 +50,7 @@ class MetricItem(BaseModel):
 
 
 class ScoringResponse(BaseModel):
-    """Response schema for scoring calculation (S2-02, S2-03)."""
+    """Response schema for scoring calculation (S2-02, S2-03, AI-03)."""
 
     scoring_result_id: str
     participant_id: str
@@ -62,6 +66,9 @@ class ScoringResponse(BaseModel):
     )
     dev_areas: list[MetricItem] = Field(
         default_factory=list, description="Top 5 low-value metrics (S2-03)"
+    )
+    recommendations: list[dict] = Field(
+        default_factory=list, description="AI-generated recommendations (AI-03)"
     )
 
 
@@ -94,9 +101,10 @@ async def calculate_participant_score(
     activity_code: str = Query(..., description="Professional activity code"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
+    gemini_client: Union[GeminiClient, GeminiPoolClient] = Depends(get_gemini_client),
 ):
     """
-    Calculate professional fitness score for a participant (S2-02, S2-03).
+    Calculate professional fitness score for a participant (S2-02, S2-03, AI-03).
 
     Requires:
     - Active weight table for the specified professional activity
@@ -108,12 +116,13 @@ async def calculate_participant_score(
     - Weight table version used
     - Strengths: Top 5 high-value metrics (S2-03)
     - Dev areas: Top 5 low-value metrics (S2-03)
+    - Recommendations: AI-generated recommendations (AI-03, optional)
 
     Raises:
     - 404: Participant or activity not found
     - 400: Missing metrics or invalid data
     """
-    scoring_service = ScoringService(db)
+    scoring_service = ScoringService(db, gemini_client=gemini_client)
 
     try:
         result = await scoring_service.calculate_score(
@@ -135,6 +144,7 @@ async def calculate_participant_score(
         missing_metrics=result["missing_metrics"],
         strengths=[MetricItem(**item) for item in result.get("strengths", [])],
         dev_areas=[MetricItem(**item) for item in result.get("dev_areas", [])],
+        recommendations=result.get("recommendations") or [],
     )
 
 

@@ -55,16 +55,17 @@ test.describe('Critical Path E2E', () => {
 
       // Admin login
       await adminPage.goto('/');
-      await adminPage.fill('input[name="email"]', ADMIN_EMAIL);
-      await adminPage.fill('input[name="password"]', ADMIN_PASSWORD);
-      await adminPage.click('button[type="submit"]');
+      await adminPage.getByRole('button', { name: 'Войти в систему' }).click();
+      await adminPage.getByRole('textbox', { name: '*Email' }).fill(ADMIN_EMAIL);
+      await adminPage.getByRole('textbox', { name: '*Пароль' }).fill(ADMIN_PASSWORD);
+      await adminPage.getByRole('button', { name: 'Войти' }).click();
 
-      // Wait for successful login
-      await adminPage.waitForURL(/\/(?!login)/);
+      // Wait for successful login and redirect to participants page
+      await adminPage.waitForURL(/\/participants/);
 
       // Get pending users via API
       const pendingUsers = await listPendingUsers(adminPage.request);
-      const newUser = pendingUsers.items.find(u => u.email === userEmail);
+      const newUser = pendingUsers.find(u => u.email === userEmail);
       expect(newUser).toBeDefined();
       userId = newUser.id;
 
@@ -78,9 +79,10 @@ test.describe('Critical Path E2E', () => {
     // Step 3: User login
     await test.step('User logs in', async () => {
       await page.goto('/');
-      await page.fill('input[name="email"]', userEmail);
-      await page.fill('input[name="password"]', userPassword);
-      await page.click('button[type="submit"]');
+      await page.getByRole('button', { name: 'Войти в систему' }).click();
+      await page.getByRole('textbox', { name: '*Email' }).fill(userEmail);
+      await page.getByRole('textbox', { name: '*Пароль' }).fill(userPassword);
+      await page.getByRole('button', { name: 'Войти' }).click();
 
       // Wait for successful login and redirect
       await page.waitForURL(/\/(?!login)/);
@@ -105,7 +107,7 @@ test.describe('Critical Path E2E', () => {
     // Step 5: Upload DOCX report
     let reportId;
     await test.step('Upload DOCX report', async () => {
-      const reportPath = path.join(process.cwd(), 'e2e', 'fixtures', 'test-report.docx');
+      const reportPath = path.join(process.cwd(), 'e2e', 'fixtures', 'Batura_A.A._Biznes-Profil_Biznes-otchyot_1718107.docx');
 
       const report = await uploadReport(
         page.request,
@@ -114,7 +116,7 @@ test.describe('Critical Path E2E', () => {
         reportPath
       );
 
-      expect(report.report_type).toBe('REPORT_1');
+      expect(report.type).toBe('REPORT_1');
       expect(report.status).toBe('UPLOADED');
       reportId = report.id;
     });
@@ -125,10 +127,8 @@ test.describe('Critical Path E2E', () => {
       const metricDefs = await listMetricDefs(page.request);
       expect(metricDefs.items.length).toBeGreaterThan(0);
 
-      // Enter values for first 5 metrics (or all available)
-      const metricsToEnter = metricDefs.items.slice(0, Math.min(5, metricDefs.items.length));
-
-      for (const metricDef of metricsToEnter) {
+      // Enter values for ALL metrics (required for scoring)
+      for (const metricDef of metricDefs.items) {
         // Enter a random value between 1 and 10
         const value = (Math.random() * 9 + 1).toFixed(1);
 
@@ -147,7 +147,7 @@ test.describe('Critical Path E2E', () => {
     await test.step('Calculate professional fitness score', async () => {
       // Use a known activity code from seed data
       // In real setup, we should query available activities first
-      const activityCode = 'MEETING_FACILITATION';
+      const activityCode = 'meeting_facilitation';
 
       scoringResult = await calculateScore(
         page.request,
@@ -157,15 +157,18 @@ test.describe('Critical Path E2E', () => {
 
       expect(scoringResult.participant_id).toBe(participantId);
       expect(scoringResult.score_pct).toBeDefined();
-      expect(scoringResult.score_pct).toBeGreaterThanOrEqual(0);
-      expect(scoringResult.score_pct).toBeLessThanOrEqual(100);
+
+      // score_pct is returned as a string representation of decimal
+      const scorePct = parseFloat(scoringResult.score_pct);
+      expect(scorePct).toBeGreaterThanOrEqual(0);
+      expect(scorePct).toBeLessThanOrEqual(100);
       expect(scoringResult.strengths).toBeDefined();
       expect(scoringResult.dev_areas).toBeDefined();
     });
 
     // Step 8: Get final report
     await test.step('Get final report JSON', async () => {
-      const activityCode = 'MEETING_FACILITATION';
+      const activityCode = 'meeting_facilitation';
 
       const finalReport = await getFinalReport(
         page.request,
@@ -178,7 +181,7 @@ test.describe('Critical Path E2E', () => {
       expect(finalReport.score_pct).toBeDefined();
       expect(finalReport.strengths).toBeDefined();
       expect(finalReport.dev_areas).toBeDefined();
-      expect(finalReport.metrics_table).toBeDefined();
+      expect(finalReport.metrics).toBeDefined();
       expect(finalReport.template_version).toBeDefined();
 
       // Verify strengths and dev_areas are within expected range
@@ -190,7 +193,7 @@ test.describe('Critical Path E2E', () => {
 
     // Step 9: Verify HTML format is also available
     await test.step('Get final report HTML', async () => {
-      const activityCode = 'MEETING_FACILITATION';
+      const activityCode = 'meeting_facilitation';
 
       const response = await page.request.get(
         `/api/participants/${participantId}/final-report?activity_code=${activityCode}&format=html`

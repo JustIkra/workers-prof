@@ -28,6 +28,8 @@ services:
         condition: service_healthy
     volumes:
       - reports:/app/storage
+      # Mount repo for CLI tools and access to local files in dev
+      - ./:/workspace
     command: ["./docker-entrypoint.sh"]
     restart: unless-stopped
 

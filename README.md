@@ -402,7 +402,7 @@ score_pct = Σ(metric_value × weight × 10)
 
 ### Интеграция с Gemini API
 
-Система использует Gemini API для генерации персонализированных рекомендаций и (в дальнейшем) для Vision‑fallback при извлечении чисел из изображений отчётов.
+Система использует Gemini API для генерации персонализированных рекомендаций и для извлечения чисел из изображений отчётов через Gemini Vision.
 - Основа: общий score_pct, сильные стороны, зоны развития
 - Модели по умолчанию: `gemini-2.5-flash` (text/vision), настраивается через `.env`
 - В `test/ci` внешняя сеть отключена (OFFLINE), вызовы мокируются
@@ -472,7 +472,7 @@ curl -H "Authorization: Bearer <TOKEN>" \
 
 - Final Report UI: список отчётов без заглушек, кнопки «Просмотреть JSON/Скачать HTML»
 - Scoring History API: `GET /api/participants/{id}/scores`
-- OCR → Нормализация → Gemini Vision fallback по правилам из `.memory-base`
+- Gemini Vision → Нормализация по правилам из `.memory-base`
 - VPN WireGuard: split‑tunnel на домены Gemini + `/api/vpn/health`
 - Observability/CI/E2E: счётчики per‑key Gemini; E2E сценарии 9–10
 

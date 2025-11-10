@@ -1,7 +1,7 @@
 Конвенции тестирования
 
 Область действия
-- Все сервисы проекта: backend (FastAPI), frontend (Vue 3), фоновые воркеры (Celery), интеграции (OCR/Gemini).
+- Все сервисы проекта: backend (FastAPI), frontend (Vue 3), фоновые воркеры (Celery), интеграции (Gemini Vision).
 - Цель — детерминированные, быстрые и воспроизводимые тесты с понятными критериями готовности.
 
 Уровни (пирамида)
@@ -18,7 +18,7 @@
 Правила детерминизма
 - Фиксировать время/случайность (freezegun/monkeypatch random/uuid).
 - Не читать конфигурацию из реального окружения, использовать фикстуры settings.
-- Для OCR/LLM — жёсткие фейки с фиксированными значениями и confidence.
+- Для Vision/LLM — жёсткие фейки с фиксированными значениями и confidence.
 
 Структура и инструменты
 - Backend: pytest, pytest-asyncio, httpx[async], asgi-lifespan; см. `.memory-base/Conventions/Testing/backend.md`.

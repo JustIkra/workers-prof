@@ -1,771 +1,1187 @@
-# Critical Path E2E UI Test Plan (S3-05)
-## Цифровая модель управления компетенциями
+# Workers-Prof Application - Critical Path Test Plan (S3-05)
 
 ## Application Overview
 
-The Цифровая модель управления компетенциями (Digital Competency Management Model) is a comprehensive web application for professional competency assessment and personnel development. The system provides:
+The **Workers-Prof** application is a comprehensive competency management system that automates professional suitability assessment. The platform features:
 
-- **User Management**: Registration with admin approval workflow
-- **Participant Management**: Centralized registry of assessment participants with full history
-- **Report Processing**: Automated DOCX report upload with OCR and AI-powered metric extraction
-- **Professional Suitability Scoring**: Calculation of professional fitness scores based on weighted metric tables
-- **Final Reports**: Generation of comprehensive assessment reports in JSON and HTML formats
+- **User Management**: Role-based access control with admin approval workflow for new registrations
+- **Participant Management**: Complete registry of participants with personal data and assessment history
+- **Report Processing**: Upload and automated processing of DOCX reports with AI Vision-powered metric extraction
+- **Manual Metric Entry**: Interface for reviewing and correcting automatically extracted metrics
+- **Scoring Engine**: Calculation of professional suitability scores using weighted metric formulas
+- **Final Reports**: Generation of comprehensive assessment reports in JSON and HTML formats with personalized recommendations
 
-The application features role-based access control with:
-- **Regular Users**: Can manage participants, upload reports, enter metrics, and calculate scores
-- **Administrators**: Can approve new users and manage weight tables
+The system supports three types of reports per participant: Business Report (REPORT_1), Respondent Report (REPORT_2), and Competencies Report (REPORT_3).
 
-## Test Environment
+---
+
+## Test Execution Environment
 
 - **Application URL**: http://localhost:9187
-- **Test Browser**: Chromium
-- **Seed File**: `e2e/seed.spec.ts`
-- **Test Data Location**: `/Users/maksim/git_projects/workers-prof/e2e/fixtures/test-report.docx`
-- **Admin Credentials**:
-  - Email: `admin@test.com`
-  - Password: `admin123`
-
-## Critical Path Test Scenarios
-
-### Scenario 1: User Registration
-
-**Seed:** `e2e/seed.spec.ts`
-
-**Objective**: Verify that new users can register and their account is created in PENDING status awaiting admin approval.
-
-**Steps:**
-1. Navigate to application home page at `http://localhost:9187`
-2. Verify landing page displays with heading "Цифровая модель управления компетенциями"
-3. Click on "Зарегистрироваться" button (ref: top right button or bottom CTA button)
-4. Verify navigation to registration page at `http://localhost:9187/register`
-5. Verify registration form displays with heading "Регистрация"
-6. In the "*Email" textbox, enter a unique test email address:
-   - Format: `e2e-test-user-{timestamp}@test.com`
-   - Example: `e2e-test-user-1699876543210@test.com`
-7. In the "*Пароль" textbox, enter a valid password:
-   - Must contain at least 8 characters, including letters and numbers
-   - Example: `TestPass123`
-8. In the "*Подтверждение пароля" textbox, enter the same password: `TestPass123`
-9. Click the "Зарегистрироваться" button to submit the form
-
-**Expected Results:**
-- Form submission is successful
-- User receives confirmation that registration is pending admin approval
-- User cannot log in until approved
-- New user appears in the admin pending users list with status PENDING
-
-**Data to Save for Later Scenarios:**
-- `testUserEmail`: The email address used for registration
-- `testUserPassword`: The password used for registration
+- **Test Fixtures Location**: `/Users/maksim/git_projects/workers-prof/e2e/fixtures/`
+- **Admin Credentials**: admin@test.com / admin123
+- **Test Data Files**:
+  - REPORT_1: `Batura_A.A._Biznes-Profil_Biznes-otchyot_1718107.docx`
+  - REPORT_2: `Batura_A.A._Biznes-Profil_Otchyot_dlya_respondenta_1718107.docx`
+  - REPORT_3: `Batura_A.A._Biznes-Profil_Otchyot_po_kompetentsiyam_1718107.docx`
 
 ---
 
-### Scenario 2: Admin Login
+## Test Scenarios
 
-**Seed:** `e2e/seed.spec.ts`
+### 1. User Registration
 
-**Objective**: Verify that admin can successfully authenticate and access admin-specific features.
+**Seed**: `e2e/seed.spec.ts` (fresh database state)
 
-**Assumptions**:
-- Admin account exists with email `admin@test.com` and password `admin123`
-- This should be performed in a separate browser context/tab to maintain both sessions
+**Preconditions**:
+- Application is running on http://localhost:9187
+- Database is in fresh state (no pending users)
+- Browser is opened to the home page
 
-**Steps:**
-1. Open a new browser context (separate session)
-2. Navigate to `http://localhost:9187`
-3. Click "Войти в систему" button on the landing page
-4. Verify navigation to login page at `http://localhost:9187/login`
-5. Verify login form displays with heading "Вход в систему"
-6. In the "*Email" textbox, enter: `admin@test.com`
-7. In the "*Пароль" textbox, enter: `admin123`
-8. Click the "Войти" button to submit the form
+#### 1.1 Successful User Registration
 
-**Expected Results:**
-- Login is successful
-- Success message displays: "Вход выполнен успешно"
-- Redirect to participants page at `http://localhost:9187/participants`
-- Top navigation bar displays:
-  - "Участники" menu item (with icon)
-  - "Админ" dropdown menu (with icon)
-  - User profile button showing "admin@test.com"
-- Admin dropdown menu contains:
-  - "Пользователи" (Users management)
-  - "Весовые таблицы" (Weight tables)
+**Steps**:
+1. Navigate to http://localhost:9187
+2. Verify page displays heading "Цифровая модель управления компетенциями"
+3. Click button with text "Зарегистрироваться" (either top or bottom button)
+4. Verify redirect to `/register` page
+5. Verify heading "Регистрация" is displayed
+6. Locate textbox with placeholder "Введите email"
+7. Type email: `testuser@example.com`
+8. Locate textbox with placeholder "Введите пароль (минимум 8 символов, буквы и цифры)"
+9. Type password: `Test1234`
+10. Locate textbox with placeholder "Повторите пароль"
+11. Type password confirmation: `Test1234`
+12. Click button "Зарегистрироваться"
+13. Wait for success message (toast notification)
 
----
+**Expected Results**:
+- Toast/alert appears with text: "Регистрация успешна! Ожидайте одобрения администратора."
+- Form is cleared or user is redirected to login page
+- New user record is created in database with `approved=false`
 
-### Scenario 3: Admin User Approval
+**Verification Points**:
+- Email validation works (prevents invalid formats)
+- Password requirements are enforced (minimum 8 characters, letters and digits)
+- Password confirmation must match password
+- Success message is clearly visible
 
-**Seed:** `e2e/seed.spec.ts`
+#### 1.2 Registration with Invalid Email
 
-**Objective**: Verify that admin can view pending users and approve new registrations, granting them access to the system.
+**Steps**:
+1. Navigate to http://localhost:9187/register
+2. Enter email: `invalid-email`
+3. Enter password: `Test1234`
+4. Enter password confirmation: `Test1234`
+5. Attempt to submit form
 
-**Assumptions**:
-- Admin is logged in (from Scenario 2)
-- At least one user is in PENDING status (from Scenario 1)
+**Expected Results**:
+- Form validation prevents submission
+- Error message indicates invalid email format
 
-**Steps:**
-1. From the participants page, click on the "Админ" dropdown menu
-2. Verify dropdown displays menu items: "Пользователи" and "Весовые таблицы"
-3. Click on "Пользователи" menu item
-4. Verify navigation to admin users page at `http://localhost:9187/admin/users`
-5. Verify page displays heading "Управление пользователями"
-6. Verify subheading "Ожидают одобрения (N)" where N is the count of pending users
-7. Locate the newly registered user in the pending users table:
-   - Email matches the test email from Scenario 1
-   - Status column shows "PENDING" badge
-   - Date column shows current date (08.11.2025)
-8. Click the "Одобрить" button for the test user
+#### 1.3 Registration with Weak Password
 
-**Expected Results:**
-- Success message appears confirming user approval
-- User row is removed from the pending users table
-- Counter "Ожидают одобрения (N)" decreases by 1
-- The approved user can now log in to the system
+**Steps**:
+1. Navigate to http://localhost:9187/register
+2. Enter email: `testuser2@example.com`
+3. Enter password: `weak`
+4. Enter password confirmation: `weak`
+5. Attempt to submit form
 
-**Verification Points:**
-- The email of the approved user matches the one from Scenario 1
-- Status changes from PENDING to ACTIVE (if there's an approved users section)
+**Expected Results**:
+- Form validation prevents submission
+- Error message indicates password requirements (minimum 8 characters, letters and digits)
 
----
+#### 1.4 Registration with Mismatched Passwords
 
-### Scenario 4: User Login (After Approval)
+**Steps**:
+1. Navigate to http://localhost:9187/register
+2. Enter email: `testuser3@example.com`
+3. Enter password: `Test1234`
+4. Enter password confirmation: `Different1234`
+5. Attempt to submit form
 
-**Seed:** `e2e/seed.spec.ts`
+**Expected Results**:
+- Form validation prevents submission
+- Error message indicates passwords do not match
 
-**Objective**: Verify that newly approved users can successfully log in and access the application.
+#### 1.5 Registration with Duplicate Email
 
-**Assumptions**:
-- User was registered in Scenario 1
-- User was approved by admin in Scenario 3
-- Use the original browser context from Scenario 1 (or open a new one)
+**Steps**:
+1. Complete successful registration with `duplicate@example.com`
+2. Navigate back to http://localhost:9187/register
+3. Attempt to register again with same email `duplicate@example.com`
+4. Submit form
 
-**Steps:**
-1. If not already on login page, navigate to `http://localhost:9187/login`
-2. In the "*Email" textbox, enter the test user email from Scenario 1
-3. In the "*Пароль" textbox, enter the test user password from Scenario 1
-4. Click the "Войти" button
-
-**Expected Results:**
-- Login is successful
-- Success message displays: "Вход выполнен успешно"
-- Redirect to participants page at `http://localhost:9187/participants`
-- Top navigation bar displays:
-  - "Участники" menu item
-  - User profile button showing the test user's email
-- Note: Regular users do NOT see the "Админ" dropdown menu
-- Participants list page displays with heading "Участники"
-- "Добавить участника" button is visible
+**Expected Results**:
+- Server returns error response
+- Error message indicates email already exists
 
 ---
 
-### Scenario 5: Create Participant
+### 2. Admin Approval
 
-**Seed:** `e2e/seed.spec.ts`
+**Seed**: `e2e/seed.spec.ts` (requires at least one pending user)
 
-**Objective**: Verify that authenticated users can create new participants in the system.
+**Preconditions**:
+- At least one user with `approved=false` exists in database
+- Admin user exists (admin@test.com)
+- Browser is not logged in
 
-**Assumptions**:
-- User is logged in (from Scenario 4)
-- User is on the participants list page
+#### 2.1 Admin Login
 
-**Steps:**
-1. From the participants page, click the "Добавить участника" button
-2. Verify "Добавить участника" dialog opens with heading "Добавить участника"
-3. Verify the dialog contains:
-   - "*ФИО" textbox (required, placeholder: "Введите полное имя")
-   - "Дата рождения" date picker
-   - "Внешний ID" textbox (optional, placeholder: "Внешний идентификатор (необязательно)")
-   - "Отмена" button
-   - "Создать" button
-4. In the "*ФИО" textbox, enter: `Тестов Тест Тестович`
-5. Click on the "Дата рождения" date picker
-6. Select birth date: `1990-01-15`
-7. In the "Внешний ID" textbox, enter: `E2E-TEST-{timestamp}`
-   - Example: `E2E-TEST-001`
-8. Click the "Создать" button to submit the form
+**Steps**:
+1. Navigate to http://localhost:9187/login
+2. Verify heading "Вход в систему" is displayed
+3. Locate textbox with placeholder "Введите email"
+4. Type email: `admin@test.com`
+5. Locate textbox with placeholder "Введите пароль"
+6. Type password: `admin123`
+7. Click button "Войти"
+8. Wait for redirect
 
-**Expected Results:**
+**Expected Results**:
+- Redirect to `/participants` page
+- Toast notification appears with text: "Вход выполнен успешно"
+- Top navigation shows user email "admin@test.com" in dropdown
+- "Админ" menu item is visible (admin-only feature)
+
+**Verification Points**:
+- Login fails with incorrect credentials
+- Session is established (token stored)
+- Navigation bar shows authenticated state
+
+#### 2.2 Navigate to User Management
+
+**Steps**:
+1. Ensure logged in as admin
+2. Locate menuitem "Админ" in top navigation
+3. Click on "Админ" menuitem to expand dropdown
+4. Verify dropdown contains options: "Пользователи" and "Весовые таблицы"
+5. Click menuitem "Пользователи"
+6. Wait for page load
+
+**Expected Results**:
+- URL changes to `/admin/users`
+- Heading "Управление пользователями" is displayed
+- Section heading "Ожидают одобрения (N)" shows count of pending users
+- If pending users exist, they are listed with email and approval button
+- If no pending users, message "Нет пользователей, ожидающих одобрения" is shown
+
+#### 2.3 Approve Pending User
+
+**Preconditions**:
+- At least one pending user exists (from scenario 1.1)
+
+**Steps**:
+1. Navigate to `/admin/users` (as admin)
+2. Verify pending user `testuser@example.com` is listed in "Ожидают одобрения" section
+3. Locate button "Одобрить" next to the user email
+4. Click "Одобрить" button
+5. Wait for confirmation
+
+**Expected Results**:
+- Toast notification appears: "Пользователь одобрен"
+- User is removed from "Ожидают одобрения" section
+- User count in heading decrements
+- User record in database is updated with `approved=true`
+
+**Verification Points**:
+- Approved user can now log in
+- Pending list updates in real-time
+- Admin action is logged (audit trail)
+
+#### 2.4 Reject Pending User (Optional Edge Case)
+
+**Steps**:
+1. Navigate to `/admin/users` (as admin)
+2. Locate pending user with "Отклонить" button (if available)
+3. Click "Отклонить" button
+4. Confirm rejection dialog (if present)
+
+**Expected Results**:
+- User is removed from pending list
+- User record is either deleted or marked as rejected
+- User cannot log in
+
+---
+
+### 3. User Login
+
+**Seed**: `e2e/seed.spec.ts` (requires approved user)
+
+**Preconditions**:
+- User `testuser@example.com` exists with `approved=true` (from scenario 2.3)
+- Browser is logged out
+
+#### 3.1 Successful Login with Approved User
+
+**Steps**:
+1. Navigate to http://localhost:9187/login
+2. Enter email: `testuser@example.com`
+3. Enter password: `Test1234`
+4. Click button "Войти"
+5. Wait for redirect
+
+**Expected Results**:
+- Redirect to `/participants` page
+- Toast notification: "Вход выполнен успешно"
+- Top navigation shows user email "testuser@example.com"
+- Participants list is visible (may be empty initially)
+- "Админ" menu is NOT visible (non-admin user)
+
+**Verification Points**:
+- Session token is stored in localStorage or cookies
+- Authenticated routes are accessible
+- Role-based UI elements are correct
+
+#### 3.2 Login with Unapproved User
+
+**Preconditions**:
+- User exists with `approved=false`
+
+**Steps**:
+1. Navigate to http://localhost:9187/login
+2. Enter email of unapproved user
+3. Enter correct password
+4. Click "Войти"
+
+**Expected Results**:
+- Login fails with error message
+- Error indicates user is not approved or account is pending
+- No redirect occurs
+
+#### 3.3 Login with Invalid Credentials
+
+**Steps**:
+1. Navigate to http://localhost:9187/login
+2. Enter email: `testuser@example.com`
+3. Enter password: `WrongPassword123`
+4. Click "Войти"
+
+**Expected Results**:
+- Error message appears: "Неверный email или пароль" (or similar)
+- No redirect occurs
+- Form remains on login page
+
+#### 3.4 Verify Session Persistence
+
+**Steps**:
+1. Login successfully as `testuser@example.com`
+2. Navigate to `/participants`
+3. Refresh browser page (F5)
+4. Wait for page load
+
+**Expected Results**:
+- User remains logged in (session persists)
+- Page loads without redirect to login
+- User email still visible in navigation
+
+---
+
+### 4. Create Participant
+
+**Seed**: `e2e/seed.spec.ts`
+
+**Preconditions**:
+- User is logged in (from scenario 3.1)
+- Currently on `/participants` page
+
+#### 4.1 Successful Participant Creation
+
+**Steps**:
+1. Verify on `/participants` page with heading "Участники"
+2. Click button "Добавить участника"
+3. Verify dialog opens with heading "Добавить участника"
+4. Locate textbox with placeholder "Введите полное имя"
+5. Type full name: `Батура Александр Александрович`
+6. Locate combobox labeled "Дата рождения"
+7. Click on date picker to open calendar
+8. Select date: June 15, 1985 (1985-06-15)
+   - Navigate to year 1985
+   - Navigate to month June (Июнь)
+   - Click day 15
+9. Locate textbox with placeholder "Внешний идентификатор (необязательно)"
+10. Type external ID: `BATURA_AA_TEST`
+11. Click button "Создать"
+12. Wait for dialog to close
+
+**Expected Results**:
 - Dialog closes
-- Success message appears confirming participant creation
-- Participants table refreshes and displays the new participant
-- New participant row shows:
-  - ФИО: "Тестов Тест Тестович"
-  - Дата рождения: "1990-01-15" (or formatted as "15.01.1990")
-  - Внешний ID: "E2E-TEST-001"
-  - Действия: "Открыть" and "Удалить" buttons
-- Total count updates (e.g., "Всего 3" if there were 2 before)
+- Toast notification: "Участник создан успешно" (or similar)
+- New participant appears in the table with:
+  - Full name: "Батура Александр Александрович"
+  - Birth date: "1985-06-15"
+  - External ID: "BATURA_AA_TEST"
+- Table shows action buttons: "Открыть" and "Удалить"
+- Participant count updates ("Всего 1" or increments)
 
-**Data to Save for Later Scenarios:**
-- `participantId`: The ID of the created participant (can be extracted from URL when opened)
-- `participantName`: "Тестов Тест Тестович"
-- `participantExternalId`: "E2E-TEST-001"
+**Verification Points**:
+- Form validation requires full name
+- Date picker accepts valid dates
+- External ID is optional
+- Participant is persisted in database
+
+#### 4.2 Create Participant Without External ID
+
+**Steps**:
+1. Click "Добавить участника"
+2. Enter full name: `Иванов Иван Иванович`
+3. Select birth date: 1990-01-01
+4. Leave external ID empty
+5. Click "Создать"
+
+**Expected Results**:
+- Participant is created successfully
+- External ID cell is empty or shows placeholder value
+- No validation error for missing external ID
+
+#### 4.3 Create Participant with Missing Required Fields
+
+**Steps**:
+1. Click "Добавить участника"
+2. Leave full name empty
+3. Select birth date
+4. Click "Создать"
+
+**Expected Results**:
+- Form validation prevents submission
+- Error message indicates required field "ФИО"
+
+#### 4.4 Create Participant with Invalid Date
+
+**Steps**:
+1. Click "Добавить участника"
+2. Enter full name
+3. Attempt to select future date (e.g., tomorrow)
+4. Try to submit
+
+**Expected Results**:
+- Date picker prevents selection of future dates
+- Or validation error appears if future date is entered
 
 ---
 
-### Scenario 6: Upload Report
+### 5. Upload Reports
 
-**Seed:** `e2e/seed.spec.ts`
+**Seed**: `e2e/seed.spec.ts`
 
-**Objective**: Verify that users can upload DOCX reports for participants, triggering the automated extraction pipeline.
-
-**Assumptions**:
+**Preconditions**:
 - User is logged in
-- Participant was created in Scenario 5
-- Test DOCX file exists at `/Users/maksim/git_projects/workers-prof/e2e/fixtures/test-report.docx`
+- Participant "Батура Александр Александрович" exists (from scenario 4.1)
+- Test fixture files are available at `/Users/maksim/git_projects/workers-prof/e2e/fixtures/`
 
-**Steps:**
-1. From the participants list, locate the test participant "Тестов Тест Тестович"
-2. Click the "Открыть" button for the test participant
-3. Verify navigation to participant detail page at `http://localhost:9187/participants/{participantId}`
-4. Verify page displays:
-   - Heading with participant name: "Тестов Тест Тестович"
-   - "Назад" button
-   - "Рассчитать пригодность" button
-   - Participant details table showing ФИО, Дата рождения, Внешний ID, Дата создания
-   - "Отчёты" section with heading "Отчёты"
-   - "Загрузить отчёт" button
-5. Click the "Загрузить отчёт" button
-6. Verify "Загрузить отчёт" dialog opens with heading "Загрузить отчёт"
-7. Verify dialog contains:
-   - "*Тип отчёта" dropdown (required, placeholder: "Выберите тип")
-   - "*Файл (DOCX)" file upload section
-   - "Выбрать файл" button
-   - Helper text: "Только файлы DOCX, максимум 20 МБ"
-   - "Отмена" button
-   - "Загрузить" button (initially disabled)
-8. Click on "*Тип отчёта" dropdown
-9. Select report type from available options (check what types are available in the dropdown)
-10. Click "Выбрать файл" button
-11. When file chooser dialog appears, select the test DOCX file:
-    - Path: `/Users/maksim/git_projects/workers-prof/e2e/fixtures/test-report.docx`
-12. Verify selected filename appears in the upload section
-13. Verify "Загрузить" button becomes enabled
-14. Click the "Загрузить" button to submit the upload
+#### 5.1 Navigate to Participant Detail Page
 
-**Expected Results:**
+**Steps**:
+1. On `/participants` page, locate participant "Батура Александр Александрович"
+2. Click button "Открыть" for this participant
+3. Wait for page load
+
+**Expected Results**:
+- URL changes to `/participants/{participant_id}` (UUID)
+- Heading displays participant name: "Батура Александр Александрович"
+- Participant info table shows:
+  - ФИО: "Батура Александр Александрович"
+  - Дата рождения: "1985-06-15"
+  - Внешний ID: "BATURA_AA_TEST"
+  - Дата создания: current timestamp
+- Section "Отчёты" is visible with heading
+- Button "Загрузить отчёт" is present
+- Button "Рассчитать пригодность" is present but may be disabled
+- Reports table is empty with message: "Нет загруженных отчётов"
+
+#### 5.2 Upload REPORT_1 (Business Report)
+
+**Steps**:
+1. On participant detail page, click button "Загрузить отчёт"
+2. Verify dialog opens with heading "Загрузить отчёт"
+3. Click combobox labeled "Тип отчёта"
+4. Verify dropdown shows options: "Отчёт 1", "Отчёт 2", "Отчёт 3"
+5. Select option "Отчёт 1"
+6. Click button "Выбрать файл"
+7. In file picker dialog, select file: `Batura_A.A._Biznes-Profil_Biznes-otchyot_1718107.docx`
+8. Verify filename appears in upload area
+9. Click button "Загрузить"
+10. Wait for upload to complete
+
+**Expected Results**:
 - Dialog closes
-- Success message appears: "Отчёт загружен успешно" or similar
-- Reports table refreshes and shows the uploaded report with:
-  - Тип: Selected report type
-  - Статус: "PROCESSING" or "PENDING" initially
-  - Дата загрузки: Current date and time
-  - Действия: Available action buttons (e.g., "Просмотреть", "Удалить")
-- Empty state message "Нет загруженных отчётов" is no longer visible
-- Background processing begins:
-  - Celery task extracts images from DOCX
-  - OCR processing on extracted tables/charts
-  - Metrics are extracted and stored in database
+- Toast notification: "Отчёт загружен успешно" (or similar)
+- Reports table now shows one row:
+  - Тип: "Отчёт 1" or "REPORT_1"
+  - Статус: "Обработка" or "Обработан" (depending on Celery task completion)
+  - Дата загрузки: current date/time
+  - Действия: buttons for "Открыть" / "Скачать" / "Удалить"
+- File is stored on server in `/app/storage/` directory
+- Database records created: `file_ref`, `report` (with `file_ref_id`)
+- Celery task `extract_images_from_report` is triggered (runs async or eager in test mode)
 
-**Note on Async Processing:**
-- The extraction pipeline runs asynchronously via Celery
-- Report status should eventually change to "COMPLETED" or "READY"
-- For E2E testing, may need to poll/wait for status change
-- Metrics should appear in the extracted_metric table
+**Verification Points**:
+- Only DOCX files are accepted
+- File size limit is enforced (max 20 MB)
+- Upload progress indicator appears for large files
+- Status updates when processing completes
 
-**Data to Save for Later Scenarios:**
-- `reportId`: The ID of the uploaded report
-- `reportType`: The type selected during upload
+#### 5.3 Upload REPORT_2 (Respondent Report)
 
----
+**Steps**:
+1. Click "Загрузить отчёт" again
+2. Select report type "Отчёт 2"
+3. Choose file: `Batura_A.A._Biznes-Profil_Otchyot_dlya_respondenta_1718107.docx`
+4. Click "Загрузить"
+5. Wait for completion
 
-### Scenario 7: Enter Metrics Manually
+**Expected Results**:
+- Second report appears in table
+- Type: "Отчёт 2" or "REPORT_2"
+- Status updates to "Обработан" when Celery task completes
+- Reports table shows 2 rows
 
-**Seed:** `e2e/seed.spec.ts`
+#### 5.4 Upload REPORT_3 (Competencies Report)
 
-**Objective**: Verify that users can manually enter or verify metric values extracted from reports.
+**Steps**:
+1. Click "Загрузить отчёт" again
+2. Select report type "Отчёт 3"
+3. Choose file: `Batura_A.A._Biznes-Profil_Otchyot_po_kompetentsiyam_1718107.docx`
+4. Click "Загрузить"
+5. Wait for completion
 
-**Assumptions**:
-- User is logged in
-- Participant has at least one uploaded report (from Scenario 6)
-- Metrics have been extracted (either via OCR or need manual entry)
+**Expected Results**:
+- Third report appears in table
+- Type: "Отчёт 3" or "REPORT_3"
+- Reports table shows 3 rows (all reports uploaded)
+- Each report has independent status tracking
 
-**Note**: Based on the exploration, the UI for manual metric entry was not directly visible. This scenario assumes there is a metrics management interface accessible from the participant detail page or report detail view. If metrics are automatically extracted and no manual entry UI exists, this scenario should focus on viewing/verifying extracted metrics.
+**Verification Points**:
+- System prevents uploading duplicate report types for same participant
+- Or allows overwriting with confirmation dialog
+- Status transitions: "Загружается" → "Обработка" → "Обработан" or "Ошибка"
 
-**Steps (Assuming Metrics View/Edit Interface Exists):**
+#### 5.5 Attempt to Upload Invalid File Type
 
-1. From the participant detail page, locate the uploaded report in the reports table
-2. Click on the report row or "Просмотреть" action button to view report details
-3. Navigate to the metrics section of the report detail view
-4. Verify that extracted metrics are displayed (if OCR processing completed)
-5. If manual entry/editing is available:
-   - Locate metric input fields or edit buttons
-   - For each required metric (scale 1-10), enter or verify values:
-     - Коммуникабельность (communicability): `7.5`
-     - Командность (teamwork): `8.0`
-     - Конфликтность низкая (low_conflict): `6.5`
-     - Роль «Душа команды» (team_soul): `7.0`
-     - Организованность (organization): `8.5`
-     - Ответственность (responsibility): `9.0`
-     - Невербальная логика (nonverbal_logic): `6.0`
-     - Обработка информации (info_processing): `7.5`
-     - Комплексное решение проблем (complex_problem_solving): `7.0`
-     - Эмоциональная стабильность (emotional_stability): `8.0`
-     - Стрессоустойчивость (stress_resistance): `7.5`
-     - Вербальная логика (verbal_logic): `6.5`
-     - Вербальный интеллект (verbal_intelligence): `7.0`
-6. Click "Сохранить" or "Подтвердить" button to save metric values
-7. Verify success message appears
+**Steps**:
+1. Click "Загрузить отчёт"
+2. Select report type "Отчёт 1"
+3. Attempt to select a .pdf or .txt file
 
-**Alternative Steps (If No Manual Entry UI):**
+**Expected Results**:
+- File picker restricts to .docx only
+- Or validation error appears: "Только файлы DOCX"
 
-1. Verify that OCR extraction completed successfully
-2. Check that metrics appear in the participant detail view or scoring interface
-3. Ensure minimum required metrics are present for scoring calculation
+#### 5.6 Attempt to Upload Oversized File
 
-**Expected Results:**
-- All 13 metrics required for "meeting_facilitation" professional activity are available
-- Metric values are within valid range (1.0 to 10.0)
-- Metrics are stored in the `extracted_metric` table with proper participant and report associations
-- Confidence scores are recorded for each metric
-- Source is marked as either "OCR" or "MANUAL" (if manually entered)
+**Preconditions**:
+- Test file larger than 20 MB is available
 
-**Metrics Required for Meeting Facilitation:**
-Based on the seed data, these 13 metrics are required:
-1. communicability (вес: 0.18)
-2. teamwork (вес: 0.10)
-3. low_conflict (вес: 0.05)
-4. team_soul (вес: 0.05)
-5. organization (вес: 0.12)
-6. responsibility (вес: 0.10)
-7. nonverbal_logic (вес: 0.08)
-8. info_processing (вес: 0.08)
-9. complex_problem_solving (вес: 0.06)
-10. emotional_stability (вес: 0.07)
-11. stress_resistance (вес: 0.05)
-12. verbal_logic (вес: 0.03)
-13. verbal_intelligence (вес: 0.03)
+**Steps**:
+1. Click "Загрузить отчёт"
+2. Select report type
+3. Choose file larger than 20 MB
+4. Attempt to upload
 
----
+**Expected Results**:
+- Validation error: "Максимум 20 МБ"
+- Upload is prevented
 
-### Scenario 8: Calculate Professional Suitability Score
+#### 5.7 Verify Processing Status Updates
 
-**Seed:** `e2e/seed.spec.ts`
+**Steps**:
+1. After uploading a report, observe status column
+2. Wait for Celery task to complete (may take 10-60 seconds depending on Vision processing)
+3. Refresh page if needed
 
-**Objective**: Verify that users can calculate professional suitability scores for participants based on extracted metrics and weight tables.
-
-**Assumptions**:
-- User is logged in
-- Participant has uploaded reports with extracted metrics (from Scenarios 6 & 7)
-- All required metrics for at least one professional activity are available
-- Weight table exists for the professional activity "Организация и проведение совещаний" (code: `meeting_facilitation`)
-
-**Steps:**
-1. Navigate to the participant detail page for "Тестов Тест Тестович"
-2. Verify participant details are displayed
-3. Click the "Рассчитать пригодность" button
-4. Verify "Рассчитать профессиональную пригодность" dialog opens
-5. Verify dialog contains:
-   - Heading: "Рассчитать профессиональную пригодность"
-   - "*Профессиональная область" dropdown (required)
-   - Info alert: "Убедитесь, что у участника загружены и обработаны отчёты с метриками"
-   - "Отмена" button
-   - "Рассчитать" button (initially disabled)
-6. If warning appears "У участника нет загруженных отчётов":
-   - Verify this is accurate (check reports table)
-   - If reports exist but metrics aren't extracted yet, wait for processing to complete
-7. Click on "*Профессиональная область" dropdown to view available activities
-8. Select "Организация и проведение совещаний" from the dropdown
-9. Verify "Рассчитать" button becomes enabled
-10. Click the "Рассчитать" button to trigger score calculation
-
-**Expected Results:**
-- Dialog closes
-- Success message appears: "Расчёт выполнен успешно" or similar
-- Participant detail page refreshes
-- Scoring results section appears on the page showing:
-  - **Профессиональная область**: "Организация и проведение совещаний"
-  - **Процент пригодности**: Calculated percentage (e.g., "72.5%")
-  - **Дата расчёта**: Current date and time
-  - **Сильные стороны**: List of top-performing metrics (highest values)
-  - **Зоны развития**: List of metrics needing improvement (lowest values)
-- Action buttons available:
-  - "Просмотреть JSON" - View detailed results in JSON format
-  - "Скачать HTML" or "Просмотреть отчёт" - View/download HTML report
-
-**Calculation Details:**
-- Score is calculated as: `score_pct = Σ(metric_value × weight) × 10`
-- Example with sample values:
-  ```
-  communicability (7.5) × 0.18 = 1.35
-  teamwork (8.0) × 0.10 = 0.80
-  ... (all 13 metrics)
-  Total weighted sum × 10 = 72.5%
-  ```
-- Result is stored in `scoring_result` table with:
-  - participant_id
-  - prof_activity_id
-  - weight_table_id
-  - score_pct (Decimal with 2 decimal places)
-  - strengths (JSONB array)
-  - development_areas (JSONB array)
-  - recommendations (JSONB, if AI-generated)
-
-**Verification Points:**
-- Score percentage is between 0.00 and 100.00
-- Strengths list contains 3-5 top metrics
-- Development areas list contains 3-5 bottom metrics
-- Timestamp is accurate
-
-**Data to Save for Later Scenarios:**
-- `scoringResultId`: The ID of the created scoring result
-- `calculatedScore`: The percentage score calculated
+**Expected Results**:
+- Status changes from "Обработка" to "Обработан"
+- Or status shows "Ошибка" if extraction failed
+- Status updates automatically via polling or WebSocket (if implemented)
+- Or manual refresh shows updated status
 
 ---
 
-### Scenario 9: View Final Report (JSON Format)
+### 6. Manual Metrics Entry
 
-**Seed:** `e2e/seed.spec.ts`
+**Seed**: `e2e/seed.spec.ts`
 
-**Objective**: Verify that users can view comprehensive assessment results in JSON format with all scoring details.
-
-**Assumptions**:
+**Preconditions**:
 - User is logged in
-- Scoring calculation was completed in Scenario 8
-- Scoring results exist for the test participant
+- Participant "Батура Александр Александрович" exists
+- At least one report is uploaded and processed (status: "Обработан")
+- On participant detail page
 
-**Steps:**
-1. From the participant detail page with scoring results visible
-2. Locate the scoring results section
-3. Click the "Просмотреть JSON" button or link
+#### 6.1 Navigate to Report Metrics Page
 
-**Expected Results:**
-- JSON report modal/page opens or new tab opens
-- JSON content is displayed in a formatted/readable way (with syntax highlighting if available)
-- JSON structure contains:
+**Steps**:
+1. On participant detail page, locate the uploaded report (e.g., REPORT_1)
+2. Verify status is "Обработан"
+3. Click button "Открыть" in the report's action column
+4. Wait for navigation
+
+**Expected Results**:
+- URL changes to `/reports/{report_id}` or `/participants/{participant_id}/reports/{report_id}`
+- Page displays report details:
+  - Report type (REPORT_1, REPORT_2, or REPORT_3)
+  - Upload date
+  - Processing status
+- Section "Извлечённые метрики" or "Метрики" is visible
+- If Vision extraction succeeded, metrics are pre-filled with values and confidence scores
+- If extraction failed or no metrics found, form is empty
+- Edit/input controls are available for each metric
+
+**Verification Points**:
+- Source indicator displays: "LLM" (Vision) or "MANUAL"
+- Confidence scores are shown (e.g., 0.85, 0.92)
+- Low confidence metrics (< 0.8) are highlighted or flagged for review
+
+#### 6.2 Review Auto-Extracted Metrics
+
+**Steps**:
+1. On report metrics page, review the list of metrics
+2. Verify expected metrics are present based on report type:
+   - Communicability (коммуникабельность)
+   - Teamwork (работа в команде)
+   - Responsibility (ответственность)
+   - Leadership (лидерство)
+   - Stress resistance (стрессоустойчивость)
+   - Time management (тайм-менеджмент)
+   - And others as defined in metric definitions
+
+**Expected Results**:
+- Each metric has a label (name)
+- Each metric shows a numeric value (range 1.0 to 10.0)
+- Confidence score is displayed (if available)
+- Source indicator shows "LLM" or "MANUAL"
+
+#### 6.3 Manually Enter/Correct Metric Values
+
+**Assumption**: Metrics can be edited even if auto-extracted
+
+**Steps**:
+1. Locate metric input field for "Communicability" (коммуникабельность)
+2. Clear existing value (if any)
+3. Enter value: `7.5`
+4. Locate metric input for "Teamwork" (работа в команде)
+5. Enter value: `6.5`
+6. Locate metric input for "Responsibility" (ответственность)
+7. Enter value: `8.0`
+8. Locate metric input for "Leadership" (лидерство)
+9. Enter value: `7.0`
+10. Locate metric input for "Stress resistance" (стрессоустойчивость)
+11. Enter value: `7.5`
+12. Locate metric input for "Time management" (тайм-менеджмент)
+13. Enter value: `6.0`
+14. Continue entering values for remaining metrics as needed
+15. Click button "Сохранить" or "Сохранить метрики"
+16. Wait for save confirmation
+
+**Expected Results**:
+- Toast notification: "Метрики сохранены успешно"
+- Values are persisted to database (`extracted_metric` table)
+- Source changes to "MANUAL" or remains as is with updated values
+- Confidence score may be set to 1.0 for manual entries
+- Page remains on report detail or redirects back to participant page
+
+**Verification Points**:
+- Input validation enforces range 1.0-10.0
+- Decimal values are accepted (e.g., 7.5)
+- Values outside range show error (e.g., 11.0 or 0.5)
+- Save button is disabled until valid changes are made
+
+#### 6.4 Enter Invalid Metric Values
+
+**Steps**:
+1. On metrics entry page, locate a metric input
+2. Enter value: `15.0` (above max)
+3. Attempt to save
+
+**Expected Results**:
+- Validation error: "Значение должно быть от 1 до 10"
+- Save is prevented
+
+**Steps**:
+1. Clear field and enter value: `0.5` (below min)
+2. Attempt to save
+
+**Expected Results**:
+- Validation error: "Значение должно быть от 1 до 10"
+- Save is prevented
+
+#### 6.5 Save Partial Metrics
+
+**Steps**:
+1. Enter values for only some metrics (e.g., 3 out of 10)
+2. Leave other fields empty
+3. Click "Сохранить"
+
+**Expected Results**:
+- Either:
+  - A) System allows partial save (saves entered values)
+  - B) Validation requires all metrics to be filled
+- If partial save allowed, warning may appear about incomplete data
+- Scoring calculation later may require all metrics
+
+#### 6.6 Navigate Back to Participant Page
+
+**Steps**:
+1. After saving metrics, click "Назад" button or navigate via breadcrumbs
+2. Verify return to participant detail page
+
+**Expected Results**:
+- URL returns to `/participants/{participant_id}`
+- Reports list still shows all uploaded reports
+- Metrics are saved and available for scoring
+
+---
+
+### 7. Calculate Score
+
+**Seed**: `e2e/seed.spec.ts`
+
+**Preconditions**:
+- User is logged in
+- Participant "Батура Александр Александрович" exists
+- All three reports uploaded and metrics entered (from scenarios 5 and 6)
+- On participant detail page
+
+#### 7.1 Open Calculate Score Dialog
+
+**Steps**:
+1. On participant detail page, verify reports are present
+2. Click button "Рассчитать пригодность"
+3. Verify dialog opens
+
+**Expected Results**:
+- Dialog appears with heading "Рассчитать профессиональную пригодность"
+- Combobox labeled "Профессиональная область" is present
+- Info alert may appear: "Убедитесь, что у участника загружены и обработаны отчёты с метриками"
+- If no reports uploaded, warning alert: "У участника нет загруженных отчётов"
+- Button "Рассчитать" is initially disabled until activity selected
+
+#### 7.2 Select Professional Activity
+
+**Steps**:
+1. In the dialog, click combobox "Профессиональная область"
+2. Verify dropdown shows available professional activities
+3. Verify option "Организация и проведение совещаний" is present
+4. Verify code "meeting_facilitation" is shown as subtitle
+5. Click option "Организация и проведение совещаний"
+6. Verify button "Рассчитать" becomes enabled
+
+**Expected Results**:
+- Selected activity appears in combobox
+- Professional activity options are loaded from database (`prof_activity` table)
+- Each option shows name and code
+- Button "Рассчитать" is now clickable
+
+**Verification Points**:
+- Dropdown loads all active professional activities
+- Activities with no active weight tables may be disabled or show warning
+
+#### 7.3 Calculate Suitability Score
+
+**Steps**:
+1. With "Организация и проведение совещаний" selected
+2. Click button "Рассчитать"
+3. Wait for calculation to complete
+
+**Expected Results**:
+- Dialog closes or shows loading indicator
+- Calculation is performed (may call API endpoint: `POST /api/scoring/calculate`)
+- API uses `ScoringService.calculate_score()` with:
+  - Participant ID
+  - Professional activity code: `meeting_facilitation`
+  - Fetches extracted metrics from database
+  - Loads active weight table for `meeting_facilitation`
+  - Computes: `score_pct = Σ(metric_value × weight) × 10`
+  - Expected score ≈ 72% based on sample metrics:
+    - Communicability 7.5 × weight
+    - Teamwork 6.5 × weight
+    - Responsibility 8.0 × weight
+    - etc.
+- Toast notification: "Расчёт выполнен успешно"
+- Scoring result is saved to database (`scoring_result` table)
+- Page may show new "Результаты" section or update UI with score
+
+**Verification Points**:
+- Calculation requires all necessary metrics to be present
+- If metrics are missing, error appears: "Недостаточно данных для расчёта"
+- Score is quantized to 0.01 precision (e.g., 72.34%)
+- Recommendations are generated (strengths and development areas)
+
+#### 7.4 Verify Calculation Error Handling
+
+**Preconditions**:
+- Participant has no metrics entered
+
+**Steps**:
+1. On participant with no reports or metrics, click "Рассчитать пригодность"
+2. Select professional activity
+3. Click "Рассчитать"
+
+**Expected Results**:
+- Error message: "У участника нет метрик для расчёта"
+- Or dialog prevents calculation with disabled button and warning
+
+**Steps** (Missing metrics):
+1. Participant has some metrics but not all required for selected activity
+2. Attempt calculation
+
+**Expected Results**:
+- Error: "Не все метрики доступны для расчёта"
+- Missing metrics are listed
+
+#### 7.5 View Calculation Results
+
+**Steps**:
+1. After successful calculation, verify results are displayed on participant page
+2. Look for "Результаты профпригодности" section or similar
+
+**Expected Results**:
+- Section shows:
+  - Professional activity: "Организация и проведение совещаний"
+  - Score percentage: ~72% (or calculated value)
+  - Calculation date/time
+  - Action buttons: "Просмотреть JSON", "Скачать HTML"
+- Results table may show multiple scoring results if calculated for different activities
+
+---
+
+### 8. View Final Report JSON
+
+**Seed**: `e2e/seed.spec.ts`
+
+**Preconditions**:
+- User is logged in
+- Participant "Батура Александр Александрович" exists
+- Scoring calculation completed for "Организация и проведение совещаний" (from scenario 7.3)
+
+#### 8.1 Open JSON Report Dialog/Page
+
+**Steps**:
+1. On participant detail page, locate scoring results section
+2. Find result for "Организация и проведение совещаний" (meeting_facilitation)
+3. Click button "Просмотреть JSON"
+4. Wait for dialog or new page to load
+
+**Expected Results**:
+- Dialog or modal appears with heading "Финальный отчёт (JSON)"
+- Or new page/tab opens showing JSON content
+- JSON structure is displayed (may be formatted with syntax highlighting)
+
+#### 8.2 Verify JSON Report Structure
+
+**Steps**:
+1. In the JSON view, verify presence of required fields:
+   - `participant_id` (UUID string)
+   - `participant_name` (string: "Батура Александр Александрович")
+   - `activity_code` (string: "meeting_facilitation")
+   - `activity_name` (string: "Организация и проведение совещаний")
+   - `score_pct` (number: approximately 72.0)
+   - `calculated_at` (ISO timestamp)
+   - `strengths` (array of objects)
+   - `dev_areas` (array of objects, development areas)
+   - `metrics_table` (array of metric objects)
+
+**Expected Results - Field Details**:
+- `participant_id`: matches participant UUID
+- `score_pct`: decimal value, expected ≈ 72.0 or similar
+- `strengths`: array with 3-5 elements
+  - Each element has: `metric_code`, `metric_name`, `value`, `description`
+  - Example: `{"metric_code": "responsibility", "metric_name": "Ответственность", "value": 8.0, "description": "..."}`
+- `dev_areas`: array with 3-5 elements (areas for development)
+  - Similar structure to strengths
+  - Contains metrics with lower values or high improvement potential
+- `metrics_table`: array of all metrics used in calculation
+  - Each element: `metric_code`, `metric_name`, `value`, `weight`, `weighted_score`
+  - Example: `{"metric_code": "communicability", "metric_name": "Коммуникабельность", "value": 7.5, "weight": 0.15, "weighted_score": 1.125}`
+
+**Verification Points**:
+- JSON is valid (can be parsed)
+- `strengths.length >= 3 && strengths.length <= 5`
+- `dev_areas.length >= 3 && dev_areas.length <= 5`
+- `metrics_table` includes all metrics from weight table
+- Sum of weights in `metrics_table` equals 1.0
+- Calculated `score_pct` matches: `Σ(value × weight) × 10`
+
+#### 8.3 Verify Strengths Content
+
+**Steps**:
+1. Locate `strengths` array in JSON
+2. Verify each strength has:
+   - High metric value (typically >= 7.0)
+   - Descriptive text explaining why it's a strength
+   - Metric is relevant to selected professional activity
+
+**Expected Results**:
+- Strengths are top-performing metrics for the participant
+- Descriptions are meaningful (not generic placeholders)
+- Example strength:
   ```json
   {
-    "participant": {
-      "id": "uuid",
-      "full_name": "Тестов Тест Тестович",
-      "birth_date": "1990-01-15",
-      "external_id": "E2E-TEST-001"
-    },
-    "professional_activity": {
-      "code": "meeting_facilitation",
-      "name": "Организация и проведение совещаний",
-      "description": "..."
-    },
-    "scoring": {
-      "score_pct": "72.50",
-      "calculated_at": "2025-11-08T...",
-      "weight_table_version": "v1.0"
-    },
-    "metrics": [
-      {
-        "code": "communicability",
-        "name": "Коммуникабельность",
-        "value": "7.50",
-        "weight": "0.18",
-        "contribution": "1.35"
-      },
-      // ... all 13 metrics
-    ],
-    "strengths": [
-      {
-        "metric_code": "responsibility",
-        "metric_name": "Ответственность",
-        "value": "9.00"
-      },
-      // ... top 3-5 metrics
-    ],
-    "development_areas": [
-      {
-        "metric_code": "verbal_logic",
-        "metric_name": "Вербальная логика",
-        "value": "6.50"
-      },
-      // ... bottom 3-5 metrics
-    ],
-    "recommendations": [
-      // AI-generated recommendations if available
-    ]
+    "metric_code": "responsibility",
+    "metric_name": "Ответственность",
+    "value": 8.0,
+    "description": "Высокий уровень ответственности способствует эффективному выполнению задач и соблюдению обязательств."
   }
   ```
-- User can copy/download the JSON content
-- Close button or back navigation returns to participant detail page
 
-**Verification Points:**
-- All participant data is accurate and matches Scenario 5 inputs
-- Professional activity is "meeting_facilitation"
-- Score percentage matches Scenario 8 calculation
-- All 13 metrics are listed with correct values and weights
-- Strengths highlight top performers (e.g., responsibility: 9.0, organization: 8.5)
-- Development areas highlight areas for growth (e.g., verbal_logic: 6.5)
-- No PII data leakage in unexpected fields
-- Timestamps are in ISO format
+#### 8.4 Verify Development Areas Content
+
+**Steps**:
+1. Locate `dev_areas` array in JSON
+2. Verify each development area has:
+   - Lower metric value or improvement opportunity
+   - Constructive recommendation for improvement
+   - Relevance to professional activity
+
+**Expected Results**:
+- Development areas identify opportunities for growth
+- Recommendations are actionable
+- Example:
+  ```json
+  {
+    "metric_code": "time_management",
+    "metric_name": "Тайм-менеджмент",
+    "value": 6.0,
+    "description": "Развитие навыков планирования и приоритизации поможет повысить эффективность работы."
+  }
+  ```
+
+#### 8.5 Copy or Download JSON
+
+**Steps**:
+1. If "Копировать" button is present, click it
+2. Or if "Скачать JSON" button is present, click it
+
+**Expected Results**:
+- If copy: JSON is copied to clipboard, toast: "JSON скопирован в буфер обмена"
+- If download: file downloads with name like `final_report_{participant_id}_{activity_code}.json`
+- File contents match displayed JSON
 
 ---
 
-### Scenario 10: View Final Report (HTML Format)
+### 9. Download Final Report HTML
 
-**Seed:** `e2e/seed.spec.ts`
+**Seed**: `e2e/seed.spec.ts`
 
-**Objective**: Verify that users can view or download professionally formatted HTML reports suitable for sharing with stakeholders.
-
-**Assumptions**:
+**Preconditions**:
 - User is logged in
-- Scoring calculation was completed in Scenario 8
-- Scoring results exist for the test participant
+- Scoring calculation completed for participant (from scenario 7.3)
+- On participant detail page
 
-**Steps:**
-1. From the participant detail page with scoring results visible
-2. Locate the scoring results section
-3. Click the "Скачать HTML" or "Просмотреть отчёт" button
+#### 9.1 Download HTML Report
 
-**Expected Results:**
-- HTML report opens in a new tab/window or download dialog appears
-- If opened in browser, HTML report displays with:
+**Steps**:
+1. On participant detail page, locate scoring results section
+2. Find result for "Организация и проведение совещаний"
+3. Click button "Скачать HTML"
+4. Wait for download to start
 
-  **Header Section:**
-  - Report title: "Отчёт о профессиональной пригодности"
-  - Participant name: "Тестов Тест Тестович"
-  - Date of birth: "15.01.1990"
-  - External ID: "E2E-TEST-001"
-  - Report generation date: Current date
+**Expected Results**:
+- File download initiates
+- Filename format: `final_report_{participant_name}_{activity_code}.html` or similar
+- Example: `final_report_Batura_A.A._meeting_facilitation.html`
+- File is saved to browser's download folder
 
-  **Professional Activity Section:**
-  - Activity name: "Организация и проведение совещаний"
-  - Activity description: Full description text
+**Verification Points**:
+- HTTP request is sent: `GET /api/participants/{participant_id}/final-report?activity_code=meeting_facilitation&format=html`
+- Response `Content-Type`: `text/html; charset=utf-8`
+- Response status: 200 OK
+- File size is reasonable (typically 20-100 KB depending on template)
 
-  **Score Summary:**
-  - Overall suitability percentage displayed prominently (e.g., "72.5%")
-  - Visual indicator (color coding: green for high, yellow for medium, red for low)
-  - Calculation date and time
+#### 9.2 Verify HTML Report Content
 
-  **Metrics Breakdown Table:**
-  | Метрика | Значение | Вес | Вклад в оценку |
-  |---------|----------|-----|----------------|
-  | Коммуникабельность | 7.50 | 0.18 | 1.35 |
-  | Командность | 8.00 | 0.10 | 0.80 |
-  | ... | ... | ... | ... |
+**Steps**:
+1. Open downloaded HTML file in browser
+2. Verify document structure:
+   - Page title: "Финальный отчёт - Батура Александр Александрович"
+   - Header section with participant info
+   - Scoring summary section
+   - Strengths section (3-5 items)
+   - Development areas section (3-5 items)
+   - Metrics table with all metric values and weights
+   - Footer with generation date/time
 
-  **Strengths Section:**
-  - Heading: "Сильные стороны"
-  - List of top 3-5 metrics with high scores
-  - Each item shows metric name and value
-  - Formatted as bullet points or cards
+**Expected Results - HTML Structure**:
+- Professional HTML layout (not raw JSON)
+- CSS styles applied (template may include Bootstrap or custom CSS)
+- Sections:
+  - **Header**: Participant name, birth date, external ID
+  - **Overview**: Professional activity, score percentage (e.g., "72%"), calculation date
+  - **Strengths**: Bulleted or numbered list with descriptions
+  - **Development Areas**: Bulleted or numbered list with recommendations
+  - **Metrics Table**: Columns: Metric Name, Value, Weight, Weighted Score
+  - **Footer**: "Сгенерировано: {timestamp}", system version
 
-  **Development Areas Section:**
-  - Heading: "Зоны развития"
-  - List of 3-5 metrics with lower scores
-  - Each item shows metric name and value
-  - Formatted as bullet points or cards
+**Verification Points**:
+- HTML is well-formed (valid syntax)
+- Text is readable and properly encoded (UTF-8, no mojibake)
+- Score is displayed prominently (e.g., in large font or colored badge)
+- Strengths and dev areas match JSON content
+- Metrics table includes all metrics from calculation
+- Visual design is professional (suitable for business reports)
 
-  **Recommendations Section (if available):**
-  - AI-generated personalized recommendations
-  - Development action items
-  - Training suggestions
+#### 9.3 Verify HTML Report Rendering
 
-  **Footer:**
-  - Report generation metadata
-  - System version/branding
-  - Disclaimer text (if applicable)
+**Steps**:
+1. Open HTML file in different browsers (Chrome, Firefox, Safari if possible)
+2. Check for rendering consistency
+3. Verify no missing images or broken styles
 
-- HTML is properly formatted with CSS styling
-- Report is printable (good print layout)
-- If downloaded, file is saved with meaningful name:
-  - Pattern: `report_{participant_external_id}_{date}.html`
-  - Example: `report_E2E-TEST-001_2025-11-08.html`
+**Expected Results**:
+- Report renders correctly across browsers
+- No JavaScript errors in console
+- Print preview shows good layout (report is printable)
+- Colors and fonts are consistent
 
-**Verification Points:**
-- All data matches the JSON report from Scenario 9
-- No broken styling or layout issues
-- All sections are present and readable
-- Numbers are formatted correctly (decimal precision)
-- Russian language text displays correctly (no encoding issues)
-- Report can be printed or saved as PDF from browser
+#### 9.4 Download Report for Different Activity (Edge Case)
+
+**Preconditions**:
+- Participant has scoring results for multiple professional activities
+
+**Steps**:
+1. Calculate score for a second activity (if available)
+2. Click "Скачать HTML" for the second activity
+
+**Expected Results**:
+- Different HTML file downloads
+- Filename includes second activity code
+- Content reflects second activity's scoring results
 
 ---
 
-## Test Data Summary
+## Test Execution Notes
 
-### Pre-existing Data (Seeded)
-- **Admin User**:
-  - Email: `admin@test.com`
-  - Password: `admin123`
+### Asynchronous Processing Considerations
 
-- **Existing Participants**:
-  - Батура Александр Александрович (BATURA_AA_001)
-  - Иванов Иван Иванович (E2E-TEST-001)
+**Celery Task Handling**:
+- In `test` or `ci` environment, Celery tasks run synchronously (eager mode) due to `CELERY_TASK_ALWAYS_EAGER=1`
+- In `dev` environment with Redis/RabbitMQ, tasks are async:
+  - Report extraction may take 10-60 seconds
+  - Status updates require polling or page refresh
+  - Tests should implement retry logic or wait strategies
 
-- **Professional Activity**:
-  - Code: `meeting_facilitation`
-  - Name: "Организация и проведение совещаний"
-  - ID: `22fdacda-0f53-44d2-aba5-49f9239fd383`
+**Wait Strategies**:
+- Use `await page.waitForSelector()` for dynamic content
+- Use `await page.waitForResponse()` to wait for API calls
+- For status updates, implement polling with timeout:
+  ```javascript
+  // Poll status until "Обработан" or timeout (60s)
+  await page.waitForFunction(
+    () => document.querySelector('.status-cell')?.textContent === 'Обработан',
+    { timeout: 60000 }
+  );
+  ```
 
-- **Metrics**: 13 metrics required for meeting_facilitation (see Scenario 7)
+### Test Data Management
 
-- **Weight Table**: Active weight table for meeting_facilitation with sum of weights = 1.0
+**Database State**:
+- Each test scenario should use `e2e/seed.spec.ts` to ensure fresh state
+- Use transactions or database cleanup hooks between tests
+- For isolation, consider creating unique test users per scenario (e.g., `testuser_${timestamp}@example.com`)
 
-### Test Data to Create
-- **New User**:
-  - Email: `e2e-test-user-{timestamp}@test.com`
-  - Password: `TestPass123`
+**File Fixtures**:
+- Test DOCX files are located at `/Users/maksim/git_projects/workers-prof/e2e/fixtures/`
+- Verify files exist before test run
+- Files contain real business report data with embedded tables/images
 
-- **New Participant**:
-  - Full Name: `Тестов Тест Тестович`
-  - Birth Date: `1990-01-15`
-  - External ID: `E2E-TEST-{timestamp}`
+### UI Element Selectors
 
-- **Test Report**:
-  - File: `/Users/maksim/git_projects/workers-prof/e2e/fixtures/test-report.docx`
-  - Type: To be determined from available dropdown options
+**Recommended Selector Strategy**:
+1. Prefer `role` selectors: `page.getByRole('button', { name: 'Загрузить' })`
+2. Use `placeholder` for textboxes: `page.getByPlaceholder('Введите email')`
+3. Use `text` for exact matches: `page.getByText('Регистрация успешна!')`
+4. Avoid CSS selectors or XPath unless necessary (brittle)
 
-## Key UI Elements Reference
+**Dynamic Content**:
+- Some elements may render after API calls
+- Use `waitForSelector` or `waitForLoadState('networkidle')`
+- Toast notifications may auto-dismiss after 3-5 seconds (capture quickly)
 
-### Navigation
-- **Landing Page Buttons**: "Войти в систему", "Зарегистрироваться"
-- **Main Menu**: "Участники", "Админ" (admin only)
-- **Admin Submenu**: "Пользователи", "Весовые таблицы"
-- **User Profile Button**: Displays logged-in user email
+### Expected Score Calculation
 
-### Forms and Dialogs
+**Example Calculation for "meeting_facilitation"**:
+- Assume weight table for `meeting_facilitation` has:
+  - `communicability`: weight 0.20
+  - `teamwork`: weight 0.15
+  - `responsibility`: weight 0.15
+  - `leadership`: weight 0.20
+  - `stress_resistance`: weight 0.15
+  - `time_management`: weight 0.15
+  - Sum of weights = 1.0
 
-#### Registration Form (`/register`)
-- Fields: Email*, Пароль*, Подтверждение пароля*
-- Buttons: "Зарегистрироваться", Link to "Войти"
+- With sample metrics:
+  - Communicability: 7.5
+  - Teamwork: 6.5
+  - Responsibility: 8.0
+  - Leadership: 7.0
+  - Stress resistance: 7.5
+  - Time management: 6.0
 
-#### Login Form (`/login`)
-- Fields: Email*, Пароль*
-- Buttons: "Войти", Link to "Зарегистрироваться"
+- Calculation:
+  ```
+  score_pct = (7.5×0.20 + 6.5×0.15 + 8.0×0.15 + 7.0×0.20 + 7.5×0.15 + 6.0×0.15) × 10
+            = (1.5 + 0.975 + 1.2 + 1.4 + 1.125 + 0.9) × 10
+            = 7.1 × 10
+            = 71.0%
+  ```
 
-#### Add Participant Dialog
-- Fields: ФИО*, Дата рождения, Внешний ID
-- Buttons: "Отмена", "Создать"
+- Expected `score_pct` ≈ 71.0% (may vary based on actual weight table)
 
-#### Upload Report Dialog
-- Fields: Тип отчёта* (dropdown), Файл (DOCX)*
-- Buttons: "Отмена", "Загрузить"
+**Verification**:
+- Test should assert `score_pct` is within expected range (e.g., 70-75%)
+- If exact weights are known, calculate expected value and assert with tolerance (±0.5%)
 
-#### Calculate Score Dialog
-- Fields: Профессиональная область* (dropdown)
-- Buttons: "Отмена", "Рассчитать"
+---
 
-### Tables
+## Edge Cases and Error Scenarios
 
-#### Participants Table
-- Columns: ФИО, Дата рождения, Внешний ID, Действия
-- Actions: "Открыть", "Удалить"
-- Pagination: Items per page selector, Previous/Next buttons
+### User Registration Edge Cases
 
-#### Pending Users Table (`/admin/users`)
-- Columns: Email, Статус, Дата регистрации, Действия
-- Actions: "Одобрить"
+1. **Email Already Exists**: Attempt registration with existing email
+2. **SQL Injection**: Enter `'; DROP TABLE users; --` in email field (should be sanitized)
+3. **XSS Attack**: Enter `<script>alert('XSS')</script>` in name field (should be escaped)
+4. **Unicode Characters**: Enter Cyrillic email like `тест@тест.рф` (may or may not be supported)
+5. **Very Long Password**: Enter 1000-character password (should be limited)
 
-#### Reports Table (on participant detail page)
-- Columns: Тип, Статус, Дата загрузки, Действия
-- Empty State: "Нет загруженных отчётов" with icon
+### Report Upload Edge Cases
+
+1. **Corrupted DOCX**: Upload a DOCX file with invalid ZIP structure
+2. **Empty DOCX**: Upload a DOCX with no content
+3. **DOCX Without Images**: Upload report without embedded tables/images (no numeric data to extract)
+4. **Duplicate Upload**: Upload same report type twice for same participant
+5. **Concurrent Uploads**: Upload multiple reports simultaneously (race condition test)
+
+### Metric Entry Edge Cases
+
+1. **Negative Values**: Enter `-5.0` (should be rejected)
+2. **Very Large Decimals**: Enter `7.123456789` (should round to precision limit)
+3. **Non-Numeric Input**: Enter `abc` or `seven` (should show validation error)
+4. **Empty Fields**: Leave all fields empty and attempt save
+5. **Scientific Notation**: Enter `1e1` (equal to 10.0) - should be handled or rejected
+
+### Scoring Edge Cases
+
+1. **Missing Metrics**: Calculate score with only partial metrics available
+2. **No Weight Table**: Select activity with no active weight table
+3. **Weight Sum ≠ 1.0**: Backend error if weight table is misconfigured
+4. **Extreme Metric Values**: All metrics at 1.0 or all at 10.0 (boundary testing)
+5. **Concurrent Calculations**: Calculate score multiple times rapidly (idempotency test)
+
+### Final Report Edge Cases
+
+1. **Large Report**: Participant with 100+ metrics (stress test HTML generation)
+2. **Special Characters in Name**: Participant name with `<>&"'` characters (HTML escaping)
+3. **Missing Recommendations**: If AI recommendation generation fails
+4. **Very Long Descriptions**: Strengths/dev areas with 1000+ character descriptions
+
+---
 
 ## Success Criteria
 
-The E2E critical path test passes if:
+### Test Pass Conditions
 
-1. **User Registration & Approval Flow**:
-   - New users can register successfully
-   - Admins can view and approve pending users
-   - Approved users can log in and access the system
+A test scenario passes if:
+1. All steps execute without errors
+2. All expected results are observed
+3. All verification points are confirmed
+4. No unexpected errors appear in browser console or backend logs
+5. Database state is consistent after scenario completion
 
-2. **Participant Management**:
-   - Users can create new participants with required data
-   - Participants appear in the list with correct information
-   - Participant detail pages are accessible
+### Coverage Goals
 
-3. **Report Processing**:
-   - DOCX reports can be uploaded successfully
-   - File validation works (type, size limits)
-   - Upload triggers background processing
+- **Functional Coverage**: All critical path scenarios (1-9) pass
+- **Happy Path**: 100% of scenarios 1.1, 2.1, 3.1, 4.1, 5.2-5.4, 6.3, 7.3, 8.2, 9.1 pass
+- **Error Handling**: At least 70% of edge case scenarios pass
+- **Cross-Browser**: Tests pass in Chrome (primary) and Firefox (secondary)
 
-4. **Metric Extraction**:
-   - Metrics are extracted from reports (via OCR or manual entry)
-   - All required metrics for scoring are available
-   - Metric values are within valid ranges (1.0 - 10.0)
+### Performance Benchmarks
 
-5. **Scoring Calculation**:
-   - Professional suitability scores can be calculated
-   - Score is mathematically correct based on weights
-   - Results include strengths and development areas
+- **Page Load**: Any page loads within 3 seconds
+- **Report Upload**: File upload completes within 10 seconds (excluding processing)
+- **Vision Processing**: Report extraction completes within 60 seconds (in dev mode)
+- **Scoring Calculation**: Score calculation completes within 5 seconds
+- **HTML Report Download**: Download initiates within 2 seconds
 
-6. **Final Reports**:
-   - JSON reports contain complete and accurate data
-   - HTML reports are well-formatted and printable
-   - Reports can be viewed/downloaded successfully
+---
 
-7. **Data Integrity**:
-   - All data persists correctly in the database
-   - Relationships between entities are maintained
-   - No data loss or corruption occurs
+## Appendix
 
-8. **User Experience**:
-   - Navigation flows are intuitive
-   - Success/error messages are clear
-   - Forms validate input appropriately
-   - Loading states are handled gracefully
+### Test Environment Setup
 
-## Edge Cases and Error Handling
+**Prerequisites**:
+```bash
+# Start application stack
+docker-compose up -d
 
-### To Consider for Extended Testing:
+# Or run locally
+cd api-gateway
+source venv/bin/activate
+uvicorn main:app --reload --host 0.0.0.0 --port 9187
 
-1. **Registration Errors**:
-   - Duplicate email addresses
-   - Weak passwords (< 8 chars, no numbers)
-   - Password mismatch
-   - Invalid email format
+# Start Celery worker (separate terminal)
+celery -A app.core.celery_app.celery_app worker -l info
+```
 
-2. **Login Errors**:
-   - Incorrect credentials
-   - Pending user attempts to log in
-   - Disabled/deleted user account
+**Seed Test Data**:
+```bash
+# Run seed script to create admin user and test data
+cd api-gateway
+python setup_test_data.py
+```
 
-3. **File Upload Errors**:
-   - Non-DOCX file types
-   - Files exceeding 20 MB size limit
-   - Corrupted DOCX files
-   - Empty files
+**Run Playwright Tests**:
+```bash
+# From project root
+npm run test:e2e
 
-4. **Metric Extraction Failures**:
-   - OCR confidence below threshold
-   - Missing required tables in report
-   - Gemini API failures (fallback to manual entry)
+# Or run specific test
+npx playwright test e2e/critical-path.spec.ts
+```
 
-5. **Scoring Errors**:
-   - Missing required metrics
-   - Invalid weight table (sum ≠ 1.0)
-   - Metric values out of range
+### Troubleshooting
 
-6. **Concurrent Operations**:
-   - Multiple users accessing same participant
-   - Simultaneous report uploads
-   - Weight table updates during scoring
+**Issue**: "У участника нет загруженных отчётов" warning persists after upload
+- **Cause**: Celery task not running or failed silently
+- **Fix**: Check Celery worker logs, ensure Redis/RabbitMQ is running, verify `CELERY_TASK_ALWAYS_EAGER=1` in test env
 
-## Notes for Test Implementation
+**Issue**: "Недостаточно данных для расчёта" error when calculating score
+- **Cause**: Missing required metrics or metrics not saved
+- **Fix**: Verify all metrics from weight table are present in `extracted_metric` for participant
 
-1. **Browser Contexts**: Maintain separate contexts for admin and regular user sessions to test concurrent workflows.
+**Issue**: JSON report shows empty `strengths` or `dev_areas`
+- **Cause**: Recommendation generation failed or disabled
+- **Fix**: Check `AI_RECOMMENDATIONS_ENABLED=1` in env, verify Gemini API keys, check backend logs
 
-2. **Async Operations**: Report processing and metric extraction are asynchronous. Implement polling or wait strategies to verify completion.
+**Issue**: HTML download returns 404
+- **Cause**: Scoring result not found or activity code mismatch
+- **Fix**: Verify `scoring_result` exists in database for participant + activity, check query params
 
-3. **Test Data Cleanup**: Consider implementing cleanup after test execution to maintain test environment state.
+### Test Data Reference
 
-4. **Timestamps**: Use dynamic timestamp generation for unique test data (emails, external IDs).
+**Admin User**:
+- Email: `admin@test.com`
+- Password: `admin123`
+- Role: ADMIN
+- Approved: true
 
-5. **Report Type Selection**: During upload dialog testing, document available report types for future test updates.
+**Test Participant**:
+- Full Name: `Батура Александр Александрович`
+- Birth Date: `1985-06-15`
+- External ID: `BATURA_AA_TEST`
 
-6. **Metric Entry UI**: If manual metric entry UI is not implemented, adjust Scenario 7 to focus on verifying OCR extraction results.
+**Professional Activity**:
+- Code: `meeting_facilitation`
+- Name: `Организация и проведение совещаний`
 
-7. **Screenshots**: Capture screenshots at key points for debugging and documentation.
-
-8. **Performance**: Monitor response times for file upload and score calculation operations.
-
-## File Paths
-
-- **Test Plan**: `/Users/maksim/git_projects/workers-prof/e2e/TEST_PLAN_S3-05_CRITICAL_PATH.md`
-- **Test Data**: `/Users/maksim/git_projects/workers-prof/e2e/fixtures/test-report.docx`
-- **Seed File**: `/Users/maksim/git_projects/workers-prof/e2e/seed.spec.ts`
-- **Playwright Config**: `/Users/maksim/git_projects/workers-prof/playwright.config.js`
+**Report Files**:
+- REPORT_1: `Batura_A.A._Biznes-Profil_Biznes-otchyot_1718107.docx`
+- REPORT_2: `Batura_A.A._Biznes-Profil_Otchyot_dlya_respondenta_1718107.docx`
+- REPORT_3: `Batura_A.A._Biznes-Profil_Otchyot_po_kompetentsiyam_1718107.docx`
 
 ---
 
 **Document Version**: 1.0
-**Last Updated**: 2025-11-08
-**Prepared By**: Test Planning Agent
-**Application Version**: 0.0.1 (beta)
+**Date**: 2025-11-09
+**Author**: Test Planning Team
+**Status**: Ready for Implementation

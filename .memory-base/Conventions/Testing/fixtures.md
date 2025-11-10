@@ -10,7 +10,7 @@
 - `participant_factory` — создает участника с уникальными полями.
 - `weight_table_active` — активные веса для выбранной профобласти.
 - `report_with_docx` — загруженный отчёт с привязанным file_ref (temp файл).
-- `ocr_stub` — monkeypatch OCR, возвращает числа по коду метрики.
+- `vision_stub` — monkeypatch Vision клиент, возвращает числа по коду метрики.
 - `gemini_stub` — возвращает фиксированный JSON рекомендаций.
 
 Фабрики

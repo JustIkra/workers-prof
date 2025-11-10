@@ -52,16 +52,18 @@ export async function listPendingUsers(request) {
 /**
  * Helper to create a participant
  */
-export async function createParticipant(request, fullName, externalId = null) {
-  const response = await request.post('/api/participants', {
-    data: {
-      full_name: fullName,
-      external_id: externalId
-    }
-  });
+export async function createParticipant(request, fullName, externalId = null, birthDate = null) {
+  const data = {
+    full_name: fullName,
+    external_id: externalId
+  };
+  if (birthDate) {
+    data.birth_date = birthDate;
+  }
+  const response = await request.post('/api/participants', { data });
   expect(response.ok()).toBeTruthy();
-  const data = await response.json();
-  return data;
+  const result = await response.json();
+  return result;
 }
 
 /**
@@ -85,7 +87,10 @@ export async function uploadReport(request, participantId, reportType, filePath)
     }
   });
 
-  expect(response.ok()).toBeTruthy();
+  if (!response.ok()) {
+    const error = await response.text();
+    throw new Error(`Upload failed (${response.status()}): ${error}`);
+  }
   const data = await response.json();
   return data;
 }
@@ -122,7 +127,10 @@ export async function listMetricDefs(request) {
  */
 export async function calculateScore(request, participantId, activityCode) {
   const response = await request.post(`/api/scoring/participants/${participantId}/calculate?activity_code=${activityCode}`);
-  expect(response.ok()).toBeTruthy();
+  if (!response.ok()) {
+    const error = await response.text();
+    throw new Error(`Calculate score failed (${response.status()}): ${error}`);
+  }
   const data = await response.json();
   return data;
 }

@@ -97,6 +97,16 @@ test.describe('Critical Path E2E Test - Complete User Journey', () => {
 
     // 15. Verify participant was created
     await expect(page.getByText('Участник создан')).toBeVisible();
+
+    // Wait for dialog to close automatically
+    await expect(page.getByRole('heading', { name: 'Добавить участника', level: 2 })).not.toBeVisible();
+
+    // Use external ID filter to find the newly created participant (pagination-safe)
+    await page.getByPlaceholder('Внешний ID').fill(participantExternalId);
+    await page.getByPlaceholder('Внешний ID').press('Enter');
+
+    // Wait for table to refresh and verify participant appears
+    await page.waitForTimeout(500); // Allow table to refresh
     await expect(page.getByRole('cell', { name: 'Тестов Тест Тестович' }).first()).toBeVisible();
     await expect(page.getByRole('cell', { name: '1990-01-15' }).first()).toBeVisible();
     await expect(page.getByRole('cell', { name: participantExternalId })).toBeVisible();
@@ -119,10 +129,10 @@ test.describe('Critical Path E2E Test - Complete User Journey', () => {
     const fileChooserPromise = page.waitForEvent('filechooser');
     await page.getByRole('button', { name: 'Выбрать файл' }).first().click();
     const fileChooser = await fileChooserPromise;
-    await fileChooser.setFiles('/Users/maksim/git_projects/workers-prof/e2e/fixtures/test-report.docx');
+    await fileChooser.setFiles('/Users/maksim/git_projects/workers-prof/e2e/fixtures/Batura_A.A._Biznes-Profil_Biznes-otchyot_1718107.docx');
 
     // 20. Verify file is selected
-    await expect(page.getByText('test-report.docx')).toBeVisible();
+    await expect(page.getByText('Batura_A.A._Biznes-Profil_Biznes-otchyot_1718107.docx')).toBeVisible();
 
     // 21. Click "Загрузить" button
     await page.getByRole('button', { name: 'Загрузить', exact: true }).click();

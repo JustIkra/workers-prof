@@ -399,7 +399,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, computed } from 'vue'
+import { ref, reactive, onMounted, computed, nextTick } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
@@ -616,6 +616,7 @@ const extractMetrics = async (reportId) => {
 
 const viewMetrics = async (reportId) => {
   currentReportId.value = reportId
+  await nextTick() // Wait for DOM to update before opening dialog
   showMetricsDialog.value = true
 }
 

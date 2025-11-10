@@ -18,6 +18,10 @@ RUN apt-get update \
         iptables \
         resolvconf \
         wireguard-tools \
+        libgomp1 \
+        libglib2.0-0 \
+        tesseract-ocr \
+        tesseract-ocr-rus \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Python dependencies first (better layer caching)

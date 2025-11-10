@@ -105,6 +105,7 @@ VPN_ROUTE_DOMAINS=generativelanguage.googleapis.com
 VPN_BYPASS_CIDRS=172.16.0.0/12,10.0.0.0/8,192.168.0.0/16
 
 # ===== Gemini / AI =====
+# По умолчанию используется Gemini Vision; локальный OCR — fallback.
 GEMINI_API_KEYS=key1,key2,key3
 GEMINI_MODEL_TEXT=gemini-2.5-flash
 GEMINI_MODEL_VISION=gemini-2.5-flash
@@ -137,7 +138,7 @@ CORS_ALLOW_ALL=true
 ENV=test
 LOG_LEVEL=WARNING
 AI_RECOMMENDATIONS_ENABLED=0  # Офлайн режим
-AI_VISION_FALLBACK_ENABLED=0
+AI_VISION_FALLBACK_ENABLED=0  # Vision отключен в тестах; внешние вызовы замокированы
 VPN_ENABLED=0
 ```
 

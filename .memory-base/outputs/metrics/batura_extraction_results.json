@@ -1,0 +1,268 @@
+[
+  {
+    "docx": "Batura_A.A._Biznes-Profil_Biznes-otchyot_1718107.docx",
+    "metrics": [],
+    "labels": [],
+    "ambiguous": [
+      {
+        "source": "image6.png",
+        "reason": "consensus_failed",
+        "attempts": 1,
+        "label_candidates": [],
+        "value_candidates": []
+      },
+      {
+        "source": "image6.png",
+        "reason": "consensus_failed",
+        "attempts": 1,
+        "label_candidates": [],
+        "value_candidates": []
+      },
+      {
+        "source": "image6.png",
+        "reason": "consensus_failed",
+        "attempts": 1,
+        "label_candidates": [],
+        "value_candidates": []
+      },
+      {
+        "source": "image6.png",
+        "reason": "consensus_failed",
+        "attempts": 1,
+        "label_candidates": [],
+        "value_candidates": []
+      }
+    ]
+  },
+  {
+    "docx": "Batura_A.A._Biznes-Profil_Otchyot_dlya_respondenta_1718107.docx",
+    "metrics": [
+      {
+        "label": "Стрессоустойчивость",
+        "value": "10.0",
+        "source": "image4.png",
+        "confidence": 0.6666666666666666
+      }
+    ],
+    "labels": [
+      "Стрессоустойчивость"
+    ],
+    "ambiguous": [
+      {
+        "source": "image4.png",
+        "reason": "consensus_failed",
+        "attempts": 1,
+        "label_candidates": [],
+        "value_candidates": []
+      },
+      {
+        "source": "image4.png",
+        "reason": "consensus_failed",
+        "attempts": 1,
+        "label_candidates": [],
+        "value_candidates": []
+      },
+      {
+        "source": "image4.png",
+        "reason": "consensus_failed",
+        "attempts": 1,
+        "label_candidates": [],
+        "value_candidates": []
+      },
+      {
+        "source": "image4.png",
+        "reason": "consensus_failed",
+        "attempts": 2,
+        "label_candidates": [],
+        "value_candidates": [
+          "8.8",
+          "6.8"
+        ]
+      },
+      {
+        "source": "image4.png",
+        "reason": "consensus_failed",
+        "attempts": 1,
+        "label_candidates": [],
+        "value_candidates": []
+      },
+      {
+        "source": "image4.png",
+        "reason": "consensus_failed",
+        "attempts": 1,
+        "label_candidates": [],
+        "value_candidates": []
+      },
+      {
+        "source": "image4.png",
+        "reason": "consensus_failed",
+        "attempts": 2,
+        "label_candidates": [],
+        "value_candidates": [
+          "3.2",
+          "5.1"
+        ]
+      },
+      {
+        "source": "image4.png",
+        "reason": "consensus_failed",
+        "attempts": 1,
+        "label_candidates": [],
+        "value_candidates": []
+      },
+      {
+        "source": "image4.png",
+        "reason": "consensus_failed",
+        "attempts": 1,
+        "label_candidates": [],
+        "value_candidates": []
+      },
+      {
+        "source": "image4.png",
+        "reason": "consensus_failed",
+        "attempts": 1,
+        "label_candidates": [],
+        "value_candidates": []
+      },
+      {
+        "source": "image4.png",
+        "reason": "consensus_failed",
+        "attempts": 1,
+        "label_candidates": [],
+        "value_candidates": []
+      },
+      {
+        "source": "image4.png",
+        "reason": "consensus_failed",
+        "attempts": 1,
+        "label_candidates": [],
+        "value_candidates": []
+      },
+      {
+        "source": "image4.png",
+        "reason": "consensus_failed",
+        "attempts": 1,
+        "label_candidates": [],
+        "value_candidates": []
+      },
+      {
+        "source": "image4.png",
+        "reason": "consensus_failed",
+        "attempts": 1,
+        "label_candidates": [],
+        "value_candidates": []
+      },
+      {
+        "source": "image4.png",
+        "reason": "consensus_failed",
+        "attempts": 1,
+        "label_candidates": [],
+        "value_candidates": []
+      },
+      {
+        "source": "image4.png",
+        "reason": "consensus_failed",
+        "attempts": 1,
+        "label_candidates": [],
+        "value_candidates": []
+      },
+      {
+        "source": "image4.png",
+        "reason": "consensus_failed",
+        "attempts": 1,
+        "label_candidates": [],
+        "value_candidates": []
+      },
+      {
+        "source": "image4.png",
+        "reason": "consensus_failed",
+        "attempts": 1,
+        "label_candidates": [],
+        "value_candidates": []
+      },
+      {
+        "source": "image4.png",
+        "reason": "consensus_failed",
+        "attempts": 1,
+        "label_candidates": [],
+        "value_candidates": []
+      },
+      {
+        "source": "image4.png",
+        "reason": "consensus_failed",
+        "attempts": 1,
+        "label_candidates": [],
+        "value_candidates": []
+      },
+      {
+        "source": "image4.png",
+        "reason": "consensus_failed",
+        "attempts": 1,
+        "label_candidates": [],
+        "value_candidates": []
+      },
+      {
+        "source": "image4.png",
+        "reason": "consensus_failed",
+        "attempts": 1,
+        "label_candidates": [],
+        "value_candidates": []
+      },
+      {
+        "source": "image4.png",
+        "reason": "consensus_failed",
+        "attempts": 1,
+        "label_candidates": [],
+        "value_candidates": []
+      },
+      {
+        "source": "image4.png",
+        "reason": "consensus_failed",
+        "attempts": 1,
+        "label_candidates": [],
+        "value_candidates": []
+      },
+      {
+        "source": "image4.png",
+        "reason": "consensus_failed",
+        "attempts": 1,
+        "label_candidates": [],
+        "value_candidates": []
+      },
+      {
+        "source": "image4.png",
+        "reason": "consensus_failed",
+        "attempts": 1,
+        "label_candidates": [],
+        "value_candidates": []
+      },
+      {
+        "source": "image4.png",
+        "reason": "consensus_failed",
+        "attempts": 1,
+        "label_candidates": [],
+        "value_candidates": []
+      },
+      {
+        "source": "image4.png",
+        "reason": "consensus_failed",
+        "attempts": 1,
+        "label_candidates": [],
+        "value_candidates": []
+      },
+      {
+        "source": "image4.png",
+        "reason": "consensus_failed",
+        "attempts": 1,
+        "label_candidates": [],
+        "value_candidates": []
+      }
+    ]
+  },
+  {
+    "docx": "Batura_A.A._Biznes-Profil_Otchyot_po_kompetentsiyam_1718107.docx",
+    "metrics": [],
+    "labels": [],
+    "ambiguous": []
+  }
+]

@@ -13,11 +13,11 @@
     - POST /participants/{id}/score?activity=CODE
     - POST /reports/{id}/recommendations  # генерация рекомендаций (Gemini)
     - GET  /participants/{id}/final-report # получение итогового отчёта (JSON/HTML/PDF)
-  - События: публикация задач Celery (ocr, normalize, vision)
+  - События: публикация задач Celery (vision, normalize)
 
 - ai-request-sender (Celery workers)
-  - Подписка на очереди: ocr, normalize, vision
-  - Взаимодействие с PaddleOCR и Gemini API
+  - Подписка на очереди: vision, normalize
+  - Взаимодействие с Gemini API (Vision)
   - Запись результатов в БД через слой репозиториев (прямое подключение)
 
 - frontend (Vue)

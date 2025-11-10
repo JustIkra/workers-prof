@@ -6,12 +6,12 @@
 
 - Логирование
   - API: structlog/loguru с кореляционным request_id
-  - Workers: отдельные логи по задачам (ocr/normalize/vision)
+  - Workers: отдельные логи по задачам (vision/normalize)
   - Хранение логов на volume; ротация
 
 - Метрики/трейсинг (опц.)
   - Prometheus + Grafana; экспортеры для API/Workers
-  - Тайминги OCR/LLM, доля fallback, ошибки
+  - Тайминги Vision/LLM, доля ошибок, ретраи
 
 - Бэкапы
   - Postgres: ежедневные дампы; ретеншн ≥ 14 дней

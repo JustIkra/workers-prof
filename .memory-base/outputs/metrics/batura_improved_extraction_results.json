@@ -1,0 +1,99 @@
+[
+  {
+    "docx": "Batura_A.A._Biznes-Profil_Biznes-otchyot_1718107.docx",
+    "metrics": [],
+    "labels": [],
+    "errors": []
+  },
+  {
+    "docx": "Batura_A.A._Biznes-Profil_Otchyot_dlya_respondenta_1718107.docx",
+    "metrics": [
+      {
+        "label": "ВЫЧИСЛЕНИЯ",
+        "value": "2.9",
+        "source": "image3.png",
+        "confidence": 1.0
+      },
+      {
+        "label": "ЛЕКСИКА",
+        "value": "4.3",
+        "source": "image3.png",
+        "confidence": 1.0
+      },
+      {
+        "label": "ЭРУДИЦИЯ",
+        "value": "7.5",
+        "source": "image3.png",
+        "confidence": 1.0
+      },
+      {
+        "label": "ПРОСТРАНСТВЕННОЕ МЫШЛЕНИЕ",
+        "value": "4.6",
+        "source": "image3.png",
+        "confidence": 1.0
+      },
+      {
+        "label": "НЕВЕРБАЛЬНАЯ ЛОГИКА",
+        "value": "9",
+        "source": "image3.png",
+        "confidence": 1.0
+      },
+      {
+        "label": "ВЕРБАЛЬНАЯ ЛОГИКА",
+        "value": "5.3",
+        "source": "image3.png",
+        "confidence": 1.0
+      },
+      {
+        "label": "ОБРАБОТКА ИНФОРМАЦИИ",
+        "value": "5.1",
+        "source": "image3.png",
+        "confidence": 1.0
+      },
+      {
+        "label": "ОБЩИЙ БАЛЛ ИНТЕЛЛЕКТА",
+        "value": "5.5",
+        "source": "image3.png",
+        "confidence": 1.0
+      }
+    ],
+    "labels": [
+      "ВЫЧИСЛЕНИЯ",
+      "ЛЕКСИКА",
+      "ЭРУДИЦИЯ",
+      "ПРОСТРАНСТВЕННОЕ МЫШЛЕНИЕ",
+      "НЕВЕРБАЛЬНАЯ ЛОГИКА",
+      "ВЕРБАЛЬНАЯ ЛОГИКА",
+      "ОБРАБОТКА ИНФОРМАЦИИ",
+      "ОБЩИЙ БАЛЛ ИНТЕЛЛЕКТА"
+    ],
+    "errors": [
+      {
+        "source": "image4.png",
+        "error": "Rate limit exceeded"
+      },
+      {
+        "source": "image5.png",
+        "error": "Rate limit exceeded"
+      },
+      {
+        "source": "image6.png",
+        "error": "Rate limit exceeded"
+      },
+      {
+        "source": "image7.png",
+        "error": "Rate limit exceeded"
+      },
+      {
+        "source": "image8.png",
+        "error": "Rate limit exceeded"
+      }
+    ]
+  },
+  {
+    "docx": "Batura_A.A._Biznes-Profil_Otchyot_po_kompetentsiyam_1718107.docx",
+    "metrics": [],
+    "labels": [],
+    "errors": []
+  }
+]

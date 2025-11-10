@@ -1,0 +1,22 @@
+[
+  {
+    "source": "image4.png",
+    "error": "Rate limit exceeded"
+  },
+  {
+    "source": "image5.png",
+    "error": "Rate limit exceeded"
+  },
+  {
+    "source": "image6.png",
+    "error": "Rate limit exceeded"
+  },
+  {
+    "source": "image7.png",
+    "error": "Rate limit exceeded"
+  },
+  {
+    "source": "image8.png",
+    "error": "Rate limit exceeded"
+  }
+]

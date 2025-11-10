@@ -119,6 +119,7 @@
 <script setup>
 import { ref, computed, watch, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
+import MetricInput from './MetricInput.vue'
 import { metricsApi } from '@/api'
 import { parseNumber, formatForApi } from '@/utils/numberFormat'
 

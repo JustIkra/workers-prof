@@ -1,0 +1,67 @@
+[
+  {
+    "docx": "Batura_A.A._Biznes-Profil_Biznes-otchyot_1718107.docx",
+    "metrics": [],
+    "labels": [],
+    "errors": [
+      {
+        "source": "image5.png",
+        "error": "'\\n  \"metrics\"'"
+      }
+    ]
+  },
+  {
+    "docx": "Batura_A.A._Biznes-Profil_Otchyot_dlya_respondenta_1718107.docx",
+    "metrics": [],
+    "labels": [],
+    "errors": [
+      {
+        "source": "image2.png",
+        "error": "'\\n  \"metrics\"'"
+      },
+      {
+        "source": "image3.png",
+        "error": "'\\n  \"metrics\"'"
+      },
+      {
+        "source": "image4.png",
+        "error": "'\\n  \"metrics\"'"
+      },
+      {
+        "source": "image6.png",
+        "error": "'\\n  \"metrics\"'"
+      },
+      {
+        "source": "image7.png",
+        "error": "'\\n  \"metrics\"'"
+      },
+      {
+        "source": "image8.png",
+        "error": "'\\n  \"metrics\"'"
+      }
+    ]
+  },
+  {
+    "docx": "Batura_A.A._Biznes-Profil_Otchyot_po_kompetentsiyam_1718107.docx",
+    "metrics": [],
+    "labels": [],
+    "errors": [
+      {
+        "source": "image1.png",
+        "error": "'\\n  \"metrics\"'"
+      },
+      {
+        "source": "image2.png",
+        "error": "'\\n  \"metrics\"'"
+      },
+      {
+        "source": "image3.png",
+        "error": "'\\n  \"metrics\"'"
+      },
+      {
+        "source": "image4.png",
+        "error": "'\\n  \"metrics\"'"
+      }
+    ]
+  }
+]

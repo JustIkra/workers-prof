@@ -31,7 +31,7 @@
   - `.memory-base/Tech details/Tech stack/TECH_STACK.md`
   - `.memory-base/Tech details/infrastructure/architecture.md`
   - `.memory-base/Tech details/infrastructure/data-model.md`
-  - `.memory-base/Tech details/infrastructure/extraction-pipeline.md`
+  - `.memory-base/Tech details/infrastructure/extraction-pipeline.md` (Gemini Vision — по умолчанию)
   - `.memory-base/Tech details/infrastructure/service-boundaries.md`
   - `.memory-base/Tech details/infrastructure/operations.md`
   - `.memory-base/Tech details/infrastructure/storage.md`
@@ -52,5 +52,5 @@
   - `.memory-base/task/plan.md`
   - `.memory-base/task/tickets/` (каталог детализированных задач)
     - Ключевые ближайшие тикеты: `S2-04_final_report_json_html.md`, `S2-06_scoring_history_endpoint.md`
-    - OCR/LLM: `AI-01_gemini_client.md`, `AI-02_keys_pool_rate_limit.md`, `AI-04_vision_fallback.md`
+    - AI (Vision): `AI-01_gemini_client.md`, `AI-02_keys_pool_rate_limit.md`, `AI-04_vision_fallback.md`
     - VPN: `VPN-01_wireguard_entrypoint.md`, `VPN-02_split_tunnel.md`, `VPN-03_vpn_health_endpoint.md`

@@ -9,13 +9,12 @@
   - Auth: OAuth2 Password + JWT (python-jose), passlib[bcrypt]
   - Миграции: Alembic; Конфигурация: Pydantic Settings
 
-- AI / OCR
-  - Gemini API (google-generativeai) — генеративные/визуальные сценарии, fallback для сложных таблиц
-  - PaddleOCR + PP-Structure (локально) — извлечение таблиц из изображений
+- AI / Vision
+  - Gemini API (google-generativeai) — генеративные/визуальные сценарии; извлечение чисел из таблиц/барчартов (Vision)
   - Документы: python-docx/docx2python, Pillow, OpenCV (пре-/постпроцессинг)
 
 - Очереди и фоновые задачи
-  - Celery — задачи: парсинг .docx, OCR, нормализация, расчёты
+  - Celery — задачи: парсинг .docx, Vision, нормализация, расчёты
   - Broker: RabbitMQ; Result backend: Redis; Мониторинг: Flower
 
 - Данные и кэш
@@ -38,7 +37,6 @@
 Привязка к сервисам
 - api-gateway (FastAPI): REST API, аутентификация, оркестровка Celery задач
 - auth: пользователи/роли/JWT (отдельный сервис или модуль API)
-- ai-request-sender: клиенты Gemini API и пайплайн OCR, Celery workers
+- ai-request-sender: клиенты Gemini API (Vision), Celery workers
 - frontend: SPA (Vue 3)
 - инфраструктура: PostgreSQL, Redis, RabbitMQ, (опционально) MinIO, Nginx Proxy Manager
-
