@@ -102,3 +102,33 @@ class ScoringHistoryResponse(BaseModel):
 
     results: list[ScoringHistoryItem]
     total: int
+
+
+# ===== Participant Metrics Schemas (S2-08) =====
+
+
+class ParticipantMetricResponse(BaseModel):
+    """Response schema for a single participant metric."""
+
+    metric_code: str
+    value: float
+    confidence: float | None
+    last_source_report_id: UUID | None
+    updated_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class ParticipantMetricsListResponse(BaseModel):
+    """Response schema for list of participant metrics."""
+
+    participant_id: UUID
+    metrics: list[ParticipantMetricResponse]
+    total: int
+
+
+class ParticipantMetricUpdateRequest(BaseModel):
+    """Request schema for updating a participant metric value manually."""
+
+    value: float = Field(..., ge=1, le=10, description="Metric value (range 1-10)")
+    confidence: float | None = Field(None, ge=0, le=1, description="Confidence score (0-1)")

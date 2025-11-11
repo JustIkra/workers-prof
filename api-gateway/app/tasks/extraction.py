@@ -30,20 +30,6 @@ logger = logging.getLogger(__name__)
 
 settings = Settings()
 
-# Create async engine for Celery tasks
-async_engine = create_async_engine(
-    settings.postgres_dsn,
-    echo=False,
-    pool_pre_ping=True,
-)
-
-AsyncSessionLocal = sessionmaker(
-    async_engine,
-    class_=AsyncSession,
-    expire_on_commit=False,
-)
-
-
 # Background loop for nested execution (tests running inside existing loop)
 _TASK_LOOP: asyncio.AbstractEventLoop | None = None
 _TASK_LOOP_THREAD: threading.Thread | None = None
@@ -109,6 +95,18 @@ def extract_images_from_report(self, report_id: str, request_id: str | None = No
 
     async def _async_extract() -> dict:
         """Inner async function to perform extraction."""
+        # IMPORTANT: создаём async-engine и sessionmaker внутри текущего event loop,
+        # чтобы избежать "Future attached to a different loop" в Celery/fork.
+        async_engine = create_async_engine(
+            settings.postgres_dsn,
+            echo=False,
+            pool_pre_ping=True,
+        )
+        AsyncSessionLocal = sessionmaker(
+            async_engine,
+            class_=AsyncSession,
+            expire_on_commit=False,
+        )
         report_uuid = uuid.UUID(report_id)
 
         logger.info("task_report_lookup", extra={"report_id": report_id})
@@ -128,14 +126,14 @@ def extract_images_from_report(self, report_id: str, request_id: str | None = No
                     logger.error("task_report_missing", extra={"report_id": report_id})
                     raise ValueError(f"Report {report_id} not found")
 
-                if report.status != "UPLOADED":
+                if report.status not in ("UPLOADED", "PROCESSING"):
                     logger.warning(
                         "task_report_skipped",
                         extra={"report_id": report_id, "status": report.status},
                     )
                     return {
                         "status": "skipped",
-                        "reason": f"Report status is {report.status}, not UPLOADED",
+                        "reason": f"Report status is {report.status}, expected UPLOADED or PROCESSING",
                     }
 
                 # 2. Get file path
@@ -212,7 +210,52 @@ def extract_images_from_report(self, report_id: str, request_id: str | None = No
                     )
                     saved_count += 1
 
-                # 5. Update report status
+                # 5. Extract metrics from images using Gemini Vision
+                metrics_result = {}
+                try:
+                    # Import here to avoid circular dependency
+                    from app.services.metric_extraction import MetricExtractionService
+
+                    # Load report images with file_ref for extraction
+                    report_images = await report_image_repo.get_by_report(report_uuid)
+
+                    if report_images:
+                        metric_service = MetricExtractionService(session)
+                        metrics_result = await metric_service.extract_metrics_from_report_images(
+                            report_uuid, report_images
+                        )
+                        await metric_service.close()
+
+                        logger.info(
+                            "task_metrics_extracted",
+                            extra={
+                                "report_id": report_id,
+                                "metrics_extracted": metrics_result.get("metrics_extracted", 0),
+                                "metrics_saved": metrics_result.get("metrics_saved", 0),
+                                "errors": len(metrics_result.get("errors", [])),
+                            },
+                        )
+                    else:
+                        logger.warning(
+                            "task_no_images_for_metrics",
+                            extra={"report_id": report_id},
+                        )
+
+                except Exception as exc:
+                    # Log error but don't fail the entire task
+                    logger.error(
+                        "task_metrics_extraction_failed",
+                        extra={"report_id": report_id, "error": str(exc)},
+                        exc_info=True,
+                    )
+                    # Store error in metrics_result for response
+                    metrics_result = {
+                        "metrics_extracted": 0,
+                        "metrics_saved": 0,
+                        "errors": [{"error": f"Metric extraction failed: {str(exc)}"}],
+                    }
+
+                # 6. Update report status
                 report.status = "EXTRACTED"
                 report.extracted_at = datetime.now(UTC)
                 report.extract_error = None
@@ -224,6 +267,8 @@ def extract_images_from_report(self, report_id: str, request_id: str | None = No
                     extra={
                         "report_id": report_id,
                         "images_extracted": saved_count,
+                        "metrics_extracted": metrics_result.get("metrics_extracted", 0),
+                        "metrics_saved": metrics_result.get("metrics_saved", 0),
                     },
                 )
 
@@ -231,6 +276,9 @@ def extract_images_from_report(self, report_id: str, request_id: str | None = No
                     "status": "success",
                     "report_id": report_id,
                     "images_extracted": saved_count,
+                    "metrics_extracted": metrics_result.get("metrics_extracted", 0),
+                    "metrics_saved": metrics_result.get("metrics_saved", 0),
+                    "metric_errors": metrics_result.get("errors", []),
                 }
 
             except DocxExtractionError as exc:
@@ -272,6 +320,9 @@ def extract_images_from_report(self, report_id: str, request_id: str | None = No
                     "report_id": report_id,
                     "error": str(exc),
                 }
+            finally:
+                # Явно закрываем пул соединений после выполнения задачи
+                await async_engine.dispose()
 
     task_id = getattr(self.request, "id", None)
     start = time.perf_counter()

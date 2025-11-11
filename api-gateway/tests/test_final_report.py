@@ -103,7 +103,7 @@ async def participant_with_full_data(db_session):
     db_session.add(report)
     await db_session.flush()
 
-    # Create extracted metrics with source and confidence
+    # Create extracted metrics with source and confidence (legacy)
     extracted_metric_repo = ExtractedMetricRepository(db_session)
     for code, _name, value, source, confidence in metrics_data:
         metric_def = metric_defs[code]
@@ -113,6 +113,19 @@ async def participant_with_full_data(db_session):
             value=value,
             source=source,
             confidence=confidence,
+        )
+
+    # Create participant metrics (S2-08)
+    from app.repositories.participant_metric import ParticipantMetricRepository
+
+    participant_metric_repo = ParticipantMetricRepository(db_session)
+    for code, _name, value, source, confidence in metrics_data:
+        await participant_metric_repo.upsert(
+            participant_id=participant.id,
+            metric_code=code,
+            value=value,
+            confidence=confidence,
+            source_report_id=report.id,
         )
 
     # Get professional activity from seeded data

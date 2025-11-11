@@ -10,13 +10,14 @@ With Decimal precision and quantization to 0.01.
 """
 
 from decimal import ROUND_HALF_UP, Decimal
-from typing import Union
+from typing import Any, Union
 from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.clients import GeminiClient, GeminiPoolClient
 from app.repositories.metric import ExtractedMetricRepository
+from app.repositories.participant_metric import ParticipantMetricRepository
 from app.repositories.prof_activity import ProfActivityRepository
 from app.repositories.scoring_result import ScoringResultRepository
 
@@ -29,7 +30,8 @@ class ScoringService:
     ):
         self.db = db
         self.gemini_client = gemini_client
-        self.extracted_metric_repo = ExtractedMetricRepository(db)
+        self.extracted_metric_repo = ExtractedMetricRepository(db)  # Legacy, for backward compatibility
+        self.participant_metric_repo = ParticipantMetricRepository(db)  # S2-08: New storage
         self.prof_activity_repo = ProfActivityRepository(db)
         self.scoring_result_repo = ScoringResultRepository(db)
 
@@ -80,14 +82,15 @@ class ScoringService:
         if total_weight != Decimal("1.0"):
             raise ValueError(f"Sum of weights must equal 1.0, got {total_weight}")
 
-        # 5. Get extracted metrics for the participant
-        # TODO: Filter by report_ids if provided
-        extracted_metrics = await self.extracted_metric_repo.get_by_participant(participant_id)
+        # 5. Get participant metrics (S2-08: from participant_metric table)
+        metrics_map = await self.participant_metric_repo.get_metrics_dict(participant_id)
 
-        # Create metric_code -> value mapping (using latest value if multiple)
-        metrics_map = {}  # metric_code -> Decimal value
-        for metric in extracted_metrics:
-            metrics_map[metric.metric_def.code] = metric.value
+        # 5b. Load MetricDef for names (needed for strengths/dev_areas/recommendations)
+        from app.repositories.metric import MetricDefRepository
+
+        metric_def_repo = MetricDefRepository(self.db)
+        metric_defs = await metric_def_repo.list_all(active_only=True)
+        metric_def_by_code = {m.code: m for m in metric_defs}
 
         # 6. Check for missing required metrics
         missing_metrics = []
@@ -133,7 +136,7 @@ class ScoringService:
         strengths, dev_areas = self._generate_strengths_and_dev_areas(
             metrics_map=metrics_map,
             weights_map=weights_map,
-            extracted_metrics=extracted_metrics,
+            metric_def_by_code=metric_def_by_code,
         )
 
         # 9. Generate AI recommendations (AI-03) if enabled
@@ -145,10 +148,7 @@ class ScoringService:
             metrics_for_recommendations = []
             for metric_code, weight in weights_map.items():
                 value = metrics_map[metric_code]
-                metric_def = next(
-                    (m.metric_def for m in extracted_metrics if m.metric_def.code == metric_code),
-                    None,
-                )
+                metric_def = metric_def_by_code.get(metric_code)
 
                 if metric_def:
                     metrics_for_recommendations.append(
@@ -203,7 +203,7 @@ class ScoringService:
         self,
         metrics_map: dict[str, Decimal],
         weights_map: dict[str, Decimal],
-        extracted_metrics: list,
+        metric_def_by_code: dict[str, Any],
     ) -> tuple[list[dict], list[dict]]:
         """
         Generate strengths and development areas from metrics (S2-03).
@@ -216,7 +216,7 @@ class ScoringService:
         Args:
             metrics_map: Mapping of metric_code -> value
             weights_map: Mapping of metric_code -> weight (for reference)
-            extracted_metrics: List of ExtractedMetric objects with metric_def
+            metric_def_by_code: Mapping of metric_code -> MetricDef
 
         Returns:
             Tuple of (strengths, dev_areas) as JSONB-compatible lists
@@ -229,15 +229,15 @@ class ScoringService:
         """
         # Build list of metric items with all necessary data
         metric_items = []
-        for metric in extracted_metrics:
-            metric_code = metric.metric_def.code
-            if metric_code in metrics_map:
+        for metric_code, value in metrics_map.items():
+            metric_def = metric_def_by_code.get(metric_code)
+            if metric_def and metric_code in weights_map:
                 metric_items.append(
                     {
                         "metric_code": metric_code,
-                        "metric_name": metric.metric_def.name,
-                        "value": str(metrics_map[metric_code]),
-                        "weight": str(weights_map.get(metric_code, Decimal("0"))),
+                        "metric_name": metric_def.name,
+                        "value": str(value),
+                        "weight": str(weights_map[metric_code]),
                     }
                 )
 
@@ -304,13 +304,20 @@ class ScoringService:
         if not participant:
             raise ValueError(f"Participant {participant_id} not found")
 
-        # 5. Get extracted metrics with details (value, source, confidence)
-        extracted_metrics = await self.extracted_metric_repo.get_by_participant(participant_id)
+        # 5. Get participant metrics with details (value, confidence) - S2-08
+        participant_metrics = await self.participant_metric_repo.list_by_participant(participant_id)
 
-        # Create metric_code -> ExtractedMetric mapping
+        # Create metric_code -> ParticipantMetric mapping
         metrics_map = {}
-        for metric in extracted_metrics:
-            metrics_map[metric.metric_def.code] = metric
+        for metric in participant_metrics:
+            metrics_map[metric.metric_code] = metric
+
+        # 5b. Load MetricDef for names and units
+        from app.repositories.metric import MetricDefRepository
+
+        metric_def_repo = MetricDefRepository(self.db)
+        metric_defs = await metric_def_repo.list_all(active_only=True)
+        metric_def_by_code = {m.code: m for m in metric_defs}
 
         # 6. Parse weights from weight table
         weights_map = {}
@@ -324,18 +331,19 @@ class ScoringService:
         for metric_code, weight in weights_map.items():
             if metric_code in metrics_map:
                 metric = metrics_map[metric_code]
+                metric_def = metric_def_by_code.get(metric_code)
                 value = metric.value
                 contribution = value * weight
 
                 detailed_metrics.append(
                     {
                         "code": metric_code,
-                        "name": metric.metric_def.name,
+                        "name": metric_def.name if metric_def else metric_code,
                         "value": value,
-                        "unit": metric.metric_def.unit or "балл",
+                        "unit": metric_def.unit if metric_def else "балл",
                         "weight": weight,
                         "contribution": contribution.quantize(Decimal("0.01")),
-                        "source": metric.source,
+                        "source": "LLM",  # Default source (S2-08: not stored in participant_metric)
                         "confidence": metric.confidence,
                     }
                 )
@@ -370,8 +378,8 @@ class ScoringService:
                     }
                 )
 
-        # 10. Calculate average confidence for notes
-        confidences = [m.confidence for m in extracted_metrics if m.confidence is not None]
+        # 10. Calculate average confidence for notes (S2-08: from participant_metrics)
+        confidences = [m.confidence for m in participant_metrics if m.confidence is not None]
         avg_confidence = sum(confidences) / len(confidences) if confidences else None
 
         notes = f"OCR confidence средний: {avg_confidence:.2f}; " if avg_confidence else ""

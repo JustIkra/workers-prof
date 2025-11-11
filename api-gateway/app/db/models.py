@@ -141,6 +141,7 @@ class Report(Base):
 
     Status:
     - UPLOADED: File uploaded, extraction not started
+    - PROCESSING: Extraction in progress
     - EXTRACTED: Metrics extracted successfully
     - FAILED: Extraction failed
     """
@@ -176,7 +177,7 @@ class Report(Base):
     __table_args__ = (
         CheckConstraint("type IN ('REPORT_1', 'REPORT_2', 'REPORT_3')", name="report_type_check"),
         CheckConstraint(
-            "status IN ('UPLOADED', 'EXTRACTED', 'FAILED')", name="report_status_check"
+            "status IN ('UPLOADED', 'PROCESSING', 'EXTRACTED', 'FAILED')", name="report_status_check"
         ),
         # Only one report of each type per participant
         UniqueConstraint("participant_id", "type", name="report_participant_type_unique"),
@@ -411,6 +412,63 @@ class ExtractedMetric(Base):
 
     def __repr__(self) -> str:
         return f"<ExtractedMetric(id={self.id}, report_id={self.report_id}, metric_def_id={self.metric_def_id}, value={self.value})>"
+
+
+# ===== ParticipantMetric Table =====
+class ParticipantMetric(Base):
+    """
+    Actual metric value for a participant (independent of reports).
+
+    Stores the latest confirmed value for each (participant_id, metric_code) pair.
+    When a new report is uploaded with the same metric, this record is updated via upsert
+    based on report timestamp priority.
+
+    Priority rules:
+    - More recent report.uploaded_at (or created_at) takes precedence
+    - On tie, higher confidence value is preferred
+    """
+
+    __tablename__ = "participant_metric"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    participant_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("participant.id", ondelete="CASCADE"), nullable=False
+    )
+    metric_code: Mapped[str] = mapped_column(String(50), nullable=False)
+    value: Mapped[float] = mapped_column(sa.Numeric(4, 2), nullable=False)
+    confidence: Mapped[float | None] = mapped_column(sa.Numeric(4, 3), nullable=True)
+    last_source_report_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("report.id", ondelete="SET NULL"), nullable=True
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True), nullable=False, server_default=text("now()")
+    )
+
+    # Relationships
+    participant: Mapped["Participant"] = relationship("Participant")
+    last_source_report: Mapped["Report | None"] = relationship("Report")
+
+    # Constraints
+    __table_args__ = (
+        UniqueConstraint(
+            "participant_id",
+            "metric_code",
+            name="participant_metric_unique",
+        ),
+        CheckConstraint(
+            "value >= 1 AND value <= 10",
+            name="participant_metric_value_range_check",
+        ),
+        CheckConstraint(
+            "confidence IS NULL OR (confidence >= 0 AND confidence <= 1)",
+            name="participant_metric_confidence_check",
+        ),
+        Index("ix_participant_metric_participant_id", "participant_id"),
+        Index("ix_participant_metric_metric_code", "metric_code"),
+    )
+
+    def __repr__(self) -> str:
+        return f"<ParticipantMetric(id={self.id}, participant_id={self.participant_id}, metric_code={self.metric_code}, value={self.value})>"
 
 
 # ===== ScoringResult Table =====

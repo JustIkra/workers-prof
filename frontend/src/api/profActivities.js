@@ -10,7 +10,7 @@ export const profActivitiesApi = {
    */
   async list() {
     const response = await apiClient.get('/prof-activities')
-    return response.data
+    return response.data.activities || []
   },
 
   /**

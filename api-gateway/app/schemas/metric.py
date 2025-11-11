@@ -149,3 +149,38 @@ class MessageResponse(BaseModel):
     """Generic message response."""
 
     message: str
+
+
+# ===== Metric Template Schemas =====
+
+
+class MetricTemplateItem(BaseModel):
+    """Schema for a metric template item (metric definition with optional value)."""
+
+    metric_def: MetricDefResponse = Field(..., description="Metric definition")
+    value: Decimal | None = Field(None, description="Current value (if already filled)")
+    source: str | None = Field(None, description="Source of extraction (if value exists)")
+    confidence: Decimal | None = Field(None, description="Confidence score (if value exists)")
+    notes: str | None = Field(None, description="Additional notes (if value exists)")
+
+
+class MetricTemplateResponse(BaseModel):
+    """Response schema for metric template - list of all active metrics with optional values."""
+
+    items: list[MetricTemplateItem]
+    total: int
+    filled_count: int = Field(..., description="Number of metrics that have values")
+    missing_count: int = Field(..., description="Number of metrics without values")
+
+
+# ===== Metric Mapping Schemas =====
+
+
+class MetricMappingResponse(BaseModel):
+    """Response schema for metric label-to-code mapping for a report type."""
+
+    report_type: str = Field(..., description="Report type (e.g., REPORT_1, REPORT_2, REPORT_3)")
+    mappings: dict[str, str] = Field(
+        ..., description="Dictionary of label (uppercase) -> metric_code mappings"
+    )
+    total: int = Field(..., description="Total number of mappings")

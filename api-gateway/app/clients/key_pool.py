@@ -115,6 +115,7 @@ class KeyPool:
         self,
         api_keys: list[str],
         qps_per_key: float = 0.5,
+        burst_multiplier: float = 2.0,
         strategy: Literal["ROUND_ROBIN", "LEAST_BUSY"] = "ROUND_ROBIN",
         circuit_breaker_failure_threshold: int = 5,
         circuit_breaker_recovery_timeout: float = 60.0,
@@ -126,6 +127,7 @@ class KeyPool:
         Args:
             api_keys: List of API keys to manage
             qps_per_key: Rate limit per key (queries per second)
+            burst_multiplier: Burst size multiplier (burst_size = qps * multiplier)
             strategy: Key selection strategy
             circuit_breaker_failure_threshold: Failures before opening circuit
             circuit_breaker_recovery_timeout: Seconds before trying recovery
@@ -141,9 +143,13 @@ class KeyPool:
             raise ValueError(f"qps_per_key must be positive, got {qps_per_key}")
 
         self.qps_per_key = qps_per_key
+        self.burst_multiplier = burst_multiplier
         self.strategy = KeySelectionStrategy(strategy)
         self._round_robin_index = 0
         self._lock = asyncio.Lock()
+
+        # Calculate burst size
+        burst_size = qps_per_key * burst_multiplier
 
         # Initialize per-key metrics
         self._keys: list[KeyMetrics] = []
@@ -151,7 +157,7 @@ class KeyPool:
             key_metrics = KeyMetrics(
                 key_id=f"key_{i}",
                 api_key=api_key,
-                rate_limiter=RateLimiter(qps=qps_per_key),
+                rate_limiter=RateLimiter(qps=qps_per_key, burst_size=burst_size),
                 circuit_breaker=CircuitBreaker(
                     failure_threshold=circuit_breaker_failure_threshold,
                     recovery_timeout=circuit_breaker_recovery_timeout,

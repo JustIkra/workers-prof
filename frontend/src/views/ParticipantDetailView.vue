@@ -97,7 +97,7 @@
           </el-table-column>
           <el-table-column
             label="Действия"
-            width="400"
+            width="450"
             fixed="right"
           >
             <template #default="{ row }">
@@ -108,30 +108,57 @@
                 <el-icon><Download /></el-icon>
                 Скачать
               </el-button>
+
+              <!-- Извлечь метрики - только для UPLOADED или FAILED -->
               <el-button
+                v-if="row.status === 'UPLOADED' || row.status === 'FAILED'"
                 size="small"
                 type="primary"
-                :disabled="row.status === 'EXTRACTED'"
                 @click="extractMetrics(row.id)"
               >
                 <el-icon><DataAnalysis /></el-icon>
-                Извлечь метрики
+                {{ row.status === 'FAILED' ? 'Повторить' : 'Извлечь метрики' }}
               </el-button>
+
+              <!-- Идет обработка - disabled -->
               <el-button
+                v-if="row.status === 'PROCESSING'"
+                size="small"
+                type="primary"
+                :loading="true"
+                disabled
+              >
+                Извлечение...
+              </el-button>
+
+              <!-- Редактировать метрики - только для EXTRACTED -->
+              <el-button
+                v-if="row.status === 'EXTRACTED'"
+                size="small"
+                type="success"
+                @click="viewMetrics(row.id)"
+              >
+                <el-icon><View /></el-icon>
+                Редактировать метрики
+              </el-button>
+
+              <!-- Просмотр метрик - для PROCESSING и EXTRACTED -->
+              <el-button
+                v-if="row.status === 'PROCESSING' || row.status === 'EXTRACTED'"
                 size="small"
                 type="info"
                 @click="viewMetrics(row.id)"
               >
                 <el-icon><View /></el-icon>
-                Метрики
+                Просмотр
               </el-button>
+
               <el-button
                 size="small"
                 type="danger"
                 @click="confirmDeleteReport(row)"
               >
                 <el-icon><Delete /></el-icon>
-                Удалить
               </el-button>
             </template>
           </el-table-column>
@@ -140,6 +167,89 @@
         <el-empty
           v-if="!reports.length && !loadingReports"
           description="Нет загруженных отчётов"
+        />
+      </el-card>
+
+      <!-- Participant Metrics Section (S2-08) -->
+      <el-card class="section-card">
+        <template #header>
+          <div class="section-header">
+            <h3>Актуальные метрики участника</h3>
+            <el-button
+              type="primary"
+              size="small"
+              @click="loadParticipantMetrics"
+            >
+              <el-icon><Refresh /></el-icon>
+              Обновить
+            </el-button>
+          </div>
+        </template>
+
+        <el-table
+          v-loading="loadingMetrics"
+          :data="participantMetrics"
+          stripe
+        >
+          <el-table-column
+            prop="metric_code"
+            label="Код метрики"
+            width="200"
+          />
+          <el-table-column
+            prop="value"
+            label="Значение"
+            width="120"
+          >
+            <template #default="{ row }">
+              <el-tag type="success">
+                {{ formatFromApi(row.value) }}
+              </el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column
+            prop="confidence"
+            label="Уверенность"
+            width="150"
+          >
+            <template #default="{ row }">
+              <span
+                v-if="row.confidence !== null"
+                :style="{ color: getConfidenceColor(row.confidence) }"
+              >
+                {{ (row.confidence * 100).toFixed(0) }}%
+              </span>
+              <span v-else>—</span>
+            </template>
+          </el-table-column>
+          <el-table-column
+            prop="updated_at"
+            label="Обновлено"
+            width="180"
+          >
+            <template #default="{ row }">
+              {{ formatDate(row.updated_at) }}
+            </template>
+          </el-table-column>
+          <el-table-column
+            prop="last_source_report_id"
+            label="Источник"
+          >
+            <template #default="{ row }">
+              <el-tag
+                v-if="row.last_source_report_id"
+                size="small"
+              >
+                Из отчёта
+              </el-tag>
+              <span v-else>—</span>
+            </template>
+          </el-table-column>
+        </el-table>
+
+        <el-empty
+          v-if="!participantMetrics.length && !loadingMetrics"
+          description="Метрики ещё не извлечены. Загрузите и обработайте отчёты."
         />
       </el-card>
 
@@ -399,7 +509,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, computed, nextTick } from 'vue'
+import { ref, reactive, onMounted, onUnmounted, computed, nextTick, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
@@ -409,7 +519,8 @@ import {
   View,
   Delete,
   TrendCharts,
-  DocumentCopy
+  DocumentCopy,
+  Refresh
 } from '@element-plus/icons-vue'
 import AppLayout from '@/components/AppLayout.vue'
 import MetricsEditor from '@/components/MetricsEditor.vue'
@@ -424,6 +535,7 @@ const participantsStore = useParticipantsStore()
 const loading = ref(false)
 const loadingReports = ref(false)
 const loadingActivities = ref(false)
+const loadingMetrics = ref(false)
 const uploading = ref(false)
 const calculating = ref(false)
 
@@ -431,8 +543,15 @@ const participant = computed(() => participantsStore.currentParticipant)
 const reports = ref([])
 const scoringResults = ref([])
 const profActivities = ref([])
+const participantMetrics = ref([])
 const currentMetrics = ref([])
 const currentReportId = ref(null)
+const refreshInterval = ref(null)
+
+// Check if any report is being processed
+const hasProcessingReports = computed(() => {
+  return reports.value.some(report => report.status === 'PROCESSING')
+})
 
 const showUploadDialog = ref(false)
 const showScoringDialog = ref(false)
@@ -478,7 +597,8 @@ const formatReportType = (type) => {
 const formatStatus = (status) => {
   const statuses = {
     UPLOADED: 'Загружен',
-    EXTRACTED: 'Обработан',
+    PROCESSING: 'Извлечение метрик...',
+    EXTRACTED: 'Метрики извлечены',
     FAILED: 'Ошибка'
   }
   return statuses[status] || status
@@ -487,6 +607,7 @@ const formatStatus = (status) => {
 const getStatusType = (status) => {
   const types = {
     UPLOADED: 'info',
+    PROCESSING: 'warning',
     EXTRACTED: 'success',
     FAILED: 'danger'
   }
@@ -552,6 +673,20 @@ const loadProfActivities = async () => {
   }
 }
 
+// S2-08: Load participant metrics
+const loadParticipantMetrics = async () => {
+  loadingMetrics.value = true
+  try {
+    const response = await participantsApi.getMetrics(route.params.id)
+    participantMetrics.value = response.metrics || []
+  } catch (error) {
+    console.error('Error loading participant metrics:', error)
+    ElMessage.error('Ошибка загрузки метрик участника')
+  } finally {
+    loadingMetrics.value = false
+  }
+}
+
 // File upload
 const handleFileChange = (file) => {
   uploadForm.file = file.raw
@@ -578,6 +713,8 @@ const handleUpload = async () => {
       uploadForm.file = null
       fileList.value = []
       await loadReports()
+      // S2-08: Reload participant metrics after report upload
+      await loadParticipantMetrics()
     } catch (error) {
       ElMessage.error('Ошибка загрузки отчёта')
     } finally {
@@ -608,11 +745,44 @@ const extractMetrics = async (reportId) => {
   try {
     await reportsApi.extract(reportId)
     ElMessage.success('Извлечение метрик запущено')
-    setTimeout(() => loadReports(), 2000)
+    // Немедленно обновим список отчетов
+    await loadReports()
   } catch (error) {
     ElMessage.error('Ошибка запуска извлечения метрик')
   }
 }
+
+// Auto-refresh functions
+const startAutoRefresh = () => {
+  if (refreshInterval.value) return // Already running
+
+  // Обновляем каждые 3 секунды
+  refreshInterval.value = setInterval(async () => {
+    try {
+      await loadReports()
+      // S2-08: Also reload participant metrics to reflect newly extracted values
+      await loadParticipantMetrics()
+    } catch (error) {
+      console.error('Auto-refresh error:', error)
+    }
+  }, 3000)
+}
+
+const stopAutoRefresh = () => {
+  if (refreshInterval.value) {
+    clearInterval(refreshInterval.value)
+    refreshInterval.value = null
+  }
+}
+
+// Watch for processing reports to enable/disable auto-refresh
+watch(hasProcessingReports, (hasProcessing) => {
+  if (hasProcessing) {
+    startAutoRefresh()
+  } else {
+    stopAutoRefresh()
+  }
+})
 
 const viewMetrics = async (reportId) => {
   currentReportId.value = reportId
@@ -620,9 +790,10 @@ const viewMetrics = async (reportId) => {
   showMetricsDialog.value = true
 }
 
-const handleMetricsUpdated = () => {
+const handleMetricsUpdated = async () => {
   ElMessage.success('Метрики обновлены')
-  // Можно обновить список отчётов, если нужно
+  // S2-08: Reload participant metrics after manual update
+  await loadParticipantMetrics()
 }
 
 const confirmDeleteReport = (report) => {
@@ -746,6 +917,11 @@ onMounted(async () => {
   await loadReports()
   await loadScoringResults()
   await loadProfActivities()
+  await loadParticipantMetrics() // S2-08: Load participant metrics
+})
+
+onUnmounted(() => {
+  stopAutoRefresh()
 })
 </script>
 

@@ -59,6 +59,7 @@ class GeminiPoolClient:
         offline: bool = False,
         transport: GeminiTransport | None = None,
         qps_per_key: float = 0.5,
+        burst_multiplier: float = 2.0,
         strategy: Literal["ROUND_ROBIN", "LEAST_BUSY"] = "ROUND_ROBIN",
         circuit_breaker_failure_threshold: int = 5,
         circuit_breaker_recovery_timeout: float = 60.0,
@@ -75,6 +76,7 @@ class GeminiPoolClient:
             offline: Disable external network calls (test/ci mode)
             transport: Custom transport (for testing)
             qps_per_key: Rate limit per key (queries per second)
+            burst_multiplier: Burst size multiplier (burst_size = qps * multiplier)
             strategy: Key selection strategy (ROUND_ROBIN or LEAST_BUSY)
             circuit_breaker_failure_threshold: Failures before opening circuit
             circuit_breaker_recovery_timeout: Seconds before trying recovery
@@ -96,6 +98,7 @@ class GeminiPoolClient:
         self._pool = KeyPool(
             api_keys=api_keys,
             qps_per_key=qps_per_key,
+            burst_multiplier=burst_multiplier,
             strategy=strategy,
             circuit_breaker_failure_threshold=circuit_breaker_failure_threshold,
             circuit_breaker_recovery_timeout=circuit_breaker_recovery_timeout,

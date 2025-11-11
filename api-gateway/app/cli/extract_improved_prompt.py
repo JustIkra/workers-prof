@@ -21,7 +21,7 @@ from typing import Any
 from PIL import Image
 import io
 
-from app.clients.gemini import GeminiClient
+from app.clients.pool_client import GeminiPoolClient
 from app.core.config import settings
 from app.services.docx_extraction import DocxImageExtractor
 
@@ -68,6 +68,7 @@ IMPROVED_VISION_PROMPT = """Ты — эксперт по анализу визу
   - Названия с пробелами (например: "РАБОТА С ДОКУМЕНТАМИ")
   - Названия ролей (ГЕНЕРАТОР ИДЕЙ, КООРДИНАТОР)
   - Названия характеристик (ЛИДЕРСТВО, СТРЕССОУСТОЙЧИВОСТЬ)
+  - **ОБЕ СТОРОНЫ ПАР ПРОТИВОПОЛОЖНОСТЕЙ** (см. раздел ниже)
 
 ❌ НЕ ИЗВЛЕКАЙ:
   - Служебные слова: "НИЗКАЯ", "ВЫСОКАЯ", "ЗОНЫ ИНТЕРПРЕТАЦИИ"
@@ -75,6 +76,21 @@ IMPROVED_VISION_PROMPT = """Ты — эксперт по анализу визу
   - Заголовки разделов/таблиц
   - Легенду графика
   - Символы: ++, +, −, --, %, ±
+
+ОСОБОЕ ВНИМАНИЕ: ПАРЫ ПРОТИВОПОЛОЖНОСТЕЙ
+На изображении могут быть метрики, представленные как ПАРЫ ПРОТИВОПОЛОЖНЫХ ХАРАКТЕРИСТИК.
+Например:
+  - ЗАМКНУТОСТЬ 8.4 ОБЩИТЕЛЬНОСТЬ
+  - НЕЗАВИСИМОСТЬ 10 КОНФОРМИЗМ
+  - МОРАЛЬНАЯ ГИБКОСТЬ 8.8 МОРАЛЬНОСТЬ
+  - ИМПУЛЬСИВНОСТЬ 5.8 ОРГАНИЗОВАННОСТЬ
+
+⚠️ КРИТИЧЕСКИ ВАЖНО: Извлекай ОБЕ СТОРОНЫ пары как ОТДЕЛЬНЫЕ метрики!
+Если видишь "ЗАМКНУТОСТЬ 8.4 ОБЩИТЕЛЬНОСТЬ", извлеки:
+  {"label": "ЗАМКНУТОСТЬ", "value": "8.4"}
+  {"label": "ОБЩИТЕЛЬНОСТЬ", "value": "8.4"}  (или другое значение, если указано)
+
+Если значения не указаны явно для обеих сторон, используй одно значение для обеих метрик.
 
 ПРАВИЛА ИЗВЛЕЧЕНИЯ ЗНАЧЕНИЙ:
 ✅ ИЗВЛЕКАЙ:
@@ -139,7 +155,38 @@ IMPROVED_VISION_PROMPT = """Ты — эксперт по анализу визу
 }
 ```
 
-Пример 4 - Если на изображении нет метрик (только заголовок/описание):
+Пример 4 - Пара противоположностей (извлекай ОБЕ СТОРОНЫ!):
+Если на изображении: "ЗАМКНУТОСТЬ 8.4 ОБЩИТЕЛЬНОСТЬ"
+```json
+{
+  "metrics": [
+    {"label": "ЗАМКНУТОСТЬ", "value": "8.4"},
+    {"label": "ОБЩИТЕЛЬНОСТЬ", "value": "8.4"}
+  ]
+}
+```
+
+Если на изображении: "НЕЗАВИСИМОСТЬ 10 КОНФОРМИЗМ"
+```json
+{
+  "metrics": [
+    {"label": "НЕЗАВИСИМОСТЬ", "value": "10"},
+    {"label": "КОНФОРМИЗМ", "value": "10"}
+  ]
+}
+```
+
+Если на изображении: "МОРАЛЬНАЯ ГИБКОСТЬ 8.8 МОРАЛЬНОСТЬ"
+```json
+{
+  "metrics": [
+    {"label": "МОРАЛЬНАЯ ГИБКОСТЬ", "value": "8.8"},
+    {"label": "МОРАЛЬНОСТЬ", "value": "8.8"}
+  ]
+}
+```
+
+Пример 5 - Если на изображении нет метрик (только заголовок/описание):
 ```json
 {
   "metrics": []
@@ -152,6 +199,7 @@ IMPROVED_VISION_PROMPT = """Ты — эксперт по анализу визу
 3. label — ПОЛНОЕ название на русском языке (как написано на изображении)
 4. value — строка с числом в формате "X" или "X.Y" (точка как разделитель)
 5. Если изображение не содержит метрик, верни: {"metrics": []}
+6. **ОБЯЗАТЕЛЬНО извлекай ОБЕ СТОРОНЫ пар противоположностей!** Если видишь пару (например, "ЗАМКНУТОСТЬ 8.4 ОБЩИТЕЛЬНОСТЬ"), создай ДВА отдельных объекта метрик - по одному для каждой стороны пары.
 
 Теперь проанализируй изображение и верни JSON со всеми найденными метриками:
 """
@@ -163,18 +211,27 @@ class ImprovedMetricExtractor:
     def __init__(self):
         self.docx_extractor = DocxImageExtractor()
 
-        # Use first API key from settings
+        # Use all API keys with rotation
         api_keys = settings.gemini_keys_list
         if not api_keys:
             raise ValueError("No Gemini API keys configured")
 
-        self.gemini_client = GeminiClient(
-            api_key=api_keys[0],
+        logger.info(f"Initializing GeminiPoolClient with {len(api_keys)} API keys")
+
+        self.gemini_client = GeminiPoolClient(
+            api_keys=api_keys,
+            model_text=settings.gemini_model_text,
             model_vision=settings.gemini_model_vision,
             timeout_s=60,
             max_retries=3,
             offline=False,
+            qps_per_key=settings.gemini_qps_per_key,
+            burst_multiplier=settings.gemini_burst_multiplier,
+            strategy=settings.gemini_strategy,
         )
+        
+        # Delay between requests (in seconds) to avoid rate limits
+        self.request_delay = 0.5  # 500ms between requests
 
     async def extract_from_docx(self, docx_path: Path) -> dict[str, Any]:
         """
@@ -197,11 +254,15 @@ class ImprovedMetricExtractor:
         for idx, img in enumerate(images):
             logger.info(f"Processing image {idx + 1}/{len(images)}: {img.filename}")
 
+            # Add delay between requests to avoid rate limits
+            if idx > 0:
+                await asyncio.sleep(self.request_delay)
+
             # Save image to tmp for debugging
             tmp_path = TMP_DIR / f"{docx_path.stem}_{img.filename}"
             tmp_path.write_bytes(img.data)
 
-            # Pre-process image (crop ROI - remove bottom 15%)
+            # Pre-process image (convert transparent background to white)
             try:
                 processed_data = self._preprocess_image(img.data)
             except Exception as e:
@@ -254,7 +315,7 @@ class ImprovedMetricExtractor:
 
     def _preprocess_image(self, image_data: bytes) -> bytes:
         """
-        Pre-process image: crop ROI (remove bottom 15% with X-axis).
+        Pre-process image: convert transparent background to white.
 
         Args:
             image_data: Original image bytes
@@ -263,18 +324,47 @@ class ImprovedMetricExtractor:
             Processed image bytes (PNG)
         """
         with Image.open(io.BytesIO(image_data)) as img:
-            # Convert to RGB if needed
-            if img.mode not in ("RGB", "L"):
+            # Handle transparent background: convert to white
+            if img.mode in ("RGBA", "LA", "P"):
+                # Handle palette mode with transparency
+                if img.mode == "P":
+                    # Check if has transparency
+                    if "transparency" in img.info:
+                        # Convert to RGBA first
+                        img = img.convert("RGBA")
+                    else:
+                        # No transparency, just convert to RGB
+                        img = img.convert("RGB")
+                
+                # If still has alpha channel, composite on white background
+                if img.mode in ("RGBA", "LA"):
+                    # Create white background in RGBA mode
+                    white_bg = Image.new("RGBA", img.size, (255, 255, 255, 255))
+                    
+                    # Convert image to RGBA if needed
+                    if img.mode == "LA":
+                        # LA (grayscale with alpha) -> RGBA
+                        rgba_img = Image.new("RGBA", img.size)
+                        rgba_img.paste(img.convert("L"), (0, 0))
+                        # Copy alpha channel
+                        alpha = img.split()[1]
+                        rgba_img.putalpha(alpha)
+                        img = rgba_img
+                    elif img.mode != "RGBA":
+                        img = img.convert("RGBA")
+                    
+                    # Composite image on white background
+                    img = Image.alpha_composite(white_bg, img).convert("RGB")
+                else:
+                    # Already RGB
+                    img = img.convert("RGB")
+            elif img.mode not in ("RGB", "L"):
+                # Convert other modes to RGB
                 img = img.convert("RGB")
-
-            # Crop bottom 15%
-            width, height = img.size
-            crop_height = int(height * 0.85)  # Remove bottom 15%
-            cropped = img.crop((0, 0, width, crop_height))
 
             # Save to PNG
             output = io.BytesIO()
-            cropped.save(output, format="PNG")
+            img.save(output, format="PNG")
             return output.getvalue()
 
     async def _extract_metrics_with_retry(
@@ -441,6 +531,25 @@ async def main():
         logger.info(f"Unique labels: {len(unique_labels)}")
         logger.info(f"Total metrics: {sum(len(r['metrics']) for r in all_results)}")
         logger.info(f"Errors: {len(all_errors)}")
+        logger.info("=" * 80)
+
+        # Print pool statistics
+        pool_stats = extractor.gemini_client.get_pool_stats()
+        logger.info("=" * 80)
+        logger.info("Gemini API Key Pool Statistics:")
+        logger.info(f"  Total keys: {pool_stats.total_keys}")
+        logger.info(f"  Healthy keys: {pool_stats.healthy_keys}")
+        logger.info(f"  Degraded keys: {pool_stats.degraded_keys}")
+        logger.info(f"  Failed keys: {pool_stats.failed_keys}")
+        logger.info(f"  Total requests: {pool_stats.total_requests}")
+        logger.info(f"  Successful requests: {pool_stats.total_successes}")
+        logger.info(f"  Failed requests: {pool_stats.total_failures}")
+        
+        # Calculate total rate limit errors from per-key stats
+        total_rate_limit_errors = sum(
+            key_stat.get("rate_limit_errors", 0) for key_stat in pool_stats.per_key_stats
+        )
+        logger.info(f"  Rate limited requests: {total_rate_limit_errors}")
         logger.info("=" * 80)
 
         # Print unique labels

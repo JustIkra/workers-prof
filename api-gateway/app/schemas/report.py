@@ -23,6 +23,7 @@ class ReportStatus(str, Enum):
     """Lifecycle states for report processing."""
 
     UPLOADED = "UPLOADED"
+    PROCESSING = "PROCESSING"
     EXTRACTED = "EXTRACTED"
     FAILED = "FAILED"
 

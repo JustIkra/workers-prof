@@ -72,6 +72,7 @@ def create_gemini_client(api_key: str | None = None) -> Union[GeminiClient, Gemi
             max_retries=3,
             offline=settings.is_offline,
             qps_per_key=settings.gemini_qps_per_key,
+            burst_multiplier=settings.gemini_burst_multiplier,
             strategy=settings.gemini_strategy,
         )
 

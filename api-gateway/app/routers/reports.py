@@ -121,7 +121,11 @@ async def extract_report(
     service = ReportService(db)
 
     # Verify report exists and belongs to accessible participant
-    await service.get_report_by_id(report_id)
+    report = await service.get_report_by_id(report_id)
+
+    # Update report status to PROCESSING
+    report.status = "PROCESSING"
+    await db.commit()
 
     # Queue extraction task
     request_id = getattr(request.state, "request_id", None)

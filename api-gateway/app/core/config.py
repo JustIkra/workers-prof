@@ -118,6 +118,9 @@ class Settings(BaseSettings):
         default="gemini-2.5-flash", description="Gemini model for vision tasks"
     )
     gemini_qps_per_key: float = Field(default=0.5, description="QPS limit per API key")
+    gemini_burst_multiplier: float = Field(
+        default=2.0, description="Burst size multiplier (burst_size = qps * multiplier)"
+    )
     gemini_timeout_s: int = Field(default=30, description="Gemini API timeout in seconds")
     gemini_strategy: Literal["ROUND_ROBIN", "LEAST_BUSY"] = Field(
         default="ROUND_ROBIN", description="Key rotation strategy"

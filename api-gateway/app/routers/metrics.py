@@ -10,7 +10,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.dependencies import get_current_active_user
+from app.core.dependencies import get_current_active_user, require_admin
 from app.db.models import User
 from app.db.session import get_db
 from app.repositories.metric import ExtractedMetricRepository, MetricDefRepository
@@ -27,7 +27,11 @@ from app.schemas.metric import (
     MetricDefListResponse,
     MetricDefResponse,
     MetricDefUpdateRequest,
+    MetricMappingResponse,
+    MetricTemplateItem,
+    MetricTemplateResponse,
 )
+from app.services.metric_mapping import get_metric_mapping_service
 
 router = APIRouter(prefix="/api", tags=["metrics"])
 
@@ -192,6 +196,77 @@ async def delete_metric_def(
 # ===== ExtractedMetric Endpoints =====
 
 
+@router.get("/reports/{report_id}/metrics/template", response_model=MetricTemplateResponse)
+async def get_metric_template(
+    report_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+) -> MetricTemplateResponse:
+    """
+    Get metric template for a report - all active metric definitions with current values.
+
+    This endpoint returns a complete list of all active metric definitions,
+    with values filled in if they have been extracted or manually entered for this report.
+    Use this to display a form for manual metric entry.
+
+    Requires: ACTIVE user (any role).
+
+    Returns: Template with all active metrics and their current values (if any).
+    """
+    # Verify report exists
+    report_repo = ReportRepository(db)
+    report = await report_repo.get_with_file_ref(report_id)
+    if not report:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Report not found")
+
+    # Get all active metric definitions
+    metric_def_repo = MetricDefRepository(db)
+    all_metric_defs = await metric_def_repo.list_all(active_only=True)
+
+    # Get existing extracted metrics for this report
+    extracted_metric_repo = ExtractedMetricRepository(db)
+    extracted_metrics = await extracted_metric_repo.list_by_report(report_id)
+
+    # Create a map of metric_def_id -> extracted_metric for quick lookup
+    extracted_map = {m.metric_def_id: m for m in extracted_metrics}
+
+    # Build template items
+    template_items = []
+    filled_count = 0
+
+    for metric_def in all_metric_defs:
+        extracted = extracted_map.get(metric_def.id)
+
+        if extracted:
+            filled_count += 1
+            template_items.append(
+                MetricTemplateItem(
+                    metric_def=MetricDefResponse.model_validate(metric_def),
+                    value=extracted.value,
+                    source=extracted.source,
+                    confidence=extracted.confidence,
+                    notes=extracted.notes,
+                )
+            )
+        else:
+            template_items.append(
+                MetricTemplateItem(
+                    metric_def=MetricDefResponse.model_validate(metric_def),
+                    value=None,
+                    source=None,
+                    confidence=None,
+                    notes=None,
+                )
+            )
+
+    return MetricTemplateResponse(
+        items=template_items,
+        total=len(template_items),
+        filled_count=filled_count,
+        missing_count=len(template_items) - filled_count,
+    )
+
+
 @router.get("/reports/{report_id}/metrics", response_model=ExtractedMetricListResponse)
 async def list_extracted_metrics(
     report_id: UUID,
@@ -199,7 +274,7 @@ async def list_extracted_metrics(
     current_user: User = Depends(get_current_active_user),
 ) -> ExtractedMetricListResponse:
     """
-    List all extracted metrics for a report.
+    List all extracted metrics for a report (only filled metrics).
 
     Requires: ACTIVE user (any role).
 
@@ -415,3 +490,45 @@ async def delete_extracted_metric(
             status_code=status.HTTP_404_NOT_FOUND, detail="Extracted metric not found"
         )
     return MessageResponse(message="Extracted metric deleted successfully")
+
+
+# ===== Metric Mapping Endpoints =====
+
+
+@router.get("/metrics/mapping/{report_type}", response_model=MetricMappingResponse)
+async def get_metric_mapping(
+    report_type: str,
+    current_user: User = Depends(require_admin),
+) -> MetricMappingResponse:
+    """
+    Get metric label-to-code mapping for a specific report type.
+
+    Requires: ADMIN user.
+
+    This endpoint returns the YAML configuration mapping for extracting
+    metrics from documents. Useful for debugging and validation.
+
+    Args:
+        report_type: Report type (e.g., "REPORT_1", "REPORT_2", "REPORT_3")
+
+    Returns:
+        Mapping configuration with label -> metric_code dictionary
+
+    Raises:
+        404: If report type is not found in configuration
+    """
+    mapping_service = get_metric_mapping_service()
+
+    # Check if report type is supported
+    supported_types = mapping_service.get_supported_report_types()
+    if report_type not in supported_types:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Report type '{report_type}' not found. "
+            f"Supported types: {', '.join(supported_types)}",
+        )
+
+    # Get mapping for report type
+    mappings = mapping_service.get_report_mapping(report_type)
+
+    return MetricMappingResponse(report_type=report_type, mappings=mappings, total=len(mappings))

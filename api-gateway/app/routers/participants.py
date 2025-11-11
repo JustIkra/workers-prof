@@ -21,6 +21,9 @@ from app.schemas.participant import (
     MetricItem,
     ParticipantCreateRequest,
     ParticipantListResponse,
+    ParticipantMetricResponse,
+    ParticipantMetricsListResponse,
+    ParticipantMetricUpdateRequest,
     ParticipantResponse,
     ParticipantSearchParams,
     ParticipantUpdateRequest,
@@ -289,3 +292,90 @@ async def get_participant_scoring_history(
         )
 
     return ScoringHistoryResponse(results=history_items, total=len(history_items))
+
+
+# ===== Participant Metrics Endpoints (S2-08) =====
+
+
+@router.get("/{participant_id}/metrics", response_model=ParticipantMetricsListResponse)
+async def get_participant_metrics(
+    participant_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+) -> ParticipantMetricsListResponse:
+    """
+    Get all actual metrics for a participant (S2-08).
+
+    Returns the latest confirmed value for each metric code,
+    independent of specific reports.
+
+    Requires: ACTIVE user (any role).
+
+    Returns: List of participant metrics with values, confidence, and update timestamps.
+    """
+    from app.repositories.participant_metric import ParticipantMetricRepository
+
+    # Check if participant exists
+    service = ParticipantService(db)
+    await service.get_participant_by_id(participant_id)  # Raises 404 if not found
+
+    # Get participant metrics
+    metric_repo = ParticipantMetricRepository(db)
+    metrics = await metric_repo.list_by_participant(participant_id)
+
+    return ParticipantMetricsListResponse(
+        participant_id=participant_id,
+        metrics=[ParticipantMetricResponse.model_validate(m) for m in metrics],
+        total=len(metrics),
+    )
+
+
+@router.put(
+    "/{participant_id}/metrics/{metric_code}",
+    response_model=ParticipantMetricResponse,
+)
+async def update_participant_metric(
+    participant_id: UUID,
+    metric_code: str,
+    request: ParticipantMetricUpdateRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+) -> ParticipantMetricResponse:
+    """
+    Manually update a participant metric value (S2-08).
+
+    Allows admin to manually correct or set metric values.
+    This is useful for manual data entry or corrections.
+
+    Requires: ACTIVE user (any role).
+
+    Request body:
+    - value: Metric value (range 1-10)
+    - confidence: Optional confidence score (0-1)
+
+    Returns: Updated metric with new value and timestamp.
+    """
+    from decimal import Decimal
+
+    from app.repositories.participant_metric import ParticipantMetricRepository
+
+    # Check if participant exists
+    service = ParticipantService(db)
+    await service.get_participant_by_id(participant_id)  # Raises 404 if not found
+
+    # Update metric
+    metric_repo = ParticipantMetricRepository(db)
+    metric = await metric_repo.update_value(
+        participant_id=participant_id,
+        metric_code=metric_code,
+        value=Decimal(str(request.value)),
+        confidence=Decimal(str(request.confidence)) if request.confidence else None,
+    )
+
+    if not metric:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Metric '{metric_code}' not found for participant {participant_id}",
+        )
+
+    return ParticipantMetricResponse.model_validate(metric)

@@ -29,11 +29,33 @@
 
       <!-- Группировка по профессиональным областям -->
       <div v-loading="loading" class="areas-container">
-        <el-empty
-          v-if="filteredAreas.length === 0"
-          description="Нет профессиональных областей"
-        />
+        <!-- Error State -->
+        <el-result
+          v-if="error"
+          icon="error"
+          title="Ошибка загрузки"
+          :sub-title="error"
+        >
+          <template #extra>
+            <el-button type="primary" @click="loadData">
+              <el-icon><RefreshRight /></el-icon>
+              Повторить
+            </el-button>
+          </template>
+        </el-result>
 
+        <!-- Empty State -->
+        <el-empty
+          v-else-if="filteredAreas.length === 0 && !loading"
+          description="Нет профессиональных областей"
+        >
+          <el-button type="primary" @click="showProfActivityDialog">
+            <el-icon><FolderAdd /></el-icon>
+            Создать первую область
+          </el-button>
+        </el-empty>
+
+        <!-- Data Grid -->
         <div v-else class="areas-grid">
           <div
             v-for="area in filteredAreas"
@@ -359,7 +381,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Plus, Delete, Edit, View, FolderAdd, Folder, Search } from '@element-plus/icons-vue'
+import { Plus, Delete, Edit, View, FolderAdd, Folder, Search, RefreshRight } from '@element-plus/icons-vue'
 import AppLayout from '@/components/AppLayout.vue'
 import { weightsApi } from '@/api/weights'
 import { profActivitiesApi } from '@/api/profActivities'
@@ -369,6 +391,7 @@ import { metricsApi } from '@/api/metrics'
 const loading = ref(false)
 const saving = ref(false)
 const searchQuery = ref('')
+const error = ref(null)
 
 // Данные
 const weightTables = ref([])
@@ -452,14 +475,13 @@ const weightSumAlertType = computed(() => {
 // Методы
 const loadWeightTables = async () => {
   try {
-    loading.value = true
     const data = await weightsApi.list()
     weightTables.value = data
-  } catch (error) {
-    console.error('Failed to load weight tables:', error)
+  } catch (err) {
+    console.error('Failed to load weight tables:', err)
+    error.value = 'Ошибка загрузки весовых таблиц'
     ElMessage.error('Ошибка загрузки весовых таблиц')
-  } finally {
-    loading.value = false
+    throw err
   }
 }
 
@@ -479,9 +501,11 @@ const loadProfActivities = async () => {
   try {
     const data = await profActivitiesApi.list()
     profActivities.value = data
-  } catch (error) {
-    console.error('Failed to load prof activities:', error)
+  } catch (err) {
+    console.error('Failed to load prof activities:', err)
+    error.value = 'Ошибка загрузки профессиональных областей'
     ElMessage.error('Ошибка загрузки профессиональных областей')
+    throw err
   }
 }
 
@@ -489,9 +513,11 @@ const loadMetrics = async () => {
   try {
     const data = await metricsApi.listMetricDefs(true)
     availableMetrics.value = data.items || []
-  } catch (error) {
-    console.error('Failed to load metrics:', error)
+  } catch (err) {
+    console.error('Failed to load metrics:', err)
+    error.value = 'Ошибка загрузки метрик'
     ElMessage.error('Ошибка загрузки метрик')
+    throw err
   }
 }
 
@@ -687,13 +713,29 @@ const formatDate = (dateStr) => {
   return new Date(dateStr).toLocaleString('ru-RU')
 }
 
+// Загрузка всех данных
+const loadData = async () => {
+  loading.value = true
+  error.value = null
+  try {
+    await Promise.all([
+      loadWeightTables(),
+      loadProfActivities(),
+      loadMetrics()
+    ])
+  } catch (err) {
+    console.error('Failed to load data:', err)
+    if (!error.value) {
+      error.value = 'Не удалось загрузить данные'
+    }
+  } finally {
+    loading.value = false
+  }
+}
+
 // Инициализация
 onMounted(async () => {
-  await Promise.all([
-    loadWeightTables(),
-    loadProfActivities(),
-    loadMetrics()
-  ])
+  await loadData()
 })
 </script>
 

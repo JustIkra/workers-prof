@@ -58,5 +58,32 @@ export const participantsApi = {
   async getReports(participantId) {
     const response = await apiClient.get(`/participants/${participantId}/reports`)
     return response.data
+  },
+
+  // ===== Participant Metrics (S2-08) =====
+
+  /**
+   * Получить актуальные метрики участника
+   * @param {string} participantId - UUID участника
+   * @returns {Promise<{participant_id: string, metrics: Array, total: number}>}
+   */
+  async getMetrics(participantId) {
+    const response = await apiClient.get(`/participants/${participantId}/metrics`)
+    return response.data
+  },
+
+  /**
+   * Обновить значение метрики участника вручную
+   * @param {string} participantId - UUID участника
+   * @param {string} metricCode - Код метрики
+   * @param {Object} data - { value, confidence? }
+   * @returns {Promise<Object>}
+   */
+  async updateMetric(participantId, metricCode, data) {
+    const response = await apiClient.put(
+      `/participants/${participantId}/metrics/${metricCode}`,
+      data
+    )
+    return response.data
   }
 }
