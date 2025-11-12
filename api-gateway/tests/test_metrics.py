@@ -89,7 +89,7 @@ async def sample_report(db_session: AsyncSession) -> Report:
     # Create report
     report = Report(
         participant_id=participant.id,
-        type="REPORT_1",
+        
         status="UPLOADED",
         file_ref_id=file_ref.id,
     )

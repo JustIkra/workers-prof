@@ -5,6 +5,7 @@ All request/response DTOs for participant management.
 """
 
 from datetime import date, datetime
+from typing import Literal
 from uuid import UUID
 
 from pydantic import BaseModel, Field
@@ -91,8 +92,10 @@ class ScoringHistoryItem(BaseModel):
     score_pct: float
     strengths: list[MetricItem] | None = None
     dev_areas: list[MetricItem] | None = None
-    recommendations: list[str] | None = None
+    recommendations: list[dict] | None = None  # AI-09: Changed from list[str] to list[dict] to support full recommendation objects
     created_at: datetime
+    recommendations_status: Literal["pending", "ready", "error", "disabled"] = "pending"
+    recommendations_error: str | None = None
 
     model_config = {"from_attributes": True}
 

@@ -168,16 +168,63 @@
             color: #333;
         }
 
-        .recommendation-link {
+        .recommendation-skill-focus {
+            margin-top: 8px;
             font-size: 13px;
-            color: #00798D;
-            text-decoration: none;
-            margin-top: 5px;
-            display: inline-block;
+            color: #606266;
         }
 
-        .recommendation-link:hover {
-            text-decoration: underline;
+        .recommendation-advice {
+            margin-top: 8px;
+            font-size: 13px;
+            color: #303133;
+            line-height: 1.5;
+        }
+
+        .recommendation-formats {
+            margin-top: 10px;
+            font-size: 13px;
+            color: #606266;
+        }
+
+        .recommendation-formats .formats-list {
+            margin: 5px 0 0 20px;
+            padding: 0;
+            list-style-type: disc;
+        }
+
+        .recommendation-formats .formats-list li {
+            margin-top: 4px;
+        }
+
+        .recommendations-alert {
+            padding: 14px 18px;
+            border-radius: 4px;
+            font-size: 13px;
+            margin-bottom: 12px;
+        }
+
+        .recommendations-alert.pending {
+            background: #e3f2fd;
+            border-left: 4px solid #2196f3;
+            color: #0d47a1;
+        }
+
+        .recommendations-alert.error {
+            background: #fdecea;
+            border-left: 4px solid #f56c6c;
+            color: #c0392b;
+        }
+
+        .recommendations-alert.disabled {
+            background: #f5f7fa;
+            border-left: 4px solid #909399;
+            color: #606266;
+        }
+
+        .recommendations-empty {
+            font-size: 13px;
+            color: #666;
         }
 
         /* Metrics Table */
@@ -287,8 +334,8 @@
                     <span>{{ prof_activity_name }} ({{ prof_activity_code }})</span>
                 </div>
                 <div class="header-meta-item">
-                    <span class="header-meta-label">Версия весовой таблицы:</span>
-                    <span>{{ weight_table_version }}</span>
+                    <span class="header-meta-label">ID весовой таблицы:</span>
+                    <span>{{ weight_table_id }}</span>
                 </div>
             </div>
         </div>
@@ -339,21 +386,55 @@
         {% endif %}
 
         <!-- Recommendations -->
-        {% if recommendations %}
         <div class="section">
             <h2>Рекомендации по обучению</h2>
+            {% if recommendations_status == 'ready' and recommendations %}
             <ul class="recommendations-list">
                 {% for rec in recommendations %}
                 <li class="recommendation">
                     <div class="recommendation-title">{{ rec.title }}</div>
-                    {% if rec.link_url %}
-                    <a href="{{ rec.link_url }}" class="recommendation-link" target="_blank">Перейти к курсу →</a>
+                    {% if rec.skill_focus %}
+                    <div class="recommendation-skill-focus">
+                        <strong>Навык:</strong> {{ rec.skill_focus }}
+                    </div>
+                    {% endif %}
+                    {% if rec.development_advice %}
+                    <div class="recommendation-advice">
+                        {{ rec.development_advice }}
+                    </div>
+                    {% endif %}
+                    {% if rec.recommended_formats %}
+                    <div class="recommendation-formats">
+                        <strong>Рекомендуемые форматы:</strong>
+                        <ul class="formats-list">
+                            {% for format in rec.recommended_formats %}
+                            <li>{{ format }}</li>
+                            {% endfor %}
+                        </ul>
+                    </div>
                     {% endif %}
                 </li>
                 {% endfor %}
             </ul>
+            {% elif recommendations_status == 'ready' %}
+            <p class="recommendations-empty">Рекомендации пока не найдены для текущего набора метрик.</p>
+            {% elif recommendations_status == 'pending' %}
+            <div class="recommendations-alert pending">
+                Рекомендации находятся в процессе формирования. Пожалуйста, обновите отчёт через несколько минут.
+            </div>
+            {% elif recommendations_status == 'error' %}
+            <div class="recommendations-alert error">
+                Не удалось получить рекомендации от ИИ.
+                {% if recommendations_error %}
+                Причина: {{ recommendations_error }}
+                {% endif %}
+            </div>
+            {% elif recommendations_status == 'disabled' %}
+            <div class="recommendations-alert disabled">
+                Генерация рекомендаций отключена в текущей конфигурации.
+            </div>
+            {% endif %}
         </div>
-        {% endif %}
 
         <!-- Metrics Table -->
         <div class="section">

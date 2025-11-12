@@ -15,6 +15,7 @@ from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
 from app.clients import GeminiClient, GeminiPoolClient
 from app.repositories.metric import ExtractedMetricRepository
 from app.repositories.participant_metric import ParticipantMetricRepository
@@ -54,7 +55,6 @@ class ScoringService:
             Dictionary with:
                 - score_pct: Decimal score as percentage (0-100), quantized to 0.01
                 - details: List of metric contributions
-                - weight_table_version: Version of the weight table used
                 - missing_metrics: List of metrics without extracted values
 
         Raises:
@@ -139,64 +139,71 @@ class ScoringService:
             metric_def_by_code=metric_def_by_code,
         )
 
-        # 9. Generate AI recommendations (AI-03) if enabled
+        # 9. Generate AI recommendations (AI-08) - async via Celery
+        # Save scoring result first, then trigger async recommendations generation
         recommendations = None
-        if self.gemini_client is not None:
-            from app.services.recommendations import generate_recommendations
+        recommendations_status = "pending"
+        if not settings.ai_recommendations_enabled or self.gemini_client is None:
+            recommendations_status = "disabled"
 
-            # Prepare metrics for recommendations generator
-            metrics_for_recommendations = []
-            for metric_code, weight in weights_map.items():
-                value = metrics_map[metric_code]
-                metric_def = metric_def_by_code.get(metric_code)
-
-                if metric_def:
-                    metrics_for_recommendations.append(
-                        {
-                            "code": metric_code,
-                            "name": metric_def.name,
-                            "unit": metric_def.unit or "балл",
-                            "value": float(value),
-                            "weight": float(weight),
-                        }
-                    )
-
-            # Generate recommendations (async, may return None on failure)
-            recommendations_data = await generate_recommendations(
-                gemini_client=self.gemini_client,
-                metrics=metrics_for_recommendations,
-                score_pct=float(score_pct),
-                prof_activity_code=prof_activity_code,
-                prof_activity_name=prof_activity.name,
-                weight_table_version=weight_table.version,
-            )
-
-            # Extract recommendations list if generation succeeded
-            if recommendations_data:
-                recommendations = recommendations_data.get("recommendations", [])
-
-        # 10. Save scoring result to database
+        # 10. Save scoring result to database (without recommendations initially)
         scoring_result = await self.scoring_result_repo.create(
             participant_id=participant_id,
             weight_table_id=weight_table.id,
             score_pct=score_pct,
             strengths=strengths,
             dev_areas=dev_areas,
-            recommendations=recommendations,
-            compute_notes=f"Calculated using weight table version {weight_table.version}",
+            recommendations=None,  # Will be updated by Celery task
+            compute_notes="Score calculated using current weight table",
+            recommendations_status=recommendations_status,
         )
+
+        # 11. Trigger async recommendations generation (AI-08)
+        if recommendations_status == "pending":
+            from app.tasks.recommendations import generate_report_recommendations
+
+            # Launch Celery task
+            task = generate_report_recommendations.delay(
+                scoring_result_id=str(scoring_result.id),
+            )
+
+            # In eager mode (tests/CI), wait for result synchronously
+            if settings.celery_task_always_eager:
+                try:
+                    task.get(timeout=30)
+                    # Refresh scoring_result from DB to get updated recommendations
+                    await self.db.refresh(scoring_result)
+                    recommendations = scoring_result.recommendations
+                    recommendations_status = scoring_result.recommendations_status
+                except Exception as e:
+                    # Log error but don't fail scoring calculation
+                    import logging
+
+                    logger = logging.getLogger(__name__)
+                    logger.warning(
+                        f"Recommendations generation failed in eager mode: {e}",
+                        exc_info=True,
+                    )
+                    recommendations_status = "error"
+                    scoring_result.recommendations_status = "error"
+                    scoring_result.recommendations_error = str(e)
+                    await self.db.commit()
+                    await self.db.refresh(scoring_result)
+                    recommendations = scoring_result.recommendations
 
         return {
             "scoring_result_id": str(scoring_result.id),
             "score_pct": score_pct,
             "details": details,
-            "weight_table_version": weight_table.version,
+            "weight_table_id": str(weight_table.id),
             "missing_metrics": [],
             "prof_activity_id": str(prof_activity.id),
             "prof_activity_name": prof_activity.name,
             "strengths": strengths,
             "dev_areas": dev_areas,
             "recommendations": recommendations,
+            "recommendations_status": recommendations_status,
+            "recommendations_error": scoring_result.recommendations_error,
         }
 
     def _generate_strengths_and_dev_areas(
@@ -342,7 +349,7 @@ class ScoringService:
                         "value": value,
                         "unit": metric_def.unit if metric_def else "балл",
                         "weight": weight,
-                        "contribution": contribution.quantize(Decimal("0.01")),
+                        "contribution": contribution.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP),
                         "source": "LLM",  # Default source (S2-08: not stored in participant_metric)
                         "confidence": metric.confidence,
                     }
@@ -355,10 +362,17 @@ class ScoringService:
         strengths_items = []
         if scoring_result.strengths:
             for strength in scoring_result.strengths[:5]:  # Max 5
+                metric_code = strength.get("metric_code")
+                # Get metric name from MetricDef if not present or if it's a code
+                metric_name = strength.get("metric_name")
+                if not metric_name or metric_name == metric_code:
+                    metric_def = metric_def_by_code.get(metric_code) if metric_code else None
+                    metric_name = metric_def.name if metric_def else (metric_code or "Неизвестная метрика")
+                
                 strengths_items.append(
                     {
-                        "title": strength["metric_name"],
-                        "metric_codes": [strength["metric_code"]],
+                        "title": metric_name,
+                        "metric_codes": [metric_code] if metric_code else [],
                         "reason": f"Высокое значение: {strength['value']} (вес {strength['weight']})",
                     }
                 )
@@ -367,10 +381,17 @@ class ScoringService:
         dev_areas_items = []
         if scoring_result.dev_areas:
             for dev_area in scoring_result.dev_areas[:5]:  # Max 5
+                metric_code = dev_area.get("metric_code")
+                # Get metric name from MetricDef if not present or if it's a code
+                metric_name = dev_area.get("metric_name")
+                if not metric_name or metric_name == metric_code:
+                    metric_def = metric_def_by_code.get(metric_code) if metric_code else None
+                    metric_name = metric_def.name if metric_def else (metric_code or "Неизвестная метрика")
+                
                 dev_areas_items.append(
                     {
-                        "title": dev_area["metric_name"],
-                        "metric_codes": [dev_area["metric_code"]],
+                        "title": metric_name,
+                        "metric_codes": [metric_code] if metric_code else [],
                         "actions": [
                             "Рекомендуется уделить внимание развитию данной компетенции",
                             "Обратитесь к специалисту за персональными рекомендациями",
@@ -383,9 +404,11 @@ class ScoringService:
         avg_confidence = sum(confidences) / len(confidences) if confidences else None
 
         notes = f"OCR confidence средний: {avg_confidence:.2f}; " if avg_confidence else ""
-        notes += f"Версия алгоритма расчета: weight_table v{weight_table.version}"
+        notes += f"Версия алгоритма расчета: weight_table {weight_table.id}"
         if scoring_result.compute_notes:
             notes += f"; {scoring_result.compute_notes}"
+
+        recommendations_list = scoring_result.recommendations or []
 
         return {
             # Header
@@ -394,14 +417,16 @@ class ScoringService:
             "report_date": scoring_result.computed_at,
             "prof_activity_code": prof_activity_code,
             "prof_activity_name": prof_activity.name,
-            "weight_table_version": weight_table.version,
+            "weight_table_id": str(weight_table.id),
             # Score
             "score_pct": scoring_result.score_pct,
             # Strengths and dev areas
             "strengths": strengths_items,
             "dev_areas": dev_areas_items,
-            # Recommendations (placeholder for now, will be implemented in AI-03)
-            "recommendations": scoring_result.recommendations or [],
+            # Recommendations (AI-generated when available)
+            "recommendations": recommendations_list,
+            "recommendations_status": scoring_result.recommendations_status,
+            "recommendations_error": scoring_result.recommendations_error,
             # Metrics
             "metrics": detailed_metrics,
             # Notes

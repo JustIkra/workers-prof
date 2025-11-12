@@ -28,4 +28,31 @@ body {
 #app {
   min-height: 100vh;
 }
+
+.actions-group {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--spacing-sm, 8px);
+  width: 220px;
+  margin: 0 auto;
+}
+
+.actions-group .el-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: var(--button-height-default, 32px);
+  font-size: var(--font-size-base, 14px);
+  border-radius: var(--border-radius-base, 4px);
+}
+
+.actions-group .el-button :deep(.el-icon) {
+  margin-right: var(--spacing-sm, 8px);
+}
+
+.actions-group__danger {
+  align-self: stretch;
+}
 </style>

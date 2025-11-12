@@ -37,7 +37,7 @@ async def test_upsert_creates_new_metric(db_session):
 
     report = Report(
         participant_id=participant.id,
-        type="REPORT_1",
+        
         status="UPLOADED",
         file_ref_id=file_ref.id,
         uploaded_at=datetime.now(UTC),
@@ -81,7 +81,7 @@ async def test_upsert_updates_with_newer_report(db_session):
 
     report1 = Report(
         participant_id=participant.id,
-        type="REPORT_1",
+        
         status="UPLOADED",
         file_ref_id=file_ref1.id,
         uploaded_at=datetime.now(UTC) - timedelta(days=1),  # 1 day ago
@@ -99,7 +99,7 @@ async def test_upsert_updates_with_newer_report(db_session):
 
     report2 = Report(
         participant_id=participant.id,
-        type="REPORT_2",
+        
         status="UPLOADED",
         file_ref_id=file_ref2.id,
         uploaded_at=datetime.now(UTC),  # Today
@@ -153,7 +153,7 @@ async def test_upsert_keeps_old_value_with_older_report(db_session):
 
     report1 = Report(
         participant_id=participant.id,
-        type="REPORT_1",
+        
         status="UPLOADED",
         file_ref_id=file_ref1.id,
         uploaded_at=datetime.now(UTC),  # Today
@@ -171,7 +171,7 @@ async def test_upsert_keeps_old_value_with_older_report(db_session):
 
     report2 = Report(
         participant_id=participant.id,
-        type="REPORT_2",
+        
         status="UPLOADED",
         file_ref_id=file_ref2.id,
         uploaded_at=datetime.now(UTC) - timedelta(days=1),  # 1 day ago
@@ -227,7 +227,7 @@ async def test_upsert_prefers_higher_confidence_on_same_date(db_session):
 
     report1 = Report(
         participant_id=participant.id,
-        type="REPORT_1",
+        
         status="UPLOADED",
         file_ref_id=file_ref1.id,
         uploaded_at=same_time,
@@ -244,7 +244,7 @@ async def test_upsert_prefers_higher_confidence_on_same_date(db_session):
 
     report2 = Report(
         participant_id=participant.id,
-        type="REPORT_2",
+        
         status="UPLOADED",
         file_ref_id=file_ref2.id,
         uploaded_at=same_time,
@@ -298,7 +298,7 @@ async def test_get_metrics_dict(db_session):
 
     report = Report(
         participant_id=participant.id,
-        type="REPORT_1",
+        
         status="UPLOADED",
         file_ref_id=file_ref.id,
         uploaded_at=datetime.now(UTC),
@@ -350,7 +350,7 @@ async def test_manual_update_value(db_session):
 
     report = Report(
         participant_id=participant.id,
-        type="REPORT_1",
+        
         status="UPLOADED",
         file_ref_id=file_ref.id,
         uploaded_at=datetime.now(UTC),

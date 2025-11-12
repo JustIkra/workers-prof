@@ -596,8 +596,15 @@ const saveTable = async () => {
       metadata: tableForm.value.metadata.description ? tableForm.value.metadata : null
     }
 
-    await weightsApi.upload(payload)
-    ElMessage.success(editingTable.value ? 'Таблица сохранена' : 'Таблица создана')
+    // Если редактирование - используем update, иначе - upload (создание или upsert)
+    if (editingTable.value) {
+      await weightsApi.update(editingTable.value.id, payload)
+      ElMessage.success('Изменения применены')
+    } else {
+      await weightsApi.upload(payload)
+      ElMessage.success('Таблица создана')
+    }
+
     tableDialogVisible.value = false
     await loadWeightTables()
   } catch (error) {

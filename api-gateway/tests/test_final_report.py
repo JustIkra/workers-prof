@@ -8,7 +8,7 @@ Verifies:
 """
 
 from datetime import date, datetime
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal
 from uuid import uuid4
 
 import pytest
@@ -96,7 +96,6 @@ async def participant_with_full_data(db_session):
     report = Report(
         id=uuid4(),
         participant_id=participant.id,
-        type="REPORT_1",
         status="EXTRACTED",
         file_ref_id=file_ref.id,
     )
@@ -145,7 +144,7 @@ async def participant_with_full_data(db_session):
     weight_value = Decimal("1") / Decimal(str(len(metrics_data)))  # Equal weights
     for code, _name, _, _, _ in metrics_data:
         weights_data.append(
-            {"metric_code": code, "weight": str(weight_value.quantize(Decimal("0.01")))}
+            {"metric_code": code, "weight": str(weight_value.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP))}
         )
 
     # Adjust first weight to ensure sum = 1.0
@@ -219,11 +218,13 @@ async def test_generate_final_report__with_valid_data__returns_complete_structur
     assert "report_date" in report_data
     assert "prof_activity_code" in report_data
     assert "prof_activity_name" in report_data
-    assert "weight_table_version" in report_data
+    assert "weight_table_id" in report_data
     assert "score_pct" in report_data
     assert "strengths" in report_data
     assert "dev_areas" in report_data
     assert "recommendations" in report_data
+    assert "recommendations_status" in report_data
+    assert "recommendations_error" in report_data
     assert "metrics" in report_data
     assert "notes" in report_data
     assert "template_version" in report_data
@@ -233,9 +234,12 @@ async def test_generate_final_report__with_valid_data__returns_complete_structur
     assert report_data["participant_name"] == "Батура Анна Александровна"
     assert report_data["prof_activity_code"] == participant_with_full_data["prof_activity"].code
     assert report_data["prof_activity_name"] == participant_with_full_data["prof_activity"].name
-    assert report_data["weight_table_version"] == 1
+    assert report_data["weight_table_id"] is not None  # Should have a valid weight table ID
     assert isinstance(report_data["score_pct"], Decimal)
     assert Decimal("0") <= report_data["score_pct"] <= Decimal("100")
+    assert report_data["recommendations_status"] in {"pending", "ready", "error", "disabled"}
+    error_value = report_data["recommendations_error"]
+    assert error_value is None or isinstance(error_value, str)
 
     # Assert: Strengths and dev_areas
     assert len(report_data["strengths"]) <= 5

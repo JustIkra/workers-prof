@@ -52,13 +52,15 @@
             fixed="right"
           >
             <template #default="{ row }">
-              <el-button
-                type="success"
-                size="small"
-                @click="handleApprove(row)"
-              >
-                Одобрить
-              </el-button>
+              <div class="actions-group">
+                <el-button
+                  type="success"
+                  size="small"
+                  @click="handleApprove(row)"
+                >
+                  Одобрить
+                </el-button>
+              </div>
             </template>
           </el-table-column>
         </el-table>

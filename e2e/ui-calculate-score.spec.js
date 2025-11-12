@@ -40,14 +40,14 @@ test.describe('Scenario 7: Calculate Professional Suitability Score', () => {
     // Verify info alert is present
     await expect(dialog.getByText('Убедитесь, что у участника загружены и обработаны отчёты с метриками')).toBeVisible();
 
-    // 6. Click on professional activity dropdown
-    await page.locator('div').filter({ hasText: /^Выберите область$/ }).nth(2).click();
+    // 6. Open professional activity dropdown (scope within dialog to avoid collisions)
+    await dialog.locator('.el-select .el-select__wrapper, .el-select .el-select__selected-item').first().click();
     
-    // Verify dropdown options are displayed
-    const activityOption = page.getByRole('option', { name: 'Организация и проведение совещаний meeting_facilitation' });
+    // Verify dropdown options are displayed (Element Plus options might not expose ARIA role consistently)
+    const activityOption = page.locator('.el-select-dropdown__item').first();
     await expect(activityOption).toBeVisible();
 
-    // 7. Select "Организация и проведение совещаний" (meeting_facilitation)
+    // 7. Select "Организация и проведение совещаний"
     await activityOption.click();
 
     // Verify selection was successful - check within the dialog context
@@ -127,8 +127,8 @@ test.describe('Scenario 7: Calculate Professional Suitability Score', () => {
     await expect(dialog).toBeVisible();
 
     // Select professional activity
-    await page.locator('div').filter({ hasText: /^Выберите область$/ }).nth(2).click();
-    await page.getByRole('option', { name: 'Организация и проведение совещаний meeting_facilitation' }).click();
+    await dialog.locator('.el-select .el-select__wrapper, .el-select .el-select__selected-item').first().click();
+    await page.locator('.el-select-dropdown__item').first().click();
 
     // Click Cancel button
     await dialog.getByRole('button', { name: 'Отмена' }).click();

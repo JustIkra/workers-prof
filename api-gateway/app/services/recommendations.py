@@ -42,10 +42,12 @@ class RecommendationsGenerator:
 Правила:
 - Используй только переданные метрики, веса и итоговый процент.
 - Не додумывай чисел; если данных не хватает — предложи нейтральные формулировки.
-- Пиши по-русски, кратко и конкретно; избегай общих фраз.
+- Пиши по-русски в мотивирующей манере, кратко и конкретно; избегай общих фраз.
+- Не используй URL, ссылки и названия конкретных коммерческих курсов.
+- Предлагай форматы обучения (воркшоп, наставник, практикум и т.п.), но без указания площадок.
 - Строго верни ТОЛЬКО JSON по схеме; не добавляй текст вне JSON.
 - Каждый список должен содержать максимум 5 элементов.
-- Все названия и описания должны быть краткими (до 80 символов).
+- Все названия и описания должны укладываться в оговорённые лимиты символов.
 """
 
     # JSON schema for response validation
@@ -96,11 +98,16 @@ class RecommendationsGenerator:
                 "maxItems": 5,
                 "items": {
                     "type": "object",
-                    "required": ["title", "link_url", "priority"],
+                    "required": ["title", "skill_focus", "development_advice"],
                     "properties": {
                         "title": {"type": "string", "maxLength": 80},
-                        "link_url": {"type": "string", "maxLength": 500},
-                        "priority": {"type": "integer", "minimum": 1, "maximum": 5},
+                        "skill_focus": {"type": "string", "maxLength": 120},
+                        "development_advice": {"type": "string", "maxLength": 240},
+                        "recommended_formats": {
+                            "type": "array",
+                            "items": {"type": "string", "maxLength": 80},
+                            "maxItems": 5,
+                        },
                     },
                 },
             },
@@ -129,13 +136,11 @@ class RecommendationsGenerator:
         prof_activity_name = input_data.context.get("prof_activity", {}).get(
             "name", "не указано"
         )
-        weight_table_version = input_data.context.get("weight_table", {}).get("version", "1")
-
         # Convert input to JSON string for inclusion in prompt
         input_dict = input_data.model_dump()
         input_json = json.dumps(input_dict, indent=2, ensure_ascii=False)
 
-        prompt = f"""Ниже данные по метрикам и весам для профдеятельности "{prof_activity_name}" (версия весов {weight_table_version}). Сформируй рекомендации.
+        prompt = f"""Ниже данные по метрикам и весам для профдеятельности "{prof_activity_name}". Сформируй рекомендации.
 
 Инпут:
 {input_json}
@@ -149,7 +154,12 @@ class RecommendationsGenerator:
     {{"title": "string", "metric_codes": ["string"], "actions": ["string"]}}
   ],
   "recommendations": [
-    {{"title": "string", "link_url": "string", "priority": 1}}
+    {{
+      "title": "string",
+      "skill_focus": "string",
+      "development_advice": "string",
+      "recommended_formats": ["string"]
+    }}
   ]
 }}
 
@@ -157,9 +167,12 @@ class RecommendationsGenerator:
 - Каждый список: максимум 5 элементов
 - title: максимум 80 символов
 - reason: максимум 200 символов
-- priority: 1 (высший) до 5 (низший)
+- skill_focus: максимум 120 символов (какой навык развивать)
+- development_advice: максимум 240 символов (как развивать)
+- recommended_formats: список форматов обучения (воркшоп, наставник, практикум и т.п.), максимум 5 элементов, каждый ≤80 символов
 - metric_codes: реальные коды из переданных метрик
 - Пиши на русском языке
+- НЕ используй URL, ссылки и названия конкретных коммерческих курсов
 """
 
         return prompt
@@ -202,14 +215,22 @@ class RecommendationsGenerator:
 
         # Truncate recommendations
         if "recommendations" in data:
-            result["recommendations"] = [
-                {
+            result["recommendations"] = []
+            for item in data["recommendations"][:5]:
+                rec = {
                     "title": str(item.get("title", ""))[:80],
-                    "link_url": str(item.get("link_url", ""))[:500],
-                    "priority": item.get("priority", 3),
+                    "skill_focus": str(item.get("skill_focus", ""))[:120],
+                    "development_advice": str(item.get("development_advice", ""))[:240],
                 }
-                for item in data["recommendations"][:5]
-            ]
+                # Handle recommended_formats
+                formats = item.get("recommended_formats", [])
+                if isinstance(formats, list):
+                    rec["recommended_formats"] = [
+                        str(fmt).strip()[:80] for fmt in formats[:5] if fmt
+                    ]
+                else:
+                    rec["recommended_formats"] = []
+                result["recommendations"].append(rec)
 
         return result
 
@@ -219,7 +240,6 @@ class RecommendationsGenerator:
         score_pct: float,
         prof_activity_code: str,
         prof_activity_name: str,
-        weight_table_version: int,
     ) -> RecommendationsResponse:
         """
         Generate recommendations using Gemini API.
@@ -229,7 +249,6 @@ class RecommendationsGenerator:
             score_pct: Overall score percentage (0-100)
             prof_activity_code: Professional activity code
             prof_activity_name: Professional activity name
-            weight_table_version: Version of weight table used
 
         Returns:
             Validated recommendations response
@@ -254,7 +273,6 @@ class RecommendationsGenerator:
                     "code": prof_activity_code,
                     "name": prof_activity_name,
                 },
-                "weight_table": {"version": weight_table_version},
             },
             metrics=metrics,
             score_pct=score_pct,
@@ -427,7 +445,12 @@ class RecommendationsGenerator:
     {{"title": "string (≤80 символов)", "metric_codes": ["CODE1"], "actions": ["action1", "action2"]}}
   ],
   "recommendations": [
-    {{"title": "string (≤80 символов)", "link_url": "string (URL или пусто)", "priority": 1}}
+    {{
+      "title": "string (≤80 символов)",
+      "skill_focus": "string (≤120 символов)",
+      "development_advice": "string (≤240 символов)",
+      "recommended_formats": ["формат1", "формат2"]
+    }}
   ]
 }}
 
@@ -435,7 +458,8 @@ class RecommendationsGenerator:
 - Каждый список: максимум 5 элементов
 - Все тексты на русском языке
 - Не добавляй ничего кроме JSON
-- priority: от 1 (высший) до 5 (низший)
+- НЕ используй URL, ссылки и названия конкретных коммерческих курсов
+- recommended_formats: список форматов обучения (воркшоп, наставник, практикум и т.п.), максимум 5 элементов
 """
 
 
@@ -445,7 +469,6 @@ async def generate_recommendations(
     score_pct: float,
     prof_activity_code: str,
     prof_activity_name: str,
-    weight_table_version: int,
 ) -> dict | None:
     """
     Convenience function to generate recommendations.
@@ -456,7 +479,6 @@ async def generate_recommendations(
         score_pct: Overall score percentage (0-100)
         prof_activity_code: Professional activity code
         prof_activity_name: Professional activity name
-        weight_table_version: Version of weight table used
 
     Returns:
         Dictionary with recommendations in ScoringResult format,
@@ -476,7 +498,6 @@ async def generate_recommendations(
         score_pct=score_pct,
         prof_activity_code=prof_activity_code,
         prof_activity_name=prof_activity_name,
-        weight_table_version=weight_table_version,
     )
 
     return response.to_scoring_result_format()

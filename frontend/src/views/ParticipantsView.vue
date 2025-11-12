@@ -73,20 +73,23 @@
             fixed="right"
           >
             <template #default="{ row }">
-              <el-button
-                type="primary"
-                size="small"
-                @click="viewParticipant(row.id)"
-              >
-                Открыть
-              </el-button>
-              <el-button
-                type="danger"
-                size="small"
-                @click="confirmDelete(row)"
-              >
-                Удалить
-              </el-button>
+              <div class="actions-group">
+                <el-button
+                  type="primary"
+                  size="small"
+                  @click="viewParticipant(row.id)"
+                >
+                  Открыть
+                </el-button>
+                <el-button
+                  class="actions-group__danger"
+                  type="danger"
+                  size="small"
+                  @click="confirmDelete(row)"
+                >
+                  Удалить
+                </el-button>
+              </div>
             </template>
           </el-table-column>
         </el-table>
@@ -285,5 +288,22 @@ onMounted(() => {
   margin-top: 20px;
   display: flex;
   justify-content: flex-end;
+}
+
+.actions-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-start;
+}
+
+.actions-group .el-button {
+  width: 140px;
+  justify-content: center;
+  margin: 0;
+}
+
+.actions-group__danger {
+  margin: 0;
 }
 </style>

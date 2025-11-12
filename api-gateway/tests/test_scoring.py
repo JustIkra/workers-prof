@@ -82,7 +82,7 @@ async def participant_with_metrics(db_session):
     report = Report(
         id=uuid4(),
         participant_id=participant.id,
-        type="REPORT_1",
+        
         status="EXTRACTED",
         file_ref_id=file_ref.id,
     )
@@ -294,6 +294,8 @@ async def test_api_calculate_score__with_valid_data__returns_200(
     assert isinstance(data["dev_areas"], list)
     assert len(data["strengths"]) <= 5
     assert len(data["dev_areas"]) <= 5
+    assert data["recommendations_status"] in {"pending", "ready", "error", "disabled"}
+    assert "recommendations_error" in data
 
     # Check strengths structure
     if len(data["strengths"]) > 0:
@@ -311,6 +313,7 @@ async def test_api_calculate_score__with_valid_data__returns_200(
     assert saved_result.score_pct == Decimal("71.25")
     assert saved_result.strengths is not None
     assert saved_result.dev_areas is not None
+    assert saved_result.recommendations_status in {"pending", "ready", "error", "disabled"}
 
 
 @pytest.mark.asyncio
@@ -526,6 +529,207 @@ async def test_strengths_dev_areas__max_five_elements__enforced(
     ), f"Dev areas must have ≤5 elements, got {len(result['dev_areas'])}"
 
 
+# ===== BUG-02: Decimal Quantize Tests =====
+
+
+@pytest.mark.asyncio
+async def test_calculate_score__with_fractional_decimal_values__no_quantize_error(
+    db_session, weight_table_with_batura_weights
+):
+    """
+    Test that fractional Decimal values (e.g., 7.5, 0.075) don't cause quantize errors (BUG-02).
+
+    This test verifies that the scoring calculation handles Decimal multiplication
+    and quantization correctly when dealing with fractional values that have
+    more precision than the target format (0.01).
+
+    Regression test for: Decimal quantize requires exponent error
+    """
+    from app.repositories.participant_metric import ParticipantMetricRepository
+
+    # Create participant with fractional metric values
+    participant_repo = ParticipantRepository(db_session)
+    participant = await participant_repo.create(
+        full_name="Fractional Test Participant",
+        birth_date=date(1990, 1, 1),
+        external_id="FRAC001",
+    )
+
+    # Create a dummy report
+    from app.db.models import FileRef, Report
+
+    file_ref = FileRef(
+        id=uuid4(),
+        storage="LOCAL",
+        bucket="test",
+        key="test/report.docx",
+        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        size_bytes=1024,
+    )
+    db_session.add(file_ref)
+    await db_session.flush()
+
+    report = Report(
+        id=uuid4(),
+        participant_id=participant.id,
+        status="EXTRACTED",
+        file_ref_id=file_ref.id,
+    )
+    db_session.add(report)
+    await db_session.flush()
+
+    # Add participant metrics with fractional values (like those from Gemini extraction)
+    participant_metric_repo = ParticipantMetricRepository(db_session)
+
+    fractional_metrics = [
+        ("communicability", Decimal("7.5")),
+        ("teamwork", Decimal("6.3")),
+        ("low_conflict", Decimal("9.7")),
+        ("team_soul", Decimal("9.1")),
+        ("organization", Decimal("6.8")),
+        ("responsibility", Decimal("6.4")),
+        ("nonverbal_logic", Decimal("9.2")),
+        ("info_processing", Decimal("5.5")),
+        ("complex_problem_solving", Decimal("6.7")),
+        ("morality_normativity", Decimal("8.9")),
+        ("stress_resistance", Decimal("2.3")),
+        ("leadership", Decimal("2.1")),
+        ("vocabulary", Decimal("2.6")),
+    ]
+
+    for code, value in fractional_metrics:
+        await participant_metric_repo.upsert(
+            participant_id=participant.id,
+            metric_code=code,
+            value=value,
+            confidence=Decimal("0.85"),  # Also fractional confidence
+            source_report_id=report.id,
+        )
+
+    await db_session.commit()
+
+    prof_activity, _ = weight_table_with_batura_weights
+
+    # This should NOT raise "Decimal quantize requires exponent" error
+    scoring_service = ScoringService(db_session)
+
+    result = await scoring_service.calculate_score(
+        participant_id=participant.id, prof_activity_code=prof_activity.code
+    )
+
+    # Verify calculation completed successfully
+    assert "score_pct" in result
+    assert isinstance(result["score_pct"], Decimal)
+    assert result["score_pct"] > Decimal("0")
+    assert result["score_pct"] <= Decimal("100")
+
+    # Verify all details have properly quantized contributions
+    assert len(result["details"]) == 13
+    for detail in result["details"]:
+        assert "contribution" in detail
+        contribution = Decimal(detail["contribution"])
+        # Verify contribution is quantized to 0.01
+        assert contribution == contribution.quantize(Decimal("0.01"))
+
+
+@pytest.mark.asyncio
+async def test_generate_final_report__with_fractional_values__no_quantize_error(
+    db_session, weight_table_with_batura_weights
+):
+    """
+    Test that generate_final_report handles fractional Decimal values correctly (BUG-02).
+
+    This specifically tests the generate_final_report method which had the missing
+    rounding parameter on line 343 of scoring.py.
+    """
+    from app.repositories.participant_metric import ParticipantMetricRepository
+
+    # Create participant
+    participant_repo = ParticipantRepository(db_session)
+    participant = await participant_repo.create(
+        full_name="Final Report Test",
+        birth_date=date(1990, 1, 1),
+        external_id="FR001",
+    )
+
+    # Create report
+    from app.db.models import FileRef, Report
+
+    file_ref = FileRef(
+        id=uuid4(),
+        storage="LOCAL",
+        bucket="test",
+        key="test/report.docx",
+        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        size_bytes=1024,
+    )
+    db_session.add(file_ref)
+    await db_session.flush()
+
+    report = Report(
+        id=uuid4(),
+        participant_id=participant.id,
+        status="EXTRACTED",
+        file_ref_id=file_ref.id,
+    )
+    db_session.add(report)
+    await db_session.flush()
+
+    # Add metrics with fractional values
+    participant_metric_repo = ParticipantMetricRepository(db_session)
+    metrics = [
+        ("communicability", Decimal("7.5")),
+        ("teamwork", Decimal("6.5")),
+        ("low_conflict", Decimal("9.5")),
+        ("team_soul", Decimal("9.5")),
+        ("organization", Decimal("6.5")),
+        ("responsibility", Decimal("6.5")),
+        ("nonverbal_logic", Decimal("9.5")),
+        ("info_processing", Decimal("5.0")),
+        ("complex_problem_solving", Decimal("6.5")),
+        ("morality_normativity", Decimal("9.0")),
+        ("stress_resistance", Decimal("2.5")),
+        ("leadership", Decimal("2.5")),
+        ("vocabulary", Decimal("2.5")),
+    ]
+
+    for code, value in metrics:
+        await participant_metric_repo.upsert(
+            participant_id=participant.id,
+            metric_code=code,
+            value=value,
+            confidence=Decimal("0.85"),
+            source_report_id=report.id,
+        )
+
+    await db_session.commit()
+
+    prof_activity, _ = weight_table_with_batura_weights
+
+    # First calculate score to create scoring_result
+    scoring_service = ScoringService(db_session)
+    await scoring_service.calculate_score(
+        participant_id=participant.id, prof_activity_code=prof_activity.code
+    )
+
+    # Now generate final report - this should NOT raise quantize error
+    final_report = await scoring_service.generate_final_report(
+        participant_id=participant.id, prof_activity_code=prof_activity.code
+    )
+
+    # Verify final report was generated successfully
+    assert "score_pct" in final_report
+    assert "metrics" in final_report
+    assert len(final_report["metrics"]) == 13
+
+    # Verify all metric contributions are properly quantized
+    for metric in final_report["metrics"]:
+        assert "contribution" in metric
+        contribution = metric["contribution"]
+        # Verify it's a Decimal quantized to 0.01
+        assert contribution == contribution.quantize(Decimal("0.01"))
+
+
 # ===== S2-06: Scoring History Tests =====
 
 
@@ -679,3 +883,63 @@ async def test_api_get_scoring_history__unauthorized__returns_401(client, partic
     response = await client.get(f"/api/scoring/participants/{participant.id}/scores")
 
     assert response.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_api_get_scoring_history__with_recommendations__returns_structured_items(
+    client, db_session, participant_with_metrics, active_user_token
+):
+    """
+    Test that recommendations are returned as full objects in scoring history (AI-09 fix).
+    """
+    participant, _ = participant_with_metrics
+
+    # Create a scoring result with recommendations
+    scoring_repo = ScoringResultRepository(db_session)
+    prof_activity_repo = ProfActivityRepository(db_session)
+
+    # Get developer activity and its weight table
+    prof_activity = await prof_activity_repo.get_by_code("developer")
+    weight_table = await prof_activity_repo.get_active_weight_table(prof_activity.id)
+
+    # Create scoring result with recommendations in dict format
+    recommendations_data = [
+        {"title": "Курс по стрессоустойчивости", "link_url": "https://example.com/stress", "priority": 1},
+        {"title": "Тренинг по лидерству", "link_url": "https://example.com/leadership", "priority": 2},
+        {"title": "Курс по расширению словарного запаса", "link_url": "", "priority": 3},
+    ]
+
+    scoring_result = await scoring_repo.create(
+        participant_id=participant.id,
+        weight_table_id=weight_table.id,
+        score_pct=Decimal("65.50"),
+        strengths=[],
+        dev_areas=[],
+        recommendations=recommendations_data,
+        compute_notes="Test scoring with recommendations",
+        recommendations_status="ready",
+    )
+
+    # Get scoring history via API
+    response = await client.get(
+        f"/api/participants/{participant.id}/scores",
+        cookies={"access_token": active_user_token},
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+
+    assert "results" in data
+    assert len(data["results"]) == 1
+
+    history_item = data["results"][0]
+    assert "recommendations" in history_item
+    assert history_item["recommendations"] is not None
+    assert len(history_item["recommendations"]) == 3
+
+    # Verify recommendations are returned as dicts with expected keys
+    first_rec = history_item["recommendations"][0]
+    assert set(first_rec.keys()) == {"title", "link_url", "priority"}
+    assert first_rec["title"] == "Курс по стрессоустойчивости"
+    assert history_item["recommendations_status"] == "ready"
+    assert history_item["recommendations_error"] is None

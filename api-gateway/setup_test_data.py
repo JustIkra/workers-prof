@@ -234,17 +234,15 @@ async def main():
         # 4. Создаём весовую таблицу
         print("\n4️⃣ Создание весовой таблицы...")
 
-        # Проверяем активную таблицу
+        # Проверяем существующую таблицу (одна таблица на активность)
         result = await session.execute(
-            select(WeightTable)
-            .where(WeightTable.prof_activity_id == prof_activity.id)
-            .where(WeightTable.is_active is True)
+            select(WeightTable).where(WeightTable.prof_activity_id == prof_activity.id)
         )
-        active_table = result.scalar_one_or_none()
+        existing_table = result.scalar_one_or_none()
 
-        if active_table:
-            print(f"   ✓ Активная весовая таблица уже существует (версия {active_table.version})")
-            weight_table = active_table
+        if existing_table:
+            print(f"   ✓ Весовая таблица уже существует (ID: {existing_table.id})")
+            weight_table = existing_table
         else:
             # Формируем массив весов в формате JSONB
             weights_json = []
@@ -259,12 +257,10 @@ async def main():
                 )
 
             # Создаём новую весовую таблицу
-            weight_table = WeightTable(
-                prof_activity_id=prof_activity.id, version=1, is_active=True, weights=weights_json
-            )
+            weight_table = WeightTable(prof_activity_id=prof_activity.id, weights=weights_json)
             session.add(weight_table)
             await session.flush()
-            print(f"   ✓ Создана и активирована весовая таблица (версия {weight_table.version})")
+            print(f"   ✓ Создана весовая таблица (ID: {weight_table.id})")
 
         # 5. Выводим сводку
         print("\n✅ Тестовые данные готовы!")

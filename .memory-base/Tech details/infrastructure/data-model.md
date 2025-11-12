@@ -66,9 +66,19 @@ erDiagram
         uuid report_id FK
         uuid metric_def_id FK
         numeric value
-        text source "OCR|LLM"
+        text source "OCR|LLM|MANUAL"
         numeric confidence
         text notes
+    }
+
+    PARTICIPANT_METRIC {
+        uuid id PK
+        uuid participant_id FK
+        text metric_code
+        numeric value
+        numeric confidence
+        uuid last_source_report_id FK
+        timestamptz updated_at
     }
 
     PROF_ACTIVITY {
@@ -82,17 +92,10 @@ erDiagram
         uuid id PK
         uuid prof_activity_id FK
         int version
+        jsonb weights "array of {metric_code, weight}"
+        jsonb metadata
         bool is_active
-        uuid uploaded_by FK
-        timestamptz uploaded_at
-        text notes
-    }
-
-    WEIGHT_ROW {
-        uuid id PK
-        uuid weight_table_id FK
-        uuid metric_def_id FK
-        numeric weight
+        timestamptz created_at
     }
 
     SCORING_RESULT {
@@ -100,46 +103,24 @@ erDiagram
         uuid participant_id FK
         uuid weight_table_id FK
         numeric score_pct
-        jsonb strengths
-        jsonb dev_areas
-        jsonb recommendations
+        jsonb strengths "array of top metrics"
+        jsonb dev_areas "array of low metrics"
+        jsonb recommendations "array of recommendations"
         timestamptz computed_at
         text compute_notes
     }
 
-    RECOMMENDATION_DEF {
-        uuid id PK
-        uuid prof_activity_id FK
-        uuid metric_def_id FK
-        numeric min_metric_value
-        numeric max_metric_value
-        numeric min_score_pct
-        numeric max_score_pct
-        text text
-        text link_url
-        bool active
-    }
-
-    RECOMMENDATION_RESULT {
-        uuid id PK
-        uuid scoring_result_id FK
-        uuid recommendation_def_id FK
-    }
-
-    USER ||--o{ WEIGHT_TABLE : "uploaded_by"
     PARTICIPANT ||--o{ REPORT : "has"
+    PARTICIPANT ||--o{ PARTICIPANT_METRIC : "has"
+    PARTICIPANT ||--o{ SCORING_RESULT : "has"
     REPORT ||--o{ REPORT_IMAGE : "contains"
+    REPORT ||--o{ EXTRACTED_METRIC : "yields"
+    REPORT ||--o{ PARTICIPANT_METRIC : "last_source"
     FILE_REF ||--o| REPORT : "original"
     FILE_REF ||--o{ REPORT_IMAGE : "derived"
-    REPORT ||--o{ EXTRACTED_METRIC : "yields"
     METRIC_DEF ||--o{ EXTRACTED_METRIC : "describes"
     PROF_ACTIVITY ||--o{ WEIGHT_TABLE : "has"
-    WEIGHT_TABLE ||--o{ WEIGHT_ROW : "has"
-    METRIC_DEF ||--o{ WEIGHT_ROW : "weighted"
-    PARTICIPANT ||--o{ SCORING_RESULT : "has"
     WEIGHT_TABLE ||--o{ SCORING_RESULT : "basis"
-    RECOMMENDATION_DEF ||--o{ RECOMMENDATION_RESULT : "applied"
-    SCORING_RESULT ||--o{ RECOMMENDATION_RESULT : "has"
 ```
 
 Словарь данных (ключевые таблицы)
@@ -159,36 +140,42 @@ erDiagram
 - metric_def
   - code (уникальный), name, description, unit, [min,max], active
 - extracted_metric
-  - (report_id, metric_def_id) уникально; value; source: OCR|LLM; confidence: 0..1; notes
+  - (report_id, metric_def_id) уникально; value; source: OCR|LLM|MANUAL; confidence: 0..1; notes
+  - Техническое хранилище метрик по отчётам (используется для трассировки)
+- participant_metric (S2-08)
+  - (participant_id, metric_code) уникально; value: 1..10; confidence; last_source_report_id; updated_at
+  - Актуальные метрики участника, независимо от отчётов
+  - Upsert правила: более поздний report.uploaded_at имеет приоритет; при равных датах — выше confidence
+  - Используется для расчёта пригодности и отображения в UI
 - prof_activity
   - code, name, description
 - weight_table
-  - prof_activity_id; version; is_active; uploaded_by; uploaded_at; notes
+  - prof_activity_id; version; is_active; weights: JSONB array of {metric_code, weight}; metadata: JSONB; created_at
   - Правило: на профобласть активна ровно одна таблица (is_active=true)
-- weight_row
-  - (weight_table_id, metric_def_id) уникально; weight ≥ 0
-  - Правило: сумма весов в одной таблице = 1.0 (валидируется сервисом и/или CHECK/триггером)
+  - Правило: сумма весов в weights array = 1.0 (валидируется сервисом)
 - scoring_result
   - participant_id; weight_table_id; score_pct: 0..100; strengths/dev_areas/recommendations: JSONB; computed_at; compute_notes
-  - История расчётов хранится: допускается несколько записей для одной пары (participant, weight_table).
-- recommendation_def
-  - Фильтры по метрике (min/max_metric_value) и/или по итоговому score (min/max_score_pct)
-  - text; link_url; active
-- recommendation_result
-  - (scoring_result_id, recommendation_def_id)
+  - История расчётов хранится: допускается несколько записей для одной пары (participant, weight_table)
+  - Recommendations генерируются AI и хранятся в JSONB (не отдельная таблица)
 
 Индексы и ограничения (рекомендуется)
-- report: UNIQUE (participant_id, type); INDEX (status)
+- report: INDEX (participant_id); INDEX (status)
 - extracted_metric: UNIQUE (report_id, metric_def_id)
-- weight_row: UNIQUE (weight_table_id, metric_def_id)
+- participant_metric: UNIQUE (participant_id, metric_code); INDEX (participant_id); INDEX (metric_code)
 - weight_table: UNIQUE (prof_activity_id, version); PARTIAL UNIQUE (prof_activity_id) WHERE is_active = true
 - scoring_result: INDEX (participant_id, weight_table_id, computed_at DESC)
 
 Потоки и валидация
 - Загрузка .docx → file_ref + report (status=UPLOADED)
-- Извлечение: создание report_image (TABLE) → extracted_metric (source, confidence)
-- Расчёт: выбор активной weight_table → score_pct + рекомендации → scoring_result
-- Аудит: весовые таблицы — только новые версии; прошлые результаты не перезаписываются задним числом
+- Извлечение:
+  - Создание report_image (TABLE) → extracted_metric (source, confidence)
+  - Upsert в participant_metric: обновление актуальных метрик участника
+- Расчёт: выбор активной weight_table + participant_metric → score_pct + рекомендации → scoring_result
+- Аудит:
+  - extracted_metric сохраняется для трассировки
+  - participant_metric обновляется по правилам upsert (более поздний отчёт имеет приоритет)
+  - Весовые таблицы — только новые версии
+  - Прошлые результаты не перезаписываются задним числом
 
 Хранение артефактов
 - LOCAL (volume) по умолчанию; опционально MINIO (S3 совместимо). Абстракция через file_ref.

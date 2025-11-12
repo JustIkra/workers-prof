@@ -11,17 +11,16 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 WORKDIR ${APP_HOME}
 
 # System deps (curl for healthcheck)
+# Note: resolvconf may fail to configure /etc/resolv.conf in Docker, but it's not critical
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         curl \
         iproute2 \
         iptables \
-        resolvconf \
         wireguard-tools \
         libgomp1 \
         libglib2.0-0 \
-        tesseract-ocr \
-        tesseract-ocr-rus \
+    && (DEBIAN_FRONTEND=noninteractive apt-get install -y resolvconf || true) \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Python dependencies first (better layer caching)
@@ -29,14 +28,16 @@ COPY requirements.txt ./
 RUN pip install --upgrade pip \
     && pip install -r requirements.txt
 
-# Copy application code
+# Copy application code (includes entrypoint scripts)
 COPY . .
 
 # Create storage dir for file uploads (if not mounted)
 RUN mkdir -p /app/storage
 
-# Add entrypoint script for migrations + app start
-RUN chmod +x /app/docker-entrypoint.sh || true
+# Ensure entrypoint scripts exist and are executable
+RUN test -f /app/docker-entrypoint.sh && test -f /app/docker-entrypoint-worker.sh && \
+    chmod +x /app/docker-entrypoint.sh /app/docker-entrypoint-worker.sh || \
+    (echo "ERROR: Entrypoint scripts not found!" && ls -la /app/docker-entrypoint* && exit 1)
 
 # Expose internal app port (external mapping is controlled by compose)
 EXPOSE 9187

@@ -115,7 +115,8 @@ async def main():
         print("Raw extracted values:")
         print("-" * 40)
         for i, metric in enumerate(metrics, 1):
-            print(f"  {i:2d}. {metric.value:>6s}  (source: {metric.source})")
+            label_str = f" [{metric.label}]" if metric.label else ""
+            print(f"  {i:2d}. {metric.value:>6s}{label_str}  (source: {metric.source})")
         print()
 
         # Apply axis label filtering
@@ -127,7 +128,8 @@ async def main():
         print("Filtered metric values:")
         print("-" * 40)
         for i, metric in enumerate(filtered_metrics, 1):
-            print(f"  {i:2d}. {metric.value:>6s}")
+            label_str = f" [{metric.label}]" if metric.label else ""
+            print(f"  {i:2d}. {metric.value:>6s}{label_str}")
         print()
 
         # Expected values from the image

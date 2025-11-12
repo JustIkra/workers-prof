@@ -48,17 +48,17 @@ class ProfActivityRepository:
 
     async def get_active_weight_table(self, prof_activity_id: UUID) -> WeightTable | None:
         """
-        Get the active weight table for a professional activity.
+        Get the weight table for a professional activity.
+
+        Note: After migration d952812cd1d6, there is one weight table per activity (no versioning).
 
         Args:
             prof_activity_id: UUID of the professional activity
 
         Returns:
-            Active WeightTable instance or None if not found.
+            WeightTable instance or None if not found.
         """
-        stmt = select(WeightTable).where(
-            WeightTable.prof_activity_id == prof_activity_id, WeightTable.is_active
-        )
+        stmt = select(WeightTable).where(WeightTable.prof_activity_id == prof_activity_id)
         result = await self.db.execute(stmt)
         return result.scalar_one_or_none()
 

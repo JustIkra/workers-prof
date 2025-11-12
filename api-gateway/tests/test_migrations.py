@@ -360,7 +360,7 @@ class TestConstraintEnforcement:
             {
                 "id": str(uuid.uuid4()),
                 "participant_id": participant_id,
-                "type": "REPORT_1",
+                
                 "status": "UPLOADED",
                 "file_ref_id": file_ref_id,
             },
@@ -394,7 +394,7 @@ class TestConstraintEnforcement:
                 {
                     "id": str(uuid.uuid4()),
                     "participant_id": participant_id,  # Same participant
-                    "type": "REPORT_1",  # Same type
+                      # Same type
                     "status": "EXTRACTED",
                     "file_ref_id": file_ref_id_2,
                 },
@@ -559,7 +559,7 @@ class TestForeignKeyConstraints:
             {
                 "id": report_id,
                 "participant_id": participant_id,
-                "type": "REPORT_1",
+                
                 "status": "UPLOADED",
                 "file_ref_id": file_ref_id,
             },

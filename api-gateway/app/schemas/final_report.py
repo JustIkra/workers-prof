@@ -64,7 +64,7 @@ class FinalReportResponse(BaseModel):
     report_date: datetime = Field(..., description="Report generation date")
     prof_activity_code: str = Field(..., description="Professional activity code")
     prof_activity_name: str = Field(..., description="Professional activity name")
-    weight_table_version: int = Field(..., description="Weight table version")
+    weight_table_id: str = Field(..., description="Weight table ID (UUID)")
 
     # Score
     score_pct: Decimal = Field(..., description="Final score percentage (0-100)")
@@ -76,6 +76,12 @@ class FinalReportResponse(BaseModel):
     # Recommendations
     recommendations: list[RecommendationItem] = Field(
         default_factory=list, description="Learning recommendations"
+    )
+    recommendations_status: Literal["pending", "ready", "error", "disabled"] = Field(
+        default="pending", description="Status of AI recommendations generation"
+    )
+    recommendations_error: str | None = Field(
+        default=None, description="Error message if recommendations generation failed"
     )
 
     # Metrics appendix

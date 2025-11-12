@@ -109,6 +109,7 @@ class FileRef(Base):
     storage: Mapped[str] = mapped_column(String(20), nullable=False, default="LOCAL")
     bucket: Mapped[str] = mapped_column(String(100), nullable=False)
     key: Mapped[str] = mapped_column(String(500), nullable=False)
+    filename: Mapped[str | None] = mapped_column(String(255), nullable=True)
     mime: Mapped[str] = mapped_column(String(100), nullable=False)
     size_bytes: Mapped[int] = mapped_column(BigInteger, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
@@ -136,9 +137,6 @@ class Report(Base):
     """
     Report uploaded for a participant.
 
-    Types:
-    - REPORT_1, REPORT_2, REPORT_3: Different report formats
-
     Status:
     - UPLOADED: File uploaded, extraction not started
     - PROCESSING: Extraction in progress
@@ -152,7 +150,6 @@ class Report(Base):
     participant_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("participant.id", ondelete="CASCADE"), nullable=False
     )
-    type: Mapped[str] = mapped_column(String(20), nullable=False)
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="UPLOADED")
     file_ref_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("file_ref.id", ondelete="RESTRICT"), nullable=False
@@ -175,12 +172,9 @@ class Report(Base):
 
     # Constraints
     __table_args__ = (
-        CheckConstraint("type IN ('REPORT_1', 'REPORT_2', 'REPORT_3')", name="report_type_check"),
         CheckConstraint(
             "status IN ('UPLOADED', 'PROCESSING', 'EXTRACTED', 'FAILED')", name="report_status_check"
         ),
-        # Only one report of each type per participant
-        UniqueConstraint("participant_id", "type", name="report_participant_type_unique"),
         # Index for filtering by status
         Index("idx_report_status", "status"),
         # Index for participant lookup
@@ -188,7 +182,7 @@ class Report(Base):
     )
 
     def __repr__(self) -> str:
-        return f"<Report(id={self.id}, participant_id={self.participant_id}, type={self.type}, status={self.status})>"
+        return f"<Report(id={self.id}, participant_id={self.participant_id}, status={self.status})>"
 
 
 # ===== ReportImage Table =====
@@ -263,10 +257,10 @@ class ProfActivity(Base):
 # ===== WeightTable Table =====
 class WeightTable(Base):
     """
-    Weight table version for a professional activity.
+    Weight table for a professional activity.
 
-    Stores metric weights as JSON structure and tracks activation status.
-    Exactly one active version per professional activity is allowed.
+    Stores metric weights as JSON structure.
+    One weight table per professional activity (no versioning).
     """
 
     __tablename__ = "weight_table"
@@ -277,15 +271,8 @@ class WeightTable(Base):
         ForeignKey("prof_activity.id", ondelete="CASCADE"),
         nullable=False,
     )
-    version: Mapped[int] = mapped_column(Integer, nullable=False)
     weights: Mapped[list[dict[str, Any]]] = mapped_column(JSONB, nullable=False)
     metadata_json: Mapped[dict[str, Any] | None] = mapped_column("metadata", JSONB, nullable=True)
-    is_active: Mapped[bool] = mapped_column(
-        Boolean,
-        nullable=False,
-        default=False,
-        server_default=text("false"),
-    )
     created_at: Mapped[datetime] = mapped_column(
         TIMESTAMP(timezone=True),
         nullable=False,
@@ -299,22 +286,13 @@ class WeightTable(Base):
     __table_args__ = (
         UniqueConstraint(
             "prof_activity_id",
-            "version",
-            name="weight_table_prof_activity_version_unique",
-        ),
-        CheckConstraint("version > 0", name="weight_table_version_positive"),
-        Index(
-            "uq_weight_table_prof_activity_active",
-            "prof_activity_id",
-            unique=True,
-            postgresql_where=text("is_active = true"),
+            name="uq_weight_table_prof_activity",
         ),
     )
 
     def __repr__(self) -> str:
         return (
-            f"<WeightTable(id={self.id}, prof_activity_id={self.prof_activity_id}, "
-            f"version={self.version}, is_active={self.is_active})>"
+            f"<WeightTable(id={self.id}, prof_activity_id={self.prof_activity_id})>"
         )
 
 
@@ -499,6 +477,10 @@ class ScoringResult(Base):
     strengths: Mapped[list[dict[str, Any]] | None] = mapped_column(JSONB, nullable=True)
     dev_areas: Mapped[list[dict[str, Any]] | None] = mapped_column(JSONB, nullable=True)
     recommendations: Mapped[list[dict[str, Any]] | None] = mapped_column(JSONB, nullable=True)
+    recommendations_status: Mapped[str] = mapped_column(
+        String(20), nullable=False, default="pending", server_default="pending"
+    )
+    recommendations_error: Mapped[str | None] = mapped_column(Text, nullable=True)
     computed_at: Mapped[datetime] = mapped_column(
         TIMESTAMP(timezone=True), nullable=False, server_default=text("now()")
     )
@@ -513,6 +495,10 @@ class ScoringResult(Base):
         CheckConstraint(
             "score_pct >= 0 AND score_pct <= 100",
             name="scoring_result_score_range_check",
+        ),
+        CheckConstraint(
+            "recommendations_status IN ('pending', 'ready', 'error', 'disabled')",
+            name="scoring_result_recommendations_status_check",
         ),
         Index("ix_scoring_result_participant_id", "participant_id"),
         Index("ix_scoring_result_computed_at", "computed_at"),

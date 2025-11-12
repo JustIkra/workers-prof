@@ -29,7 +29,6 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from app.core.config import settings
 from app.db.base import Base
 from app.db.models import User
-from app.db.seeds.prof_activity import PROF_ACTIVITY_SEED_DATA
 from app.db.session import get_db
 from main import app
 
@@ -155,31 +154,13 @@ async def test_db_engine():
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 
-        # Seed prof_activity data
-        def seed_prof_activities(connection):
-            from sqlalchemy import text
-
-            for seed in PROF_ACTIVITY_SEED_DATA:
-                stmt = text(
-                    """
-                    INSERT INTO prof_activity (id, code, name, description)
-                    VALUES (:id, :code, :name, :description)
-                    ON CONFLICT (code) DO UPDATE
-                    SET name = EXCLUDED.name,
-                        description = EXCLUDED.description
-                    """
-                )
-                connection.execute(
-                    stmt,
-                    {
-                        "id": str(seed.id),
-                        "code": seed.code,
-                        "name": seed.name,
-                        "description": seed.description,
-                    },
-                )
-
-        await conn.run_sync(seed_prof_activities)
+        # Seed prof_activity data removed (seeds directory removed in favor of direct DB management)
+        # def seed_prof_activities(connection):
+        #     from sqlalchemy import text
+        #     for seed in PROF_ACTIVITY_SEED_DATA:
+        #         stmt = text(...)
+        #         connection.execute(stmt, {...})
+        # await conn.run_sync(seed_prof_activities)
 
     yield engine
 

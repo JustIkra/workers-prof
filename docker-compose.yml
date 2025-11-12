@@ -48,8 +48,7 @@ services:
       FILE_STORAGE_BASE: ${FILE_STORAGE_BASE:-/app/storage}
       ENV: ${ENV:-prod}
       VPN_ENABLED: ${VPN_ENABLED:-0}
-    # Placeholder worker. Replace with Celery command when implemented.
-    command: ["python", "-c", "import time; print('Worker started (placeholder)'); time.sleep(10**9)"]
+    command: ["/app/docker-entrypoint-worker.sh"]
     depends_on:
       postgres:
         condition: service_healthy

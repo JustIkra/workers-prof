@@ -272,11 +272,12 @@ async def get_participant_scoring_history(
             # Handle both old format (list of strings) and new format (list of dicts)
             if isinstance(result.recommendations, list):
                 if result.recommendations and isinstance(result.recommendations[0], dict):
-                    # New format: extract 'text' field from each dict
-                    recommendations = [rec.get("text", str(rec)) for rec in result.recommendations]
-                else:
-                    # Old format: already list of strings
+                    # New format: return full recommendation objects (AI-09 fix)
+                    # Each dict should have: title, link_url, priority
                     recommendations = result.recommendations
+                else:
+                    # Old format: convert list of strings to list of dicts for compatibility
+                    recommendations = [{"title": rec, "link_url": None, "priority": 3} for rec in result.recommendations]
 
         history_items.append(
             ScoringHistoryItem(
@@ -288,6 +289,8 @@ async def get_participant_scoring_history(
                 dev_areas=dev_areas,
                 recommendations=recommendations,
                 created_at=result.computed_at,
+                recommendations_status=result.recommendations_status,
+                recommendations_error=result.recommendations_error,
             )
         )
 
@@ -313,20 +316,49 @@ async def get_participant_metrics(
 
     Returns: List of participant metrics with values, confidence, and update timestamps.
     """
+    from datetime import datetime
     from app.repositories.participant_metric import ParticipantMetricRepository
+    from app.repositories.metric import MetricDefRepository
 
     # Check if participant exists
     service = ParticipantService(db)
-    await service.get_participant_by_id(participant_id)  # Raises 404 if not found
+    participant = await service.get_participant(participant_id)
+    if not participant:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Participant not found")
 
-    # Get participant metrics
+    # Get participant metrics actually stored
     metric_repo = ParticipantMetricRepository(db)
     metrics = await metric_repo.list_by_participant(participant_id)
 
+    # Build a map for quick lookup
+    by_code = {m.metric_code: m for m in metrics}
+
+    # Ensure full metric coverage: load all defined MetricDefs
+    metric_def_repo = MetricDefRepository(db)
+    metric_defs = await metric_def_repo.list_all(active_only=True)
+
+    # Compose response list: existing metrics OR synthetic zeros
+    response_items: list[ParticipantMetricResponse] = []
+    for md in metric_defs:
+        existing = by_code.get(md.code)
+        if existing:
+            response_items.append(ParticipantMetricResponse.model_validate(existing))
+        else:
+            # Return a synthetic zero-value item for missing metrics
+            response_items.append(
+                ParticipantMetricResponse(
+                    metric_code=md.code,
+                    value=0.0,
+                    confidence=None,
+                    last_source_report_id=None,
+                    updated_at=participant.created_at if hasattr(participant, "created_at") else datetime.utcnow(),
+                )
+            )
+
     return ParticipantMetricsListResponse(
         participant_id=participant_id,
-        metrics=[ParticipantMetricResponse.model_validate(m) for m in metrics],
-        total=len(metrics),
+        metrics=response_items,
+        total=len(response_items),
     )
 
 
@@ -361,7 +393,9 @@ async def update_participant_metric(
 
     # Check if participant exists
     service = ParticipantService(db)
-    await service.get_participant_by_id(participant_id)  # Raises 404 if not found
+    participant = await service.get_participant(participant_id)
+    if not participant:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Participant not found")
 
     # Update metric
     metric_repo = ParticipantMetricRepository(db)

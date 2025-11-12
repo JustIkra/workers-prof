@@ -22,7 +22,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.dependencies import get_current_active_user
 from app.db.models import User
 from app.db.session import get_db
-from app.schemas.report import ReportListResponse, ReportResponse, ReportType, ReportUploadResponse
+from app.schemas.report import ReportListResponse, ReportResponse, ReportUploadResponse
 from app.services.report import ReportService
 from app.tasks.extraction import extract_images_from_report
 
@@ -58,7 +58,6 @@ async def get_participant_reports(
 )
 async def upload_report(
     participant_id: UUID,
-    report_type: ReportType = Form(..., description="Report type (REPORT_1/REPORT_2/REPORT_3)"),
     file: UploadFile = File(..., description="DOCX report file"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
@@ -69,7 +68,7 @@ async def upload_report(
     Requires active authentication.
     """
     service = ReportService(db)
-    return await service.upload_report(participant_id, report_type, file)
+    return await service.upload_report(participant_id, file)
 
 
 @router.get("/reports/{report_id}/download")
@@ -98,6 +97,23 @@ async def download_report(
         filename=context.filename,
         headers=headers,
     )
+
+@router.delete(
+    "/reports/{report_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+async def delete_report(
+    report_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+) -> Response:
+    """
+    Delete report with all related data and files.
+    Returns 204 No Content on success, 404 if not found.
+    """
+    service = ReportService(db)
+    await service.delete_report(report_id)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.post(

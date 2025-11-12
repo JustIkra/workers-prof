@@ -25,18 +25,6 @@ class ReportRepository:
         result = await self.db.execute(stmt)
         return result.scalar_one_or_none() is not None
 
-    async def get_by_participant_and_type(
-        self, participant_id: UUID, report_type: str
-    ) -> Report | None:
-        """Get report for participant by type."""
-        stmt = (
-            select(Report)
-            .options(selectinload(Report.file_ref))
-            .where(Report.participant_id == participant_id, Report.type == report_type)
-        )
-        result = await self.db.execute(stmt)
-        return result.scalar_one_or_none()
-
     async def create(self, report: Report, file_ref: FileRef) -> Report:
         """Persist report with associated file reference."""
         self.db.add(file_ref)

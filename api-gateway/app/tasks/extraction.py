@@ -165,11 +165,29 @@ def extract_images_from_report(self, report_id: str, request_id: str | None = No
                     extra={"report_id": report_id, "image_count": len(extracted_images)},
                 )
 
+                # Load existing images once to avoid duplicate processing on retries
+                existing_images = await report_image_repo.get_by_report_id(report_uuid)
+                existing_order_indices = {ri.order_index for ri in existing_images}
+
                 for img in extracted_images:
                     # Generate storage key for image
                     participant_id = str(report.participant_id)
                     image_filename = f"image_{img.order_index}.png"
                     image_key = f"reports/{participant_id}/{report_id}/images/{image_filename}"
+
+                    # Check if ReportImage already exists for this report and order_index
+                    # (handles retry scenarios)
+                    if img.order_index in existing_order_indices:
+                        logger.debug(
+                            "task_report_image_skipped_exists",
+                            extra={
+                                "report_id": report_id,
+                                "order_index": img.order_index,
+                                "image_key": image_key,
+                            },
+                        )
+                        saved_count += 1
+                        continue
 
                     # Convert to PNG for consistency
                     png_data = extractor.convert_to_png(img.data)
@@ -188,17 +206,36 @@ def extract_images_from_report(self, report_id: str, request_id: str | None = No
                         },
                     )
 
-                    # Create FileRef
-                    file_ref = FileRef(
-                        id=uuid.uuid4(),
-                        storage="LOCAL",
-                        bucket="local",
-                        key=image_key,
-                        mime="image/png",
-                        size_bytes=len(png_data),
+                    # Check if FileRef already exists (handles retry scenarios)
+                    stmt_file_ref = select(FileRef).where(
+                        FileRef.storage == "LOCAL",
+                        FileRef.bucket == "local",
+                        FileRef.key == image_key,
                     )
-                    session.add(file_ref)
-                    await session.flush()
+                    result_file_ref = await session.execute(stmt_file_ref)
+                    file_ref = result_file_ref.scalar_one_or_none()
+
+                    if file_ref:
+                        logger.debug(
+                            "task_file_ref_reused",
+                            extra={
+                                "report_id": report_id,
+                                "file_ref_id": str(file_ref.id),
+                                "image_key": image_key,
+                            },
+                        )
+                    else:
+                        # Create FileRef
+                        file_ref = FileRef(
+                            id=uuid.uuid4(),
+                            storage="LOCAL",
+                            bucket="local",
+                            key=image_key,
+                            mime="image/png",
+                            size_bytes=len(png_data),
+                        )
+                        session.add(file_ref)
+                        await session.flush()
 
                     # Create ReportImage
                     await report_image_repo.create(
@@ -255,10 +292,46 @@ def extract_images_from_report(self, report_id: str, request_id: str | None = No
                         "errors": [{"error": f"Metric extraction failed: {str(exc)}"}],
                     }
 
-                # 6. Update report status
-                report.status = "EXTRACTED"
-                report.extracted_at = datetime.now(UTC)
-                report.extract_error = None
+                # 6. Update report status based on metrics_saved
+                metrics_saved = metrics_result.get("metrics_saved", 0)
+                errors = metrics_result.get("errors", [])
+
+                if metrics_saved > 0:
+                    # Success: at least some metrics were saved to participant_metric
+                    report.status = "EXTRACTED"
+                    report.extracted_at = datetime.now(UTC)
+                    report.extract_error = None
+                    logger.info(
+                        "task_report_status_extracted",
+                        extra={
+                            "report_id": report_id,
+                            "metrics_saved": metrics_saved,
+                        },
+                    )
+                else:
+                    # Failure: no metrics saved to participant_metric
+                    if errors:
+                        # Critical error during metric extraction/saving
+                        error_msg = errors[0].get("error", "Unknown error")
+                        report.status = "FAILED"
+                        report.extract_error = f"Failed to save metrics: {error_msg}"
+                        logger.error(
+                            "task_report_status_error_no_metrics_saved",
+                            extra={
+                                "report_id": report_id,
+                                "error": error_msg,
+                                "total_errors": len(errors),
+                            },
+                        )
+                    else:
+                        # No errors, but no metrics found (e.g., empty images)
+                        report.status = "EXTRACTED"
+                        report.extracted_at = datetime.now(UTC)
+                        report.extract_error = None
+                        logger.warning(
+                            "task_report_status_extracted_no_metrics",
+                            extra={"report_id": report_id},
+                        )
 
                 await session.commit()
 

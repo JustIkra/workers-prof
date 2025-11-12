@@ -67,24 +67,24 @@ async def list_weight_tables(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
 
-@router.post(
-    "/{weight_table_id}/activate",
+@router.put(
+    "/{weight_table_id}",
     response_model=WeightTableResponse,
     status_code=status.HTTP_200_OK,
 )
-async def activate_weight_table(
+async def update_weight_table(
     weight_table_id: uuid.UUID,
+    payload: WeightTableUploadRequest,
     db: AsyncSession = Depends(get_db),
     _admin: User = Depends(require_admin),
 ) -> WeightTableResponse:
     """
-    Activate a weight table version for its professional activity.
+    Update an existing weight table.
 
-    Fails if another active version already exists.
     Requires ADMIN role.
     """
     service = WeightTableService(db)
     try:
-        return await service.activate_weight_table(weight_table_id)
+        return await service.update_weight_table(weight_table_id, payload)
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc

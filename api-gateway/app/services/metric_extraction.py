@@ -23,6 +23,7 @@ from uuid import UUID
 
 from PIL import Image
 from sqlalchemy import select
+from sqlalchemy.exc import DBAPIError, IntegrityError, OperationalError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.clients.pool_client import GeminiPoolClient
@@ -31,169 +32,9 @@ from app.db.models import Report, ReportImage
 from app.repositories.metric import ExtractedMetricRepository, MetricDefRepository
 from app.repositories.participant_metric import ParticipantMetricRepository
 from app.services.metric_mapping import get_metric_mapping_service
+from app.services.vision_prompts import IMPROVED_VISION_PROMPT
 
 logger = logging.getLogger(__name__)
-
-# Improved Gemini Vision prompt with explicit examples
-IMPROVED_VISION_PROMPT = """Ты — эксперт по анализу визуальных данных.
-
-Перед тобой изображение БАРЧАРТА или ТАБЛИЦЫ с психометрическими метриками.
-
-ТВОЯ ЗАДАЧА:
-Извлечь пары (название метрики, числовое значение) из изображения.
-
-ФОРМАТ ДАННЫХ НА ИЗОБРАЖЕНИИ:
-Обычно это таблица или барчарт вида:
-┌──────────────────────────────────┬────────┐
-│ НАЗВАНИЕ МЕТРИКИ                 │ ЗНАЧЕНИЕ│
-├──────────────────────────────────┼────────┤
-│ РАБОТА С ДОКУМЕНТАМИ             │  6.4   │
-│ ПРОДВИЖЕНИЕ                      │  7.6   │
-│ АНАЛИЗ И ПЛАНИРОВАНИЕ            │  4.4   │
-└──────────────────────────────────┴────────┘
-
-ПРАВИЛА ИЗВЛЕЧЕНИЯ НАЗВАНИЙ:
-✅ ИЗВЛЕКАЙ:
-  - Полные названия метрик на РУССКОМ языке
-  - Названия в ВЕРХНЕМ РЕГИСТРЕ (если присутствуют)
-  - Названия с пробелами (например: "РАБОТА С ДОКУМЕНТАМИ")
-  - Названия ролей (ГЕНЕРАТОР ИДЕЙ, КООРДИНАТОР)
-  - Названия характеристик (ЛИДЕРСТВО, СТРЕССОУСТОЙЧИВОСТЬ)
-  - **ОБЕ СТОРОНЫ ПАР ПРОТИВОПОЛОЖНОСТЕЙ** (см. раздел ниже)
-
-❌ НЕ ИЗВЛЕКАЙ:
-  - Служебные слова: "НИЗКАЯ", "ВЫСОКАЯ", "ЗОНЫ ИНТЕРПРЕТАЦИИ"
-  - Подписи осей: числа 1, 2, 3, ..., 10 (если они идут подряд)
-  - Заголовки разделов/таблиц
-  - Легенду графика
-  - Символы: ++, +, −, --, %, ±
-
-ОСОБОЕ ВНИМАНИЕ: ПАРЫ ПРОТИВОПОЛОЖНОСТЕЙ
-На изображении могут быть метрики, представленные как ПАРЫ ПРОТИВОПОЛОЖНЫХ ХАРАКТЕРИСТИК.
-Например:
-  - ЗАМКНУТОСТЬ 8.4 ОБЩИТЕЛЬНОСТЬ
-  - НЕЗАВИСИМОСТЬ 10 КОНФОРМИЗМ
-  - МОРАЛЬНАЯ ГИБКОСТЬ 8.8 МОРАЛЬНОСТЬ
-  - ИМПУЛЬСИВНОСТЬ 5.8 ОРГАНИЗОВАННОСТЬ
-
-⚠️ КРИТИЧЕСКИ ВАЖНО: Извлекай ОБЕ СТОРОНЫ пары как ОТДЕЛЬНЫЕ метрики!
-Если видишь "ЗАМКНУТОСТЬ 8.4 ОБЩИТЕЛЬНОСТЬ", извлеки:
-  {"label": "ЗАМКНУТОСТЬ", "value": "8.4"}
-  {"label": "ОБЩИТЕЛЬНОСТЬ", "value": "8.4"}  (или другое значение, если указано)
-
-Если значения не указаны явно для обеих сторон, используй одно значение для обеих метрик.
-
-ПРАВИЛА ИЗВЛЕЧЕНИЯ ЗНАЧЕНИЙ:
-✅ ИЗВЛЕКАЙ:
-  - ТОЛЬКО числовые значения метрик (НЕ подписи осей!)
-  - Диапазон: от 1 до 10 (включительно)
-  - Формат: целое число (6, 7, 10) или с одним десятичным (6.4, 7.6, 9.2)
-  - Используй точку как разделитель: "6.4" (не запятую)
-
-❌ НЕ ИЗВЛЕКАЙ:
-  - Подписи осей X (1, 2, 3, ..., 10), если они идут последовательно
-  - Значения вне диапазона 1-10
-  - Проценты, символы
-
-ПРИМЕРЫ ОЖИДАЕМОГО ВЫВОДА:
-
-Пример 1 - Барчарт профессиональных областей:
-```json
-{
-  "metrics": [
-    {"label": "РАБОТА С ДОКУМЕНТАМИ", "value": "6.4"},
-    {"label": "ПРОДВИЖЕНИЕ", "value": "7.6"},
-    {"label": "АНАЛИЗ И ПЛАНИРОВАНИЕ", "value": "4.4"},
-    {"label": "ПРИНЯТИЕ РЕШЕНИЙ", "value": "1.9"},
-    {"label": "РАЗРАБОТКА", "value": "4.7"},
-    {"label": "ОБЕСПЕЧЕНИЕ ПРОЦЕССА", "value": "8.4"},
-    {"label": "ПОДДЕРЖКА", "value": "9.0"},
-    {"label": "КОНТРОЛЬ АУДИТ", "value": "4.5"}
-  ]
-}
-```
-
-Пример 2 - Командные роли:
-```json
-{
-  "metrics": [
-    {"label": "ГЕНЕРАТОР ИДЕЙ", "value": "4.5"},
-    {"label": "ИССЛЕДОВАТЕЛЬ РЕСУРСОВ", "value": "5.8"},
-    {"label": "СПЕЦИАЛИСТ", "value": "5.9"},
-    {"label": "АНАЛИТИК", "value": "4.4"},
-    {"label": "КООРДИНАТОР", "value": "5.0"},
-    {"label": "МОТИВАТОР", "value": "3.0"},
-    {"label": "ДУША КОМАНДЫ", "value": "8.9"},
-    {"label": "РЕАЛИЗАТОР", "value": "6.2"},
-    {"label": "КОНТРОЛЕР", "value": "5.5"}
-  ]
-}
-```
-
-Пример 3 - Интеллект:
-```json
-{
-  "metrics": [
-    {"label": "ВЫЧИСЛЕНИЯ", "value": "2.9"},
-    {"label": "ЛЕКСИКА", "value": "4.3"},
-    {"label": "ЭРУДИЦИЯ", "value": "7.5"},
-    {"label": "ПРОСТРАНСТВЕННОЕ МЫШЛЕНИЕ", "value": "4.6"},
-    {"label": "НЕВЕРБАЛЬНАЯ ЛОГИКА", "value": "9.0"},
-    {"label": "ВЕРБАЛЬНАЯ ЛОГИКА", "value": "5.3"},
-    {"label": "ОБРАБОТКА ИНФОРМАЦИИ", "value": "5.1"},
-    {"label": "ОБЩИЙ БАЛЛ ИНТЕЛЛЕКТА", "value": "5.5"}
-  ]
-}
-```
-
-Пример 4 - Пара противоположностей (извлекай ОБЕ СТОРОНЫ!):
-Если на изображении: "ЗАМКНУТОСТЬ 8.4 ОБЩИТЕЛЬНОСТЬ"
-```json
-{
-  "metrics": [
-    {"label": "ЗАМКНУТОСТЬ", "value": "8.4"},
-    {"label": "ОБЩИТЕЛЬНОСТЬ", "value": "8.4"}
-  ]
-}
-```
-
-Если на изображении: "НЕЗАВИСИМОСТЬ 10 КОНФОРМИЗМ"
-```json
-{
-  "metrics": [
-    {"label": "НЕЗАВИСИМОСТЬ", "value": "10"},
-    {"label": "КОНФОРМИЗМ", "value": "10"}
-  ]
-}
-```
-
-Если на изображении: "МОРАЛЬНАЯ ГИБКОСТЬ 8.8 МОРАЛЬНОСТЬ"
-```json
-{
-  "metrics": [
-    {"label": "МОРАЛЬНАЯ ГИБКОСТЬ", "value": "8.8"},
-    {"label": "МОРАЛЬНОСТЬ", "value": "8.8"}
-  ]
-}
-```
-
-Пример 5 - Если на изображении нет метрик (только заголовок/описание):
-```json
-{
-  "metrics": []
-}
-```
-
-ВАЖНЫЕ ТРЕБОВАНИЯ:
-1. Ответ ТОЛЬКО в JSON формате (без дополнительного текста)
-2. Каждая метрика = один объект {"label": "...", "value": "..."}
-3. label — ПОЛНОЕ название на русском языке (как написано на изображении)
-4. value — строка с числом в формате "X" или "X.Y" (точка как разделитель)
-5. Если изображение не содержит метрик, верни: {"metrics": []}
-6. **ОБЯЗАТЕЛЬНО извлекай ОБЕ СТОРОНЫ пар противоположностей!** Если видишь пару (например, "ЗАМКНУТОСТЬ 8.4 ОБЩИТЕЛЬНОСТЬ"), создай ДВА отдельных объекта метрик - по одному для каждой стороны пары.
-
-Теперь проанализируй изображение и верни JSON со всеми найденными метриками:
-"""
 
 # Regex for valid metric values: 1-10 with optional single decimal digit
 VALUE_PATTERN = re.compile(r"^(?:10|[1-9])(?:[,.][0-9])?$")
@@ -282,13 +123,16 @@ class MetricExtractionService:
         all_metrics: list[ExtractedMetricData] = []
         errors = []
 
-        # Get report to determine type for mapping
+        # Get report for participant_id
         result = await self.db.execute(select(Report).where(Report.id == report_id))
         report = result.scalar_one_or_none()
         if not report:
             raise ValueError(f"Report not found: {report_id}")
 
-        logger.info(f"Report type: {report.type}")
+        # Use default report type since type field was removed from Report model
+        # All report types (REPORT_1, REPORT_2, REPORT_3) use the same mappings
+        report_type = "REPORT_1"
+        logger.info(f"Using default report type: {report_type}")
 
         # Load all metric definitions and create mapping by code
         metric_defs = await self.metric_def_repo.list_all(active_only=True)
@@ -349,14 +193,15 @@ class MetricExtractionService:
         for metric in all_metrics:
             try:
                 # Map label to metric code using YAML configuration
+                # Use default report type since type field was removed from Report model
                 metric_code = self.mapping_service.get_metric_code(
-                    report.type, metric.normalized_label
+                    report_type, metric.normalized_label
                 )
 
                 if not metric_code:
                     logger.warning(
                         f"No mapping found for label '{metric.normalized_label}' "
-                        f"in report type '{report.type}'"
+                        f"in report type '{report_type}'"
                     )
                     unknown_labels.add(metric.normalized_label)
                     mapping_not_found_count += 1
@@ -364,7 +209,7 @@ class MetricExtractionService:
                         {
                             "label": metric.normalized_label,
                             "error": "mapping_not_found",
-                            "report_type": report.type,
+                            "report_type": report_type,
                         }
                     )
                     continue
@@ -413,14 +258,32 @@ class MetricExtractionService:
                 )
 
             except Exception as e:
-                logger.error(f"Failed to save metric {metric.normalized_label}: {e}")
+                # Distinguish critical (DB-related) vs. non-critical errors
+                is_critical = isinstance(e, (DBAPIError, IntegrityError, OperationalError))
+
+                logger.error(
+                    f"Failed to save metric {metric.normalized_label}: {e} "
+                    f"(critical={is_critical})",
+                    exc_info=is_critical,
+                )
+
                 errors.append(
                     {
                         "label": metric.normalized_label,
                         "value": str(metric.normalized_value),
                         "error": str(e),
+                        "critical": is_critical,
                     }
                 )
+
+                # Re-raise critical errors to prevent setting status to EXTRACTED
+                # when database operations fail
+                if is_critical:
+                    logger.error(
+                        f"Critical database error while saving metric "
+                        f"{metric.normalized_label}, aborting extraction"
+                    )
+                    raise
 
         # Log pool statistics
         pool_stats = self.gemini_client.get_pool_stats()

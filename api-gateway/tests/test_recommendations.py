@@ -137,24 +137,34 @@ def test_recommendation_item_validation():
     """Test RecommendationItem validation."""
     # Valid item
     item = RecommendationItem(
-        title="Онлайн курс по продажам",
-        link_url="https://example.com/course",
-        priority=1,
+        title="Развитие навыков продаж",
+        skill_focus="Коммуникация и убеждение",
+        development_advice="Практикуйте активное слушание и задавайте открытые вопросы",
+        recommended_formats=["воркшоп", "наставничество"],
     )
-    assert item.title == "Онлайн курс по продажам"
-    assert item.priority == 1
+    assert item.title == "Развитие навыков продаж"
+    assert item.skill_focus == "Коммуникация и убеждение"
+    assert len(item.recommended_formats) == 2
 
-    # Test priority range [1..5]
-    with pytest.raises(ValidationError):
-        RecommendationItem(title="Test", link_url="", priority=0)
+    # Test with empty recommended_formats
+    item = RecommendationItem(
+        title="Test",
+        skill_focus="Test skill",
+        development_advice="Test advice",
+    )
+    assert item.recommended_formats == []
 
-    with pytest.raises(ValidationError):
-        RecommendationItem(title="Test", link_url="", priority=6)
-
-    # Valid priorities
-    for priority in [1, 2, 3, 4, 5]:
-        item = RecommendationItem(title="Test", link_url="", priority=priority)
-        assert item.priority == priority
+    # Test max length constraints
+    item = RecommendationItem(
+        title="A" * 80,
+        skill_focus="B" * 120,
+        development_advice="C" * 240,
+        recommended_formats=["D" * 80] * 5,
+    )
+    assert len(item.title) == 80
+    assert len(item.skill_focus) == 120
+    assert len(item.development_advice) == 240
+    assert len(item.recommended_formats) == 5
 
 
 @pytest.mark.unit
@@ -224,7 +234,12 @@ def test_recommendations_response_to_scoring_format():
             DevelopmentAreaItem(title="Test 2", metric_codes=["CODE2"], actions=["Action 1"]),
         ],
         recommendations=[
-            RecommendationItem(title="Course 1", link_url="https://example.com", priority=1),
+            RecommendationItem(
+                title="Развитие навыков",
+                skill_focus="Коммуникация",
+                development_advice="Практикуйте активное слушание",
+                recommended_formats=["воркшоп"],
+            ),
         ],
     )
 
@@ -235,7 +250,7 @@ def test_recommendations_response_to_scoring_format():
     assert "recommendations" in result
     assert len(result["strengths"]) == 1
     assert result["strengths"][0]["title"] == "Test 1"
-    assert result["recommendations"][0]["priority"] == 1
+    assert result["recommendations"][0]["skill_focus"] == "Коммуникация"
 
 
 # ===== Generator Tests =====
@@ -263,9 +278,10 @@ async def test_recommendations_generator_basic():
         ],
         "recommendations": [
             {
-                "title": "Курс по коммуникации",
-                "link_url": "https://example.com/course",
-                "priority": 1,
+                "title": "Развитие коммуникации",
+                "skill_focus": "Устная коммуникация и презентации",
+                "development_advice": "Практикуйте публичные выступления и работу с аудиторией",
+                "recommended_formats": ["воркшоп", "наставничество"],
             }
         ],
     }
@@ -300,7 +316,6 @@ async def test_recommendations_generator_basic():
         score_pct=78.4,
         prof_activity_code="SALES",
         prof_activity_name="Продажи",
-        weight_table_version=1,
     )
 
     assert len(result.strengths) == 1
@@ -324,7 +339,13 @@ async def test_recommendations_generator_truncation():
             for i in range(6)
         ],
         "recommendations": [
-            {"title": f"Rec {i}", "link_url": "", "priority": 1} for i in range(6)
+            {
+                "title": f"Rec {i}",
+                "skill_focus": f"Skill {i}",
+                "development_advice": f"Advice {i}",
+                "recommended_formats": ["воркшоп"],
+            }
+            for i in range(6)
         ],
     }
 
@@ -349,7 +370,6 @@ async def test_recommendations_generator_truncation():
         score_pct=50.0,
         prof_activity_code="TEST",
         prof_activity_name="Test Activity",
-        weight_table_version=1,
     )
 
     # Should be truncated to 5 items each
@@ -383,7 +403,14 @@ async def test_recommendations_generator_self_heal():
             {"title": "Test", "metric_codes": ["CODE"], "reason": "Healed successfully"}
         ],
         "dev_areas": [{"title": "Test", "metric_codes": ["CODE"], "actions": ["Action"]}],
-        "recommendations": [{"title": "Test", "link_url": "", "priority": 1}],
+        "recommendations": [
+            {
+                "title": "Test",
+                "skill_focus": "Test skill",
+                "development_advice": "Test advice",
+                "recommended_formats": [],
+            }
+        ],
     }
     transport.add_response(
         {
@@ -405,7 +432,6 @@ async def test_recommendations_generator_self_heal():
         score_pct=50.0,
         prof_activity_code="TEST",
         prof_activity_name="Test",
-        weight_table_version=1,
     )
 
     # Should succeed after self-heal
@@ -444,8 +470,7 @@ async def test_recommendations_generator_fails_after_retries():
             score_pct=50.0,
             prof_activity_code="TEST",
             prof_activity_name="Test",
-            weight_table_version=1,
-        )
+            )
 
 
 @pytest.mark.asyncio
@@ -472,9 +497,10 @@ async def test_recommendations_generator_convenience_function():
         ],
         "recommendations": [
             {
-                "title": "Course 1",
-                "link_url": "https://example.com",
-                "priority": 1,
+                "title": "Развитие навыков",
+                "skill_focus": "Коммуникация",
+                "development_advice": "Практикуйте активное слушание",
+                "recommended_formats": ["воркшоп"],
             }
         ],
     }
@@ -500,7 +526,6 @@ async def test_recommendations_generator_convenience_function():
         score_pct=50.0,
         prof_activity_code="TEST",
         prof_activity_name="Test",
-        weight_table_version=1,
     )
 
     # Should return dict with three keys
@@ -563,10 +588,226 @@ async def test_recommendations_generator_prompt_building():
 
     # Verify prompt contains key elements
     assert "Продажи" in prompt
-    assert "версия весов 3" in prompt
     assert "COMMUNICATION_CLARITY" in prompt
     assert "78.4" in prompt
     assert "JSON" in prompt
     assert "strengths" in prompt
     assert "dev_areas" in prompt
     assert "recommendations" in prompt
+    # Version is in JSON context, not in text
+    assert '"version": 3' in prompt
+
+
+# ===== Integration Tests (AI-08) =====
+
+
+@pytest.mark.asyncio
+@pytest.mark.integration
+async def test_generate_report_recommendations_task(db_session):
+    """Test Celery task for generating recommendations (AI-08)."""
+    from datetime import date
+    from decimal import Decimal
+
+    from app.clients import GeminiClient, GeminiTransport
+    from app.core.config import settings
+    from app.repositories.metric import MetricDefRepository
+    from app.repositories.participant import ParticipantRepository
+    from app.repositories.participant_metric import ParticipantMetricRepository
+    from app.repositories.prof_activity import ProfActivityRepository
+    from app.repositories.scoring_result import ScoringResultRepository
+    from app.tasks.recommendations import generate_report_recommendations
+
+    # 1. Setup test data - Create participant
+    participant_repo = ParticipantRepository(db_session)
+    participant = await participant_repo.create(
+        full_name="Test Participant",
+        birth_date=date(1985, 1, 1),
+        external_id="TEST_RECOMMENDATIONS",
+    )
+
+    # Get or create prof activity
+    prof_activity_repo = ProfActivityRepository(db_session)
+    prof_activities = await prof_activity_repo.list_all()
+    if not prof_activities:
+        pytest.skip("No professional activities in test database")
+    prof_activity = prof_activities[0]
+
+    weight_table = await prof_activity_repo.get_active_weight_table(prof_activity.id)
+    if not weight_table:
+        pytest.skip("No active weight table for test")
+
+
+    # 2. Create participant metrics for all required metrics
+    metric_def_repo = MetricDefRepository(db_session)
+    metric_defs = await metric_def_repo.list_all(active_only=True)
+
+    participant_metric_repo = ParticipantMetricRepository(db_session)
+
+    for weight_entry in weight_table.weights:
+        metric_code = weight_entry["metric_code"]
+        await participant_metric_repo.upsert(
+            participant_id=participant.id,
+            metric_code=metric_code,
+            value=Decimal("7.5"),  # Mid-range value
+            confidence=0.9,
+            source_report_id=None,
+        )
+
+    await db_session.commit()
+
+    # 3. Create scoring result
+    scoring_result_repo = ScoringResultRepository(db_session)
+    scoring_result = await scoring_result_repo.create(
+        participant_id=participant.id,
+        weight_table_id=weight_table.id,
+        score_pct=Decimal("75.00"),
+        strengths=[{"metric_code": "TEST", "metric_name": "Test", "value": "8.0", "weight": "0.2"}],
+        dev_areas=[
+            {"metric_code": "TEST2", "metric_name": "Test 2", "value": "6.0", "weight": "0.1"}
+        ],
+        recommendations=None,  # Will be updated by task
+        compute_notes="Test scoring",
+    )
+    await db_session.commit()
+
+    # 4. Mock Gemini response
+    mock_recommendations = {
+        "strengths": [
+            {
+                "title": "Отличная коммуникация",
+                "metric_codes": ["COMMUNICATION_CLARITY"],
+                "reason": "Высокий балл по ясности речи",
+            }
+        ],
+        "dev_areas": [
+            {
+                "title": "Улучшение планирования",
+                "metric_codes": ["PLANNING_ACCURACY"],
+                "actions": ["Изучить методики планирования", "Практиковать ежедневное планирование"],
+            }
+        ],
+        "recommendations": [
+            {
+                "title": "Развитие педагогических навыков",
+                "skill_focus": "Методика преподавания",
+                "development_advice": "Изучите современные методики обучения и практикуйте их применение",
+                "recommended_formats": ["воркшоп", "практикум"],
+            },
+            {
+                "title": "Улучшение коммуникации",
+                "skill_focus": "Устная коммуникация",
+                "development_advice": "Практикуйте публичные выступления и работу с аудиторией",
+                "recommended_formats": ["тренинг", "наставничество"],
+            },
+        ],
+    }
+
+    # Mock transport
+    class MockTransport(GeminiTransport):
+        async def request(
+            self,
+            method: str,
+            url: str,
+            headers: dict[str, Any] | None = None,
+            json: dict[str, Any] | None = None,
+            timeout: float = 30.0,
+        ) -> dict[str, Any]:
+            return {
+                "candidates": [
+                    {
+                        "content": {
+                            "parts": [{"text": json.dumps(mock_recommendations, ensure_ascii=False)}],
+                        },
+                    }
+                ]
+            }
+
+    # Temporarily patch Gemini client creation
+    import app.core.gemini_factory
+    from unittest.mock import patch
+
+    mock_client = GeminiClient(api_key="test_key", transport=MockTransport(), offline=True)
+
+    with patch.object(
+        app.core.gemini_factory, "create_gemini_client", return_value=mock_client
+    ):
+        # 5. Run Celery task (synchronous in eager mode)
+        result = generate_report_recommendations(
+            scoring_result_id=str(scoring_result.id),
+            request_id="test_request",
+        )
+
+        assert result["status"] == "success"
+        assert result["recommendations_count"] == 2
+
+    # 6. Verify recommendations were saved
+    await db_session.refresh(scoring_result)
+
+    assert scoring_result.recommendations is not None
+    assert len(scoring_result.recommendations) == 2
+    assert scoring_result.recommendations[0]["title"] == "Развитие педагогических навыков"
+    assert scoring_result.recommendations[0]["skill_focus"] == "Методика преподавания"
+    assert scoring_result.recommendations[1]["skill_focus"] == "Устная коммуникация"
+    assert scoring_result.recommendations_status == "ready"
+    assert scoring_result.recommendations_error is None
+
+
+@pytest.mark.asyncio
+@pytest.mark.integration
+async def test_generate_recommendations_task_when_disabled(db_session):
+    """Test task skips generation when AI_RECOMMENDATIONS_ENABLED=0."""
+    from datetime import date
+    from decimal import Decimal
+    from unittest.mock import patch
+
+    from app.core.config import Settings
+    from app.repositories.participant import ParticipantRepository
+    from app.repositories.prof_activity import ProfActivityRepository
+    from app.repositories.scoring_result import ScoringResultRepository
+    from app.tasks.recommendations import generate_report_recommendations
+
+    # Setup test data - Create participant
+    participant_repo = ParticipantRepository(db_session)
+    participant = await participant_repo.create(
+        full_name="Test Participant 2",
+        birth_date=date(1985, 1, 1),
+        external_id="TEST_DISABLED",
+    )
+
+    # Get prof activity
+    prof_activity_repo = ProfActivityRepository(db_session)
+    prof_activities = await prof_activity_repo.list_all()
+    if not prof_activities:
+        pytest.skip("No professional activities in test database")
+    prof_activity = prof_activities[0]
+
+    weight_table = await prof_activity_repo.get_active_weight_table(prof_activity.id)
+    if not weight_table:
+        pytest.skip("No active weight table for test")
+
+    scoring_result_repo = ScoringResultRepository(db_session)
+    scoring_result = await scoring_result_repo.create(
+        participant_id=participant.id,
+        weight_table_id=weight_table.id,
+        score_pct=Decimal("75.00"),
+        strengths=[],
+        dev_areas=[],
+        recommendations=None,
+        compute_notes="Test",
+    )
+    await db_session.commit()
+
+    # Patch settings to disable recommendations
+    mock_settings = Settings()
+    mock_settings.ai_recommendations_enabled = False
+
+    with patch("app.tasks.recommendations.settings", mock_settings):
+        result = generate_report_recommendations(
+            scoring_result_id=str(scoring_result.id),
+        )
+
+        assert result["status"] == "skipped"
+        assert result["reason"] == "AI recommendations are disabled"
+        await db_session.refresh(scoring_result)
+        assert scoring_result.recommendations_status == "disabled"
+        assert scoring_result.recommendations_error is None

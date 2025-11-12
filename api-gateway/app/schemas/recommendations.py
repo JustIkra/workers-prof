@@ -76,33 +76,44 @@ class DevelopmentAreaItem(BaseModel):
 
 class RecommendationItem(BaseModel):
     """
-    Single recommendation item (training resource).
+    Single recommendation item (learning guidance).
 
-    Represents a suggested training resource or action.
+    Represents a suggested competency focus with actionable advice.
     """
 
     title: str = Field(
         ...,
-        description="Title of the recommendation (max 80 chars)",
+        description="Short heading for the recommendation (max 80 chars)",
         max_length=80,
     )
-    link_url: str = Field(
+    skill_focus: str = Field(
         ...,
-        description="URL to the resource (optional, can be empty)",
-        max_length=500,
+        description="What competency or навык to strengthen (max 120 chars)",
+        max_length=120,
     )
-    priority: int = Field(
+    development_advice: str = Field(
         ...,
-        description="Priority level (1=highest, 5=lowest)",
-        ge=1,
-        le=5,
+        description="Actionable tip on how to develop the skill (max 240 chars)",
+        max_length=240,
+    )
+    recommended_formats: list[str] = Field(
+        default_factory=list,
+        description="Helpful learning formats (≤5 items, each ≤80 chars)",
+        max_length=5,
     )
 
-    @field_validator("title", "link_url")
+    @field_validator("title", "skill_focus", "development_advice")
     @classmethod
     def strip_whitespace(cls, v: str) -> str:
         """Strip leading/trailing whitespace."""
         return v.strip()
+
+    @field_validator("recommended_formats")
+    @classmethod
+    def validate_formats(cls, value: list[str]) -> list[str]:
+        """Trim formats list and enforce length limits."""
+        trimmed = [item.strip()[:80] for item in value if item.strip()]
+        return trimmed[:5]
 
 
 class RecommendationsResponse(BaseModel):

@@ -31,7 +31,10 @@ class WeightTableService:
 
     async def upload_weight_table(self, payload: WeightTableUploadRequest) -> WeightTableResponse:
         """
-        Upload a new weight table version for a professional activity.
+        Create or update weight table for a professional activity.
+
+        If a table already exists for the activity, it will be updated.
+        Otherwise, a new table will be created.
 
         Raises:
             ValueError: If professional activity not found.
@@ -40,19 +43,28 @@ class WeightTableService:
         if not prof_activity:
             raise ValueError(f"Professional activity '{payload.prof_activity_code}' not found")
 
-        next_version = await self.weight_repo.get_next_version(prof_activity.id)
-
         weights_payload = [
             {"metric_code": item.metric_code, "weight": str(item.weight)}
             for item in payload.weights
         ]
 
-        weight_table = await self.weight_repo.create(
-            prof_activity_id=prof_activity.id,
-            version=next_version,
-            weights=weights_payload,
-            metadata=payload.metadata,
-        )
+        # Check if weight table already exists for this activity
+        existing_table = await self.weight_repo.get_by_activity(prof_activity.id)
+
+        if existing_table:
+            # Update existing table
+            weight_table = await self.weight_repo.update(
+                weight_table=existing_table,
+                weights=weights_payload,
+                metadata=payload.metadata,
+            )
+        else:
+            # Create new table
+            weight_table = await self.weight_repo.create(
+                prof_activity_id=prof_activity.id,
+                weights=weights_payload,
+                metadata=payload.metadata,
+            )
 
         return self._serialize(weight_table, prof_activity=prof_activity)
 
@@ -73,32 +85,40 @@ class WeightTableService:
         tables = await self.weight_repo.list_all(prof_activity_id=prof_activity_id)
         return [self._serialize(table) for table in tables]
 
-    async def activate_weight_table(self, weight_table_id: uuid.UUID) -> WeightTableResponse:
+    async def update_weight_table(
+        self,
+        weight_table_id: uuid.UUID,
+        payload: WeightTableUploadRequest,
+    ) -> WeightTableResponse:
         """
-        Activate a weight table version.
+        Update an existing weight table.
 
         Raises:
-            ValueError: If weight table not found or another active version exists.
+            ValueError: If weight table not found or professional activity doesn't match.
         """
         weight_table = await self.weight_repo.get_by_id(weight_table_id)
         if not weight_table:
             raise ValueError("Weight table not found")
 
-        if weight_table.is_active:
-            return self._serialize(weight_table)
+        prof_activity = await self.prof_repo.get_by_code(payload.prof_activity_code)
+        if not prof_activity:
+            raise ValueError(f"Professional activity '{payload.prof_activity_code}' not found")
 
-        existing_active = await self.weight_repo.get_active_for_activity(
-            prof_activity_id=weight_table.prof_activity_id,
-            exclude_id=weight_table.id,
+        if weight_table.prof_activity_id != prof_activity.id:
+            raise ValueError("Cannot change professional activity of existing weight table")
+
+        weights_payload = [
+            {"metric_code": item.metric_code, "weight": str(item.weight)}
+            for item in payload.weights
+        ]
+
+        updated_table = await self.weight_repo.update(
+            weight_table=weight_table,
+            weights=weights_payload,
+            metadata=payload.metadata,
         )
-        if existing_active:
-            raise ValueError(
-                "Another active weight table exists for this professional activity. "
-                "Deactivate it before activating a new version."
-            )
 
-        activated = await self.weight_repo.activate(weight_table)
-        return self._serialize(activated)
+        return self._serialize(updated_table, prof_activity=prof_activity)
 
     def _serialize(
         self,
@@ -124,8 +144,6 @@ class WeightTableService:
             prof_activity_id=weight_table.prof_activity_id,
             prof_activity_code=activity.code,
             prof_activity_name=activity.name,
-            version=weight_table.version,
-            is_active=weight_table.is_active,
             weights=weights,
             metadata=weight_table.metadata_json,
             created_at=weight_table.created_at,

@@ -61,112 +61,15 @@
           </div>
         </template>
 
-        <el-table
-          v-loading="loadingReports"
-          :data="reports"
-          stripe
-        >
-          <el-table-column
-            prop="type"
-            label="Тип"
-            width="120"
-          >
-            <template #default="{ row }">
-              <el-tag>{{ formatReportType(row.type) }}</el-tag>
-            </template>
-          </el-table-column>
-          <el-table-column
-            prop="status"
-            label="Статус"
-            width="150"
-          >
-            <template #default="{ row }">
-              <el-tag :type="getStatusType(row.status)">
-                {{ formatStatus(row.status) }}
-              </el-tag>
-            </template>
-          </el-table-column>
-          <el-table-column
-            prop="created_at"
-            label="Дата загрузки"
-            width="180"
-          >
-            <template #default="{ row }">
-              {{ formatDate(row.created_at) }}
-            </template>
-          </el-table-column>
-          <el-table-column
-            label="Действия"
-            width="450"
-            fixed="right"
-          >
-            <template #default="{ row }">
-              <el-button
-                size="small"
-                @click="downloadReport(row.id)"
-              >
-                <el-icon><Download /></el-icon>
-                Скачать
-              </el-button>
-
-              <!-- Извлечь метрики - только для UPLOADED или FAILED -->
-              <el-button
-                v-if="row.status === 'UPLOADED' || row.status === 'FAILED'"
-                size="small"
-                type="primary"
-                @click="extractMetrics(row.id)"
-              >
-                <el-icon><DataAnalysis /></el-icon>
-                {{ row.status === 'FAILED' ? 'Повторить' : 'Извлечь метрики' }}
-              </el-button>
-
-              <!-- Идет обработка - disabled -->
-              <el-button
-                v-if="row.status === 'PROCESSING'"
-                size="small"
-                type="primary"
-                :loading="true"
-                disabled
-              >
-                Извлечение...
-              </el-button>
-
-              <!-- Редактировать метрики - только для EXTRACTED -->
-              <el-button
-                v-if="row.status === 'EXTRACTED'"
-                size="small"
-                type="success"
-                @click="viewMetrics(row.id)"
-              >
-                <el-icon><View /></el-icon>
-                Редактировать метрики
-              </el-button>
-
-              <!-- Просмотр метрик - для PROCESSING и EXTRACTED -->
-              <el-button
-                v-if="row.status === 'PROCESSING' || row.status === 'EXTRACTED'"
-                size="small"
-                type="info"
-                @click="viewMetrics(row.id)"
-              >
-                <el-icon><View /></el-icon>
-                Просмотр
-              </el-button>
-
-              <el-button
-                size="small"
-                type="danger"
-                @click="confirmDeleteReport(row)"
-              >
-                <el-icon><Delete /></el-icon>
-              </el-button>
-            </template>
-          </el-table-column>
-        </el-table>
-
-        <el-empty
-          v-if="!reports.length && !loadingReports"
-          description="Нет загруженных отчётов"
+        <report-list
+          :reports="reports"
+          :loading="loadingReports"
+          @view="viewMetrics"
+          @edit="viewMetrics"
+          @extract="extractMetrics"
+          @download="downloadReport"
+          @delete="handleDeleteReport"
+          @upload="showUploadDialog = true"
         />
       </el-card>
 
@@ -196,6 +99,14 @@
             label="Код метрики"
             width="200"
           />
+          <el-table-column
+            label="Название метрики"
+            min-width="250"
+          >
+            <template #default="{ row }">
+              {{ getMetricName(row.metric_code) }}
+            </template>
+          </el-table-column>
           <el-table-column
             prop="value"
             label="Значение"
@@ -314,19 +225,69 @@
                       :image-size="60"
                     />
                   </div>
-                  <div
-                    v-if="result.recommendations && result.recommendations.length"
-                    class="score-section"
-                  >
-                    <h5>Рекомендации:</h5>
-                    <ul>
-                      <li
-                        v-for="(rec, idx) in result.recommendations"
-                        :key="idx"
+                  <div class="score-section">
+                    <h5>
+                      Рекомендации:
+                      <el-tag
+                        v-if="result.recommendations_status"
+                        :type="getRecommendationStatusType(result.recommendations_status)"
+                        size="small"
+                        class="recommendation-status-tag"
                       >
-                        {{ rec }}
-                      </li>
-                    </ul>
+                        {{ formatRecommendationStatus(result.recommendations_status) }}
+                      </el-tag>
+                    </h5>
+                    <template v-if="hasReadyRecommendations(result)">
+                      <ul>
+                        <li
+                          v-for="(rec, idx) in result.recommendations"
+                          :key="idx"
+                          class="recommendation-item"
+                        >
+                          <strong>{{ rec.title }}</strong>
+                          <div v-if="rec.skill_focus" class="recommendation-skill-focus">
+                            <strong>Навык:</strong> {{ rec.skill_focus }}
+                          </div>
+                          <div v-if="rec.development_advice" class="recommendation-advice">
+                            {{ rec.development_advice }}
+                          </div>
+                          <div v-if="rec.recommended_formats && rec.recommended_formats.length > 0" class="recommendation-formats">
+                            <strong>Рекомендуемые форматы:</strong>
+                            <ul class="formats-list">
+                              <li v-for="(format, fmtIdx) in rec.recommended_formats" :key="fmtIdx">
+                                {{ format }}
+                              </li>
+                            </ul>
+                          </div>
+                        </li>
+                      </ul>
+                    </template>
+                    <el-alert
+                      v-else-if="result.recommendations_status === 'pending'"
+                      title="Рекомендации формируются. Обновите страницу через пару минут."
+                      type="info"
+                      :closable="false"
+                      show-icon
+                    />
+                    <el-alert
+                      v-else-if="result.recommendations_status === 'error'"
+                      :title="getRecommendationErrorTitle(result)"
+                      type="error"
+                      :closable="false"
+                      show-icon
+                    />
+                    <el-alert
+                      v-else-if="result.recommendations_status === 'disabled'"
+                      title="Генерация рекомендаций отключена для данного окружения."
+                      type="warning"
+                      :closable="false"
+                      show-icon
+                    />
+                    <el-empty
+                      v-else
+                      description="Нет данных"
+                      :image-size="60"
+                    />
                   </div>
                 </div>
                 <div
@@ -368,29 +329,6 @@
           :rules="uploadRules"
           label-position="top"
         >
-          <el-form-item
-            label="Тип отчёта"
-            prop="report_type"
-          >
-            <el-select
-              v-model="uploadForm.report_type"
-              placeholder="Выберите тип"
-              style="width: 100%"
-            >
-              <el-option
-                label="Отчёт 1"
-                value="REPORT_1"
-              />
-              <el-option
-                label="Отчёт 2"
-                value="REPORT_2"
-              />
-              <el-option
-                label="Отчёт 3"
-                value="REPORT_3"
-              />
-            </el-select>
-          </el-form-item>
           <el-form-item
             label="Файл (DOCX)"
             prop="file"
@@ -524,8 +462,9 @@ import {
 } from '@element-plus/icons-vue'
 import AppLayout from '@/components/AppLayout.vue'
 import MetricsEditor from '@/components/MetricsEditor.vue'
+import ReportList from '@/components/ReportList.vue'
 import { useParticipantsStore } from '@/stores'
-import { reportsApi, profActivitiesApi, scoringApi, participantsApi } from '@/api'
+import { reportsApi, profActivitiesApi, scoringApi, participantsApi, metricsApi } from '@/api'
 import { formatFromApi } from '@/utils/numberFormat'
 
 const router = useRouter()
@@ -544,13 +483,21 @@ const reports = ref([])
 const scoringResults = ref([])
 const profActivities = ref([])
 const participantMetrics = ref([])
+const metricDefs = ref([])
 const currentMetrics = ref([])
 const currentReportId = ref(null)
 const refreshInterval = ref(null)
+const recommendationsRefreshInterval = ref(null)
 
 // Check if any report is being processed
 const hasProcessingReports = computed(() => {
   return reports.value.some(report => report.status === 'PROCESSING')
+})
+
+const hasPendingRecommendations = computed(() => {
+  return scoringResults.value.some(
+    result => result.recommendations_status === 'pending'
+  )
 })
 
 const showUploadDialog = ref(false)
@@ -560,12 +507,10 @@ const showMetricsDialog = ref(false)
 const uploadFormRef = ref(null)
 const fileList = ref([])
 const uploadForm = reactive({
-  report_type: '',
   file: null
 })
 
 const uploadRules = {
-  report_type: [{ required: true, message: 'Выберите тип отчёта', trigger: 'change' }],
   file: [{ required: true, message: 'Выберите файл', trigger: 'change' }]
 }
 
@@ -575,23 +520,16 @@ const scoringForm = reactive({
 
 // Format helpers
 const formatDate = (dateStr) => {
-  if (!dateStr) return ''
-  return new Date(dateStr).toLocaleString('ru-RU', {
+  if (!dateStr) return '—'
+  const parsedDate = new Date(dateStr)
+  if (Number.isNaN(parsedDate.getTime())) return '—'
+  return parsedDate.toLocaleString('ru-RU', {
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
     hour: '2-digit',
     minute: '2-digit'
   })
-}
-
-const formatReportType = (type) => {
-  const types = {
-    REPORT_1: 'Отчёт 1',
-    REPORT_2: 'Отчёт 2',
-    REPORT_3: 'Отчёт 3'
-  }
-  return types[type] || type
 }
 
 const formatStatus = (status) => {
@@ -620,10 +558,37 @@ const getScoreStatus = (score) => {
   return 'warning'
 }
 
+const formatRecommendationStatus = (status) => {
+  const statuses = {
+    pending: 'Формируются',
+    ready: 'Готовы',
+    error: 'Ошибка',
+    disabled: 'Отключены'
+  }
+  return statuses[status] || status
+}
+
+const getRecommendationStatusType = (status) => {
+  const types = {
+    pending: 'info',
+    ready: 'success',
+    error: 'danger',
+    disabled: 'warning'
+  }
+  return types[status] || 'info'
+}
+
 const getConfidenceColor = (confidence) => {
   if (confidence >= 0.8) return '#67C23A'
   if (confidence >= 0.6) return '#E6A23C'
   return '#F56C6C'
+}
+
+// Get metric name by code
+const getMetricName = (metricCode) => {
+  if (!metricCode) return '—'
+  const metricDef = metricDefs.value.find(m => m.code === metricCode)
+  return metricDef?.name || metricCode
 }
 
 // Load data
@@ -652,10 +617,32 @@ const loadReports = async () => {
   }
 }
 
+const normalizeScoringResult = (item) => {
+  if (!item) return item
+  const recommendations = Array.isArray(item.recommendations) ? item.recommendations : []
+  let status = item.recommendations_status || item.recommendationsStatus || null
+
+  if (!status) {
+    status = recommendations.length > 0 ? 'ready' : 'pending'
+  }
+
+  const numericScore = Number(item.score_pct)
+  const scorePct = Number.isNaN(numericScore) ? item.score_pct : numericScore
+
+  return {
+    ...item,
+    score_pct: scorePct,
+    recommendations,
+    recommendations_status: status,
+    recommendations_error: item.recommendations_error || item.recommendationsError || null
+  }
+}
+
 const loadScoringResults = async () => {
   try {
     const response = await scoringApi.getHistory(route.params.id)
-    scoringResults.value = response.items || []
+    const items = Array.isArray(response.items) ? response.items : []
+    scoringResults.value = items.map(normalizeScoringResult)
   } catch (error) {
     console.error('Error loading scoring results:', error)
   }
@@ -665,11 +652,21 @@ const loadProfActivities = async () => {
   loadingActivities.value = true
   try {
     const response = await profActivitiesApi.list()
-    profActivities.value = response.activities || []
+    profActivities.value = response || []
   } catch (error) {
     ElMessage.error('Ошибка загрузки профессиональных областей')
   } finally {
     loadingActivities.value = false
+  }
+}
+
+// Load metric definitions
+const loadMetricDefs = async () => {
+  try {
+    const response = await metricsApi.listMetricDefs(true) // activeOnly = true
+    metricDefs.value = response.items || []
+  } catch (error) {
+    console.error('Error loading metric definitions:', error)
   }
 }
 
@@ -706,10 +703,9 @@ const handleUpload = async () => {
 
     uploading.value = true
     try {
-      await reportsApi.upload(route.params.id, uploadForm.report_type, uploadForm.file)
+      await reportsApi.upload(route.params.id, uploadForm.file)
       ElMessage.success('Отчёт загружен успешно')
       showUploadDialog.value = false
-      uploadForm.report_type = ''
       uploadForm.file = null
       fileList.value = []
       await loadReports()
@@ -775,12 +771,39 @@ const stopAutoRefresh = () => {
   }
 }
 
+const startRecommendationsRefresh = () => {
+  if (recommendationsRefreshInterval.value) return
+
+  recommendationsRefreshInterval.value = setInterval(async () => {
+    try {
+      await loadScoringResults()
+    } catch (error) {
+      console.error('Recommendations auto-refresh error:', error)
+    }
+  }, 15000)
+}
+
+const stopRecommendationsRefresh = () => {
+  if (recommendationsRefreshInterval.value) {
+    clearInterval(recommendationsRefreshInterval.value)
+    recommendationsRefreshInterval.value = null
+  }
+}
+
 // Watch for processing reports to enable/disable auto-refresh
 watch(hasProcessingReports, (hasProcessing) => {
   if (hasProcessing) {
     startAutoRefresh()
   } else {
     stopAutoRefresh()
+  }
+})
+
+watch(hasPendingRecommendations, (hasPending) => {
+  if (hasPending) {
+    startRecommendationsRefresh()
+  } else {
+    stopRecommendationsRefresh()
   }
 })
 
@@ -798,7 +821,7 @@ const handleMetricsUpdated = async () => {
 
 const confirmDeleteReport = (report) => {
   ElMessageBox.confirm(
-    `Вы уверены, что хотите удалить отчёт "${formatReportType(report.type)}"?`,
+    'Вы уверены, что хотите удалить этот отчёт?',
     'Подтверждение удаления',
     {
       confirmButtonText: 'Удалить',
@@ -816,6 +839,16 @@ const confirmDeleteReport = (report) => {
   }).catch(() => {})
 }
 
+const handleDeleteReport = async (reportId) => {
+  try {
+    await reportsApi.delete(reportId)
+    ElMessage.success('Отчёт удалён')
+    await loadReports()
+  } catch (error) {
+    ElMessage.error('Ошибка удаления отчёта')
+  }
+}
+
 // Scoring
 const calculateScoring = async () => {
   if (!scoringForm.activityCode) {
@@ -828,16 +861,22 @@ const calculateScoring = async () => {
     const result = await scoringApi.calculate(route.params.id, scoringForm.activityCode)
 
     // Добавляем новый результат в начало списка
-    scoringResults.value.unshift({
+    const normalized = normalizeScoringResult({
       id: result.scoring_result_id,
+      participant_id: route.params.id,
       prof_activity_code: result.prof_activity_code || scoringForm.activityCode,
       prof_activity_name: result.prof_activity_name,
       score_pct: parseFloat(result.score_pct),
       strengths: result.strengths || [],
       dev_areas: result.dev_areas || [],
       recommendations: result.recommendations || [],
+      recommendations_status:
+        result.recommendations_status ||
+        ((result.recommendations || []).length > 0 ? 'ready' : 'pending'),
+      recommendations_error: result.recommendations_error || null,
       created_at: new Date().toISOString()
     })
+    scoringResults.value.unshift(normalized)
 
     ElMessage.success('Расчёт пригодности выполнен')
     showScoringDialog.value = false
@@ -912,16 +951,33 @@ const downloadFinalReportHTML = async (result) => {
   }
 }
 
+const hasReadyRecommendations = (result) => {
+  return (
+    result?.recommendations_status === 'ready' &&
+    Array.isArray(result?.recommendations) &&
+    result.recommendations.length > 0
+  )
+}
+
+const getRecommendationErrorTitle = (result) => {
+  if (result?.recommendations_error) {
+    return `Ошибка генерации: ${result.recommendations_error}`
+  }
+  return 'Не удалось получить рекомендации'
+}
+
 onMounted(async () => {
   await loadParticipant()
   await loadReports()
   await loadScoringResults()
   await loadProfActivities()
+  await loadMetricDefs() // Load metric definitions for names
   await loadParticipantMetrics() // S2-08: Load participant metrics
 })
 
 onUnmounted(() => {
   stopAutoRefresh()
+  stopRecommendationsRefresh()
 })
 </script>
 
@@ -996,6 +1052,10 @@ onUnmounted(() => {
   color: #303133;
 }
 
+.recommendation-status-tag {
+  margin-left: 8px;
+}
+
 .score-section ul {
   margin: 0;
   padding-left: 20px;
@@ -1008,6 +1068,39 @@ onUnmounted(() => {
   line-height: 1.5;
 }
 
+.recommendation-item {
+  margin-bottom: 16px;
+}
+
+.recommendation-skill-focus {
+  margin-top: 8px;
+  font-size: 13px;
+  color: #606266;
+}
+
+.recommendation-advice {
+  margin-top: 8px;
+  font-size: 13px;
+  color: #303133;
+  line-height: 1.5;
+}
+
+.recommendation-formats {
+  margin-top: 10px;
+  font-size: 13px;
+  color: #606266;
+}
+
+.recommendation-formats .formats-list {
+  margin: 5px 0 0 20px;
+  padding: 0;
+  list-style-type: disc;
+}
+
+.recommendation-formats .formats-list li {
+  margin-top: 4px;
+}
+
 .final-report-actions {
   margin-top: 20px;
   padding-top: 16px;
@@ -1015,6 +1108,44 @@ onUnmounted(() => {
   display: flex;
   gap: 12px;
   flex-wrap: wrap;
+}
+
+.actions-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: stretch;
+  width: 100%;
+}
+
+.actions-group .el-button {
+  width: 100%;
+  justify-content: center;
+}
+
+.actions-group__danger {
+  margin-top: 4px;
+}
+
+.reports-actions-group {
+  display: flex;
+  flex-direction: row;
+  gap: 8px;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+
+.reports-actions-group .el-button {
+  flex-shrink: 0;
+}
+
+.reports-table :deep(colgroup col) {
+  width: 25% !important;
+}
+
+.reports-table :deep(.el-table__cell) {
+  text-align: center;
 }
 
 @media (max-width: 768px) {

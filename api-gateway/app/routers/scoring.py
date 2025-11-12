@@ -14,6 +14,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
+from typing_extensions import Literal
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.clients import GeminiClient, GeminiPoolClient
@@ -58,7 +59,7 @@ class ScoringResponse(BaseModel):
     prof_activity_name: str
     prof_activity_code: str
     score_pct: Decimal = Field(..., description="Score as percentage (0-100), quantized to 0.01")
-    weight_table_version: int
+    weight_table_id: str = Field(..., description="ID of the weight table used for scoring")
     details: list[MetricContribution]
     missing_metrics: list[str] = Field(default_factory=list)
     strengths: list[MetricItem] = Field(
@@ -69,6 +70,12 @@ class ScoringResponse(BaseModel):
     )
     recommendations: list[dict] = Field(
         default_factory=list, description="AI-generated recommendations (AI-03)"
+    )
+    recommendations_status: Literal["pending", "ready", "error", "disabled"] = Field(
+        default="pending", description="Status of AI recommendations generation"
+    )
+    recommendations_error: str | None = Field(
+        default=None, description="Error message if recommendations generation failed"
     )
 
 
@@ -84,6 +91,12 @@ class ScoringHistoryItem(BaseModel):
     dev_areas: list[dict] = Field(default_factory=list)
     recommendations: list[dict] = Field(default_factory=list)
     created_at: str  # ISO 8601 datetime string
+    recommendations_status: Literal["pending", "ready", "error", "disabled"] = Field(
+        default="pending", description="Status of AI recommendations generation"
+    )
+    recommendations_error: str | None = Field(
+        default=None, description="Error message if recommendations generation failed"
+    )
 
 
 class ScoringHistoryResponse(BaseModel):
@@ -139,12 +152,14 @@ async def calculate_participant_score(
         prof_activity_name=result["prof_activity_name"],
         prof_activity_code=activity_code,
         score_pct=result["score_pct"],
-        weight_table_version=result["weight_table_version"],
+        weight_table_id=result["weight_table_id"],
         details=[MetricContribution(**d) for d in result["details"]],
         missing_metrics=result["missing_metrics"],
         strengths=[MetricItem(**item) for item in result.get("strengths", [])],
         dev_areas=[MetricItem(**item) for item in result.get("dev_areas", [])],
         recommendations=result.get("recommendations") or [],
+        recommendations_status=result.get("recommendations_status", "pending"),
+        recommendations_error=result.get("recommendations_error"),
     )
 
 
@@ -200,6 +215,8 @@ async def get_participant_scoring_history(
                 dev_areas=result.dev_areas or [],
                 recommendations=result.recommendations or [],
                 created_at=result.computed_at.isoformat(),
+                recommendations_status=result.recommendations_status,
+                recommendations_error=result.recommendations_error,
             )
         )
 

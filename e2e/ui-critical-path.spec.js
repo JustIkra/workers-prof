@@ -122,8 +122,20 @@ test.describe('Critical Path E2E Test - Complete User Journey', () => {
     await expect(page.getByRole('heading', { name: 'Загрузить отчёт', level: 2 })).toBeVisible();
 
     // 18. Select report type
-    await page.locator('div').filter({ hasText: /^Выберите тип$/ }).nth(2).click();
-    await page.getByRole('option', { name: 'Отчёт 1' }).click();
+    // Prefer ARIA combobox, fallback to Element Plus wrapper
+    const reportTypeCombobox = page.getByRole('combobox', { name: /Тип отчёта|Выберите тип/i });
+    if (await reportTypeCombobox.count()) {
+      await reportTypeCombobox.first().click();
+    } else {
+      await page.locator('.el-select .el-select__wrapper, .el-select .el-select__selected-item').first().click();
+    }
+    // Prefer ARIA option, fallback to Element Plus dropdown item
+    const optionByRole = page.getByRole('option', { name: 'Отчёт 1' });
+    if (await optionByRole.count()) {
+      await optionByRole.first().click();
+    } else {
+      await page.locator('.el-select-dropdown__item').filter({ hasText: 'Отчёт 1' }).first().click();
+    }
 
     // 19. Upload test report file
     const fileChooserPromise = page.waitForEvent('filechooser');
@@ -139,6 +151,16 @@ test.describe('Critical Path E2E Test - Complete User Journey', () => {
 
     // 22. Verify upload success
     await expect(page.getByText('Отчёт загружен успешно')).toBeVisible();
+
+    // 22a. Verify upload timestamp is rendered in reports table
+    const reportsTableBody = page.locator('.el-table__body-wrapper tbody');
+    const uploadedReportRow = reportsTableBody.locator('tr').filter({ hasText: 'Отчёт 1' }).first();
+    await expect(uploadedReportRow).toBeVisible();
+    const uploadedAtCell = uploadedReportRow.locator('td').nth(2);
+    const uploadedAtText = (await uploadedAtCell.innerText()).trim();
+    expect(uploadedAtText).not.toBe('');
+    expect(uploadedAtText).not.toBe('—');
+    expect(uploadedAtText).toMatch(/\d{2}\.\d{2}\.\d{4}/);
 
     // ========== SCENARIO 7 & 8: Calculate Professional Suitability Score ==========
     // Note: Scenarios 7 (waiting for metrics) and 8 (score calculation) depend on 

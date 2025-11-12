@@ -65,14 +65,12 @@ class WeightItemResponse(BaseModel):
 
 
 class WeightTableResponse(BaseModel):
-    """Serialized weight table version."""
+    """Serialized weight table."""
 
     id: UUID
     prof_activity_id: UUID
     prof_activity_code: str
     prof_activity_name: str
-    version: int
-    is_active: bool
     weights: list[WeightItemResponse]
     metadata: dict[str, Any] | None = None
     created_at: datetime

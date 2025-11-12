@@ -79,7 +79,8 @@ class TestVisionExtractionIntegration:
 
             print(f"\nExtracted {len(metrics)} metrics:")
             for i, metric in enumerate(metrics, 1):
-                print(f"  {i}. {metric.value} (source: {metric.source})")
+                label_str = f" [{metric.label}]" if metric.label else ""
+                print(f"  {i}. {metric.value}{label_str} (source: {metric.source})")
 
             # Apply axis label filtering
             filtered_metrics = filter_axis_labels(metrics, expected_count=9)
@@ -139,30 +140,30 @@ class TestAxisLabelFiltering:
         """Test filtering when we have exactly expected count of non-axis values."""
         from app.services.vision_extraction import ExtractedMetric
 
-        # Mix of axis labels (1-10) and actual values
+        # Mix of axis labels (1-10) and actual values (with labels from improved prompt)
         metrics = [
-            ExtractedMetric("1", 0.0, "vision"),  # axis
-            ExtractedMetric("2", 0.0, "vision"),  # axis
-            ExtractedMetric("6.4", 0.0, "vision"),  # actual
-            ExtractedMetric("7.6", 0.0, "vision"),  # actual
-            ExtractedMetric("3", 0.0, "vision"),  # axis
-            ExtractedMetric("4.4", 0.0, "vision"),  # actual
+            ExtractedMetric("1", None, 0.0, "vision"),  # axis (no label)
+            ExtractedMetric("2", None, 0.0, "vision"),  # axis (no label)
+            ExtractedMetric("6.4", "РАБОТА С ДОКУМЕНТАМИ", 1.0, "vision"),  # actual
+            ExtractedMetric("7.6", "ПРОДВИЖЕНИЕ", 1.0, "vision"),  # actual
+            ExtractedMetric("3", None, 0.0, "vision"),  # axis (no label)
+            ExtractedMetric("4.4", "АНАЛИЗ И ПЛАНИРОВАНИЕ", 1.0, "vision"),  # actual
         ]
 
         filtered = filter_axis_labels(metrics, expected_count=3)
 
-        # Should keep only the 3 actual values
+        # Should keep only the 3 actual values (those with labels)
         assert len(filtered) == 3
-        assert all("." in m.value for m in filtered)
+        assert all(m.label is not None for m in filtered)
 
     def test_filter_no_change_when_count_matches(self):
         """Test no filtering when count already matches expected."""
         from app.services.vision_extraction import ExtractedMetric
 
         metrics = [
-            ExtractedMetric("6.4", 0.0, "vision"),
-            ExtractedMetric("7.6", 0.0, "vision"),
-            ExtractedMetric("4.4", 0.0, "vision"),
+            ExtractedMetric("6.4", "РАБОТА С ДОКУМЕНТАМИ", 1.0, "vision"),
+            ExtractedMetric("7.6", "ПРОДВИЖЕНИЕ", 1.0, "vision"),
+            ExtractedMetric("4.4", "АНАЛИЗ И ПЛАНИРОВАНИЕ", 1.0, "vision"),
         ]
 
         filtered = filter_axis_labels(metrics, expected_count=3)
@@ -175,21 +176,19 @@ class TestAxisLabelFiltering:
         """Test that ambiguous cases return all metrics."""
         from app.services.vision_extraction import ExtractedMetric
 
-        # Ambiguous: expected 5 but have 7, and can't clearly identify axis labels
+        # Ambiguous: expected 5 but have 7, with mix of labeled and unlabeled
         metrics = [
-            ExtractedMetric("6", 0.0, "vision"),  # Could be axis or value
-            ExtractedMetric("7", 0.0, "vision"),
-            ExtractedMetric("8", 0.0, "vision"),
-            ExtractedMetric("9", 0.0, "vision"),
-            ExtractedMetric("5.5", 0.0, "vision"),
-            ExtractedMetric("6.5", 0.0, "vision"),
-            ExtractedMetric("7.5", 0.0, "vision"),
+            ExtractedMetric("6", None, 1.0, "vision"),  # No label
+            ExtractedMetric("7", "МЕТРИКА 1", 1.0, "vision"),  # Has label
+            ExtractedMetric("8", None, 1.0, "vision"),  # No label
+            ExtractedMetric("9", None, 1.0, "vision"),  # No label
+            ExtractedMetric("5.5", "МЕТРИКА 2", 1.0, "vision"),  # Has label
+            ExtractedMetric("6.5", "МЕТРИКА 3", 1.0, "vision"),  # Has label
+            ExtractedMetric("7.5", "МЕТРИКА 4", 1.0, "vision"),  # Has label
         ]
 
         filtered = filter_axis_labels(metrics, expected_count=5)
 
-        # In ambiguous case, should return all
-        # (since we can't confidently filter)
-        # Actually, let's check: integers without decimals = 4, with decimals = 3
-        # So it won't match expected_count exactly, returns all
+        # In ambiguous case (4 with labels ≠ 5 expected), should return all
+        # (since we can't confidently filter to match expected count)
         assert len(filtered) == 7

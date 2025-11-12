@@ -11,14 +11,6 @@ from uuid import UUID
 from pydantic import BaseModel, Field
 
 
-class ReportType(str, Enum):
-    """Supported report types."""
-
-    REPORT_1 = "REPORT_1"
-    REPORT_2 = "REPORT_2"
-    REPORT_3 = "REPORT_3"
-
-
 class ReportStatus(str, Enum):
     """Lifecycle states for report processing."""
 
@@ -35,6 +27,7 @@ class FileRefResponse(BaseModel):
     storage: str
     bucket: str
     key: str
+    filename: str | None
     mime: str
     size_bytes: int
     created_at: datetime
@@ -47,7 +40,6 @@ class ReportResponse(BaseModel):
 
     id: UUID
     participant_id: UUID
-    type: ReportType
     status: ReportStatus
     uploaded_at: datetime
     extracted_at: datetime | None

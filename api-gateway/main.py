@@ -8,12 +8,14 @@ Loads configuration from ROOT .env file.
 import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
+from decimal import Decimal
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings, validate_config
 from app.core.middleware import RequestContextMiddleware
@@ -48,6 +50,45 @@ async def lifespan(app: FastAPI):
     # TODO: Initialize database connection pool
     # TODO: Initialize Redis connection
     # TODO: Initialize Celery client
+
+    # Auto-seed MetricDef in dev/test/ci if table is empty
+    try:
+        from app.core.config import settings as app_settings
+        from app.db.session import AsyncSessionLocal
+        from app.repositories.metric import MetricDefRepository
+        from app.services.metric_mapping import MetricMappingService
+
+        if app_settings.env in {"dev", "test", "ci"}:
+            async with AsyncSessionLocal() as db_session:  # type: AsyncSession
+                metric_repo = MetricDefRepository(db_session)
+                existing_metrics = await metric_repo.list_all(active_only=False)
+                if not existing_metrics:
+                    logger.info("metric_defs_seeding_started", extra={"event": "seed_start"})
+                    mapping_service = MetricMappingService()
+                    mapping_service.load()
+                    all_codes: set[str] = set()
+                    for mapping in mapping_service.get_all_mappings().values():
+                        all_codes.update(mapping.values())
+                    created = 0
+                    for code in sorted(all_codes):
+                        name = code.replace("_", " ").title()
+                        await metric_repo.create(
+                            code=code,
+                            name=name,
+                            description=None,
+                            unit="балл",
+                            min_value=Decimal("1"),
+                            max_value=Decimal("10"),
+                            active=True,
+                        )
+                        created += 1
+                    logger.info(
+                        "metric_defs_seeded",
+                        extra={"event": "seed_complete", "created": created},
+                    )
+    except Exception as exc:  # noqa: BLE001
+        # Do not fail startup; log and continue
+        logger.exception("metric_defs_seeding_failed", extra={"error": str(exc)})
 
     logger.info("application_ready", extra={"event": "ready", "port": settings.app_port})
 

@@ -216,7 +216,7 @@ class TestReportImageExtraction:
         report = Report(
             id=report_id,
             participant_id=participant.id,
-            type="REPORT_1",
+            
             status="UPLOADED",
             file_ref_id=file_ref.id,
         )
@@ -296,7 +296,7 @@ class TestReportImageExtraction:
         report = Report(
             id=report_id,
             participant_id=participant.id,
-            type="REPORT_1",
+            
             status="UPLOADED",
             file_ref_id=file_ref.id,
         )
@@ -368,7 +368,7 @@ class TestReportImageExtraction:
         report = Report(
             id=report_id,
             participant_id=participant.id,
-            type="REPORT_1",
+            
             status="UPLOADED",
             file_ref_id=file_ref.id,
         )
@@ -456,7 +456,7 @@ class TestExtractionEndpoint:
         report = Report(
             id=report_id,
             participant_id=participant.id,
-            type="REPORT_1",
+            
             status="UPLOADED",
             file_ref_id=file_ref.id,
         )
@@ -522,7 +522,7 @@ class TestExtractionEndpoint:
         report = Report(
             id=uuid.uuid4(),
             participant_id=participant.id,
-            type="REPORT_1",
+            
             status="UPLOADED",
             file_ref_id=file_ref.id,
         )
