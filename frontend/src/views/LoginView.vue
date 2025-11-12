@@ -26,7 +26,10 @@
         label-position="top"
         @submit.prevent="handleLogin"
       >
-        <el-form-item label="Email" prop="email">
+        <el-form-item
+          label="Email"
+          prop="email"
+        >
           <el-input
             v-model="form.email"
             type="email"
@@ -36,7 +39,10 @@
           />
         </el-form-item>
 
-        <el-form-item label="Пароль" prop="password">
+        <el-form-item
+          label="Пароль"
+          prop="password"
+        >
           <el-input
             v-model="form.password"
             type="password"
@@ -62,7 +68,9 @@
 
         <div class="register-link">
           <span>Нет аккаунта?</span>
-          <router-link to="/register">Зарегистрироваться</router-link>
+          <router-link to="/register">
+            Зарегистрироваться
+          </router-link>
         </div>
       </el-form>
     </el-card>

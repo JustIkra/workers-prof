@@ -6,13 +6,11 @@ Supports multiple profiles: dev, test, ci, prod.
 """
 
 import logging
-import os
 from pathlib import Path
 from typing import Literal
 
 from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
-
 
 # Find project root (one level up from api-gateway/)
 API_GATEWAY_DIR = Path(__file__).parent.parent.parent
@@ -38,34 +36,27 @@ class Settings(BaseSettings):
 
     # ===== Environment Profile =====
     env: Literal["dev", "test", "ci", "prod"] = Field(
-        default="dev",
-        description="Environment profile"
+        default="dev", description="Environment profile"
     )
     deterministic: bool = Field(
-        default=False,
-        description="Deterministic mode for testing (freezes time, seeds, etc.)"
+        default=False, description="Deterministic mode for testing (freezes time, seeds, etc.)"
     )
 
     # ===== Testing & Celery Configuration =====
     celery_task_always_eager: bool = Field(
-        default=False,
-        description="Run Celery tasks synchronously (test/ci mode)"
+        default=False, description="Run Celery tasks synchronously (test/ci mode)"
     )
     celery_eager_propagates_exceptions: bool = Field(
-        default=False,
-        description="Propagate exceptions in eager mode (test/ci mode)"
+        default=False, description="Propagate exceptions in eager mode (test/ci mode)"
     )
     allow_external_network: bool = Field(
-        default=True,
-        description="Allow external network calls (disabled in test/ci)"
+        default=True, description="Allow external network calls (disabled in test/ci)"
     )
     deterministic_seed: int = Field(
-        default=42,
-        description="Seed for random number generators in deterministic mode"
+        default=42, description="Seed for random number generators in deterministic mode"
     )
     frozen_time: str | None = Field(
-        default=None,
-        description="Fixed timestamp for testing (ISO format: 2025-01-01T00:00:00Z)"
+        default=None, description="Fixed timestamp for testing (ISO format: 2025-01-01T00:00:00Z)"
     )
 
     # ===== Security =====
@@ -74,49 +65,32 @@ class Settings(BaseSettings):
     access_token_ttl_min: int = Field(default=30, description="Access token TTL in minutes")
 
     # ===== Database =====
-    postgres_dsn: str = Field(
-        ...,
-        description="PostgreSQL connection string (async)"
-    )
+    postgres_dsn: str = Field(..., description="PostgreSQL connection string (async)")
 
     # ===== Cache & Queue =====
     redis_url: str = Field(default="redis://redis:6379/0", description="Redis URL")
     rabbitmq_url: str = Field(
-        default="amqp://guest:guest@rabbitmq:5672//",
-        description="RabbitMQ broker URL"
+        default="amqp://guest:guest@rabbitmq:5672//", description="RabbitMQ broker URL"
     )
 
     # ===== File Storage =====
-    file_storage: Literal["LOCAL", "MINIO"] = Field(
-        default="LOCAL",
-        description="Storage backend"
-    )
+    file_storage: Literal["LOCAL", "MINIO"] = Field(default="LOCAL", description="Storage backend")
     file_storage_base: str = Field(
-        default="/app/storage",
-        description="Base path for LOCAL storage"
+        default="/app/storage", description="Base path for LOCAL storage"
     )
     report_max_size_mb: int = Field(
-        default=15,
-        ge=1,
-        description="Maximum allowed .docx report size in megabytes"
+        default=15, ge=1, description="Maximum allowed .docx report size in megabytes"
     )
 
     # ===== CORS =====
     cors_allow_all: bool = Field(
-        default=False,
-        description="Allow all CORS origins (disable when behind NPM)"
+        default=False, description="Allow all CORS origins (disable when behind NPM)"
     )
-    allowed_origins: str = Field(
-        default="",
-        description="Comma-separated list of allowed origins"
-    )
+    allowed_origins: str = Field(default="", description="Comma-separated list of allowed origins")
 
     # ===== Logging =====
     log_level: str = Field(default="INFO", description="Log level")
-    log_mask_secrets: bool = Field(
-        default=True,
-        description="Mask secrets in logs"
-    )
+    log_mask_secrets: bool = Field(default=True, description="Mask secrets in logs")
 
     # ===== VPN (WireGuard) =====
     vpn_enabled: bool = Field(default=False, description="Enable VPN")
@@ -124,50 +98,38 @@ class Settings(BaseSettings):
     wg_config_path: str | None = Field(default=None, description="WireGuard config path")
     wg_interface: str = Field(default="wg0", description="WireGuard interface name")
     vpn_route_mode: Literal["all", "domains"] = Field(
-        default="domains",
-        description="Routing mode: all traffic or specific domains"
+        default="domains", description="Routing mode: all traffic or specific domains"
     )
     vpn_route_domains: str = Field(
         default="generativelanguage.googleapis.com",
-        description="Comma-separated domains to route via VPN"
+        description="Comma-separated domains to route via VPN",
     )
     vpn_bypass_cidrs: str = Field(
         default="172.16.0.0/12,10.0.0.0/8,192.168.0.0/16",
-        description="Comma-separated CIDRs to bypass VPN"
+        description="Comma-separated CIDRs to bypass VPN",
     )
 
     # ===== Gemini / AI =====
-    gemini_api_keys: str = Field(
-        default="",
-        description="Comma-separated Gemini API keys"
-    )
+    gemini_api_keys: str = Field(default="", description="Comma-separated Gemini API keys")
     gemini_model_text: str = Field(
-        default="gemini-2.5-flash",
-        description="Gemini model for text generation"
+        default="gemini-2.5-flash", description="Gemini model for text generation"
     )
     gemini_model_vision: str = Field(
-        default="gemini-2.5-flash",
-        description="Gemini model for vision tasks"
+        default="gemini-2.5-flash", description="Gemini model for vision tasks"
     )
-    gemini_qps_per_key: float = Field(
-        default=0.5,
-        description="QPS limit per API key"
+    gemini_qps_per_key: float = Field(default=0.5, description="QPS limit per API key")
+    gemini_burst_multiplier: float = Field(
+        default=2.0, description="Burst size multiplier (burst_size = qps * multiplier)"
     )
-    gemini_timeout_s: int = Field(
-        default=30,
-        description="Gemini API timeout in seconds"
-    )
+    gemini_timeout_s: int = Field(default=30, description="Gemini API timeout in seconds")
     gemini_strategy: Literal["ROUND_ROBIN", "LEAST_BUSY"] = Field(
-        default="ROUND_ROBIN",
-        description="Key rotation strategy"
+        default="ROUND_ROBIN", description="Key rotation strategy"
     )
     ai_recommendations_enabled: bool = Field(
-        default=True,
-        description="Enable AI-generated recommendations"
+        default=True, description="Enable AI-generated recommendations"
     )
     ai_vision_fallback_enabled: bool = Field(
-        default=True,
-        description="Enable Gemini Vision fallback for OCR"
+        default=True, description="Enable Gemini Vision processing pipeline"
     )
 
     # ===== Computed Properties =====
@@ -176,6 +138,7 @@ class Settings(BaseSettings):
         if not value:
             return []
         return [item.strip() for item in value.split(",") if item.strip()]
+
     @property
     def is_dev(self) -> bool:
         """Check if running in dev environment."""

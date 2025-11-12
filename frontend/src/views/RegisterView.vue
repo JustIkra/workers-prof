@@ -15,7 +15,10 @@
         label-position="top"
         @submit.prevent="handleRegister"
       >
-        <el-form-item label="Email" prop="email">
+        <el-form-item
+          label="Email"
+          prop="email"
+        >
           <el-input
             v-model="form.email"
             type="email"
@@ -25,7 +28,10 @@
           />
         </el-form-item>
 
-        <el-form-item label="Пароль" prop="password">
+        <el-form-item
+          label="Пароль"
+          prop="password"
+        >
           <el-input
             v-model="form.password"
             type="password"
@@ -36,7 +42,10 @@
           />
         </el-form-item>
 
-        <el-form-item label="Подтверждение пароля" prop="confirmPassword">
+        <el-form-item
+          label="Подтверждение пароля"
+          prop="confirmPassword"
+        >
           <el-input
             v-model="form.confirmPassword"
             type="password"
@@ -62,7 +71,9 @@
 
         <div class="login-link">
           <span>Уже есть аккаунт?</span>
-          <router-link to="/login">Войти</router-link>
+          <router-link to="/login">
+            Войти
+          </router-link>
         </div>
       </el-form>
     </el-card>

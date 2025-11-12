@@ -47,6 +47,13 @@ htmlcov/
 .mypy_cache/
 .ruff_cache/
 
+# Playwright
+/test-results/
+/playwright-report/
+/playwright/.cache/
+*.mp4
+*.webm
+
 # Node.js
 node_modules/
 npm-debug.log*

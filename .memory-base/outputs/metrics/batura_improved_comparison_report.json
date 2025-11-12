@@ -1,0 +1,400 @@
+{
+  "summary": {
+    "total_manual": 71,
+    "total_extracted": 78,
+    "matches": 69,
+    "mismatches": 2,
+    "missing": 0,
+    "extra": 7
+  },
+  "matches": [
+    {
+      "label": "РАБОТА С ДОКУМЕНТАМИ",
+      "manual": "6.4",
+      "extracted": "6.4"
+    },
+    {
+      "label": "ПРОДВИЖЕНИЕ",
+      "manual": "7.6",
+      "extracted": "7.6"
+    },
+    {
+      "label": "АНАЛИЗ И ПЛАНИРОВАНИЕ",
+      "manual": "4.4",
+      "extracted": "4.4"
+    },
+    {
+      "label": "ПРИНЯТИЕ РЕШЕНИЙ",
+      "manual": "1.9",
+      "extracted": "1.9"
+    },
+    {
+      "label": "РАЗРАБОТКА",
+      "manual": "4.7",
+      "extracted": "4.7"
+    },
+    {
+      "label": "ОБЕСПЕЧЕНИЕ ПРОЦЕССА",
+      "manual": "8.4",
+      "extracted": "8.4"
+    },
+    {
+      "label": "ПОДДЕРЖКА",
+      "manual": "9",
+      "extracted": "9"
+    },
+    {
+      "label": "КОНТРОЛЬ АУДИТ",
+      "manual": "4.5",
+      "extracted": "4.5"
+    },
+    {
+      "label": "ПРОИЗВОДСТВО И ТЕХНОЛОГИИ",
+      "manual": "3.2",
+      "extracted": "3.2"
+    },
+    {
+      "label": "ГЕНЕРАТОР ИДЕЙ",
+      "manual": "4.5",
+      "extracted": "4.5"
+    },
+    {
+      "label": "ИССЛЕДОВАТЕЛЬ РЕСУРСОВ",
+      "manual": "5.8",
+      "extracted": "5.8"
+    },
+    {
+      "label": "СПЕЦИАЛИСТ",
+      "manual": "5.9",
+      "extracted": "5.9"
+    },
+    {
+      "label": "АНАЛИТИК",
+      "manual": "4.4",
+      "extracted": "4.4"
+    },
+    {
+      "label": "КООРДИНАТОР",
+      "manual": "5",
+      "extracted": "5"
+    },
+    {
+      "label": "МОТИВАТОР",
+      "manual": "3",
+      "extracted": "3"
+    },
+    {
+      "label": "ДУША КОМАНДЫ",
+      "manual": "8.9",
+      "extracted": "8.9"
+    },
+    {
+      "label": "РЕАЛИЗАТОР",
+      "manual": "6.2",
+      "extracted": "6.2"
+    },
+    {
+      "label": "КОНТРОЛЕР",
+      "manual": "5.5",
+      "extracted": "5.5"
+    },
+    {
+      "label": "КОНФЛИКТНОСТЬ",
+      "manual": "2.6",
+      "extracted": "2.6"
+    },
+    {
+      "label": "ПРОИЗВОДИТЕЛЬНОСТЬ",
+      "manual": "2.8",
+      "extracted": "2.8"
+    },
+    {
+      "label": "АДМИНИСТРАТОР",
+      "manual": "4.5",
+      "extracted": "4.5"
+    },
+    {
+      "label": "ПРЕДПРИНИМАТЕЛЬ",
+      "manual": "2.6",
+      "extracted": "2.6"
+    },
+    {
+      "label": "ИНТЕГРАТОР",
+      "manual": "8.7",
+      "extracted": "8.7"
+    },
+    {
+      "label": "ВНЕШНЯЯ МОТИВАЦИЯ",
+      "manual": "5.8",
+      "extracted": "5.8"
+    },
+    {
+      "label": "ИНТЕРЕС",
+      "manual": "6.9",
+      "extracted": "6.9"
+    },
+    {
+      "label": "ТВОРЧЕСТВО",
+      "manual": "2.1",
+      "extracted": "2.1"
+    },
+    {
+      "label": "ПОМОЩЬ ЛЮДЯМ",
+      "manual": "8.1",
+      "extracted": "8.1"
+    },
+    {
+      "label": "СЛУЖЕНИЕ ОБЩЕСТВУ",
+      "manual": "7.1",
+      "extracted": "7.1"
+    },
+    {
+      "label": "ОБЩЕНИЕ",
+      "manual": "8.2",
+      "extracted": "8.2"
+    },
+    {
+      "label": "ВКЛЮЧЕННОСТЬ В КОМАНДУ",
+      "manual": "6.5",
+      "extracted": "6.5"
+    },
+    {
+      "label": "ПРИЗНАНИЕ",
+      "manual": "3.2",
+      "extracted": "3.2"
+    },
+    {
+      "label": "РУКОВОДСТВО",
+      "manual": "1",
+      "extracted": "1"
+    },
+    {
+      "label": "ДЕНЬГИ",
+      "manual": "7.1",
+      "extracted": "7.1"
+    },
+    {
+      "label": "СВЯЗИ",
+      "manual": "5.1",
+      "extracted": "5.1"
+    },
+    {
+      "label": "ЗДОРОВЬЕ",
+      "manual": "6.8",
+      "extracted": "6.8"
+    },
+    {
+      "label": "ТРАДИЦИИ",
+      "manual": "5.2",
+      "extracted": "5.2"
+    },
+    {
+      "label": "ВЫЧИСЛЕНИЯ",
+      "manual": "2.9",
+      "extracted": "2.9"
+    },
+    {
+      "label": "ЛЕКСИКА",
+      "manual": "4.3",
+      "extracted": "4.3"
+    },
+    {
+      "label": "ЭРУДИЦИЯ",
+      "manual": "7.5",
+      "extracted": "7.5"
+    },
+    {
+      "label": "ПРОСТРАНСТВЕННОЕ МЫШЛЕНИЕ",
+      "manual": "4.6",
+      "extracted": "4.6"
+    },
+    {
+      "label": "НЕВЕРБАЛЬНАЯ ЛОГИКА",
+      "manual": "9",
+      "extracted": "9"
+    },
+    {
+      "label": "ВЕРБАЛЬНАЯ ЛОГИКА",
+      "manual": "5.3",
+      "extracted": "5.3"
+    },
+    {
+      "label": "ОБРАБОТКА ИНФОРМАЦИИ",
+      "manual": "5.1",
+      "extracted": "5.1"
+    },
+    {
+      "label": "ОБЩИЙ БАЛЛ ИНТЕЛЛЕКТА",
+      "manual": "5.5",
+      "extracted": "5.5"
+    },
+    {
+      "label": "ЗАМКНУТОСТЬ",
+      "manual": "8.4",
+      "extracted": "8.4"
+    },
+    {
+      "label": "ОБЩИТЕЛЬНОСТЬ",
+      "manual": "8.4",
+      "extracted": "8.4"
+    },
+    {
+      "label": "ПАССИВНОСТЬ",
+      "manual": "3.7",
+      "extracted": "3.7"
+    },
+    {
+      "label": "НЕДОВЕРЧИВОСТЬ",
+      "manual": "6.8",
+      "extracted": "6.8"
+    },
+    {
+      "label": "ДРУЖЕЛЮБИЕ",
+      "manual": "6.8",
+      "extracted": "6.8"
+    },
+    {
+      "label": "НЕЗАВИСИМОСТЬ",
+      "manual": "10",
+      "extracted": "10"
+    },
+    {
+      "label": "КОНФОРМИЗМ",
+      "manual": "10",
+      "extracted": "10"
+    },
+    {
+      "label": "МОРАЛЬНАЯ ГИБКОСТЬ",
+      "manual": "8.8",
+      "extracted": "8.8"
+    },
+    {
+      "label": "МОРАЛЬНОСТЬ",
+      "manual": "8.8",
+      "extracted": "8.8"
+    },
+    {
+      "label": "ИМПУЛЬСИВНОСТЬ",
+      "manual": "5.8",
+      "extracted": "5.8"
+    },
+    {
+      "label": "ОРГАНИЗОВАННОСТЬ",
+      "manual": "5.8",
+      "extracted": "5.8"
+    },
+    {
+      "label": "ТРЕВОЖНОСТЬ",
+      "manual": "3.9",
+      "extracted": "3.9"
+    },
+    {
+      "label": "СЕНЗИТИВНОСТЬ",
+      "manual": "3.2",
+      "extracted": "3.2"
+    },
+    {
+      "label": "ИНТЕЛЛЕКТУАЛЬНАЯ СДЕРЖАННОСТЬ",
+      "manual": "1.7",
+      "extracted": "1.7"
+    },
+    {
+      "label": "ТРАДИЦИОННОСТЬ",
+      "manual": "4.6",
+      "extracted": "4.6"
+    },
+    {
+      "label": "КОНКРЕТНОСТЬ",
+      "manual": "4.2",
+      "extracted": "4.2"
+    },
+    {
+      "label": "ЛИДЕРСТВО",
+      "manual": "4.1",
+      "extracted": "4.1"
+    },
+    {
+      "label": "СТРЕССОУСТОЙЧИВОСТЬ",
+      "manual": "4",
+      "extracted": "4"
+    },
+    {
+      "label": "ОРИЕНТАЦИЯ НА КЛИЕНТА",
+      "manual": "5.9",
+      "extracted": "5.9"
+    },
+    {
+      "label": "КОММУНИКАБЕЛЬНОСТЬ",
+      "manual": "7.2",
+      "extracted": "7.2"
+    },
+    {
+      "label": "НОРМАТИВНОСТЬ",
+      "manual": "7.6",
+      "extracted": "7.6"
+    },
+    {
+      "label": "ОТВЕТСТВЕННОСТЬ",
+      "manual": "6.2",
+      "extracted": "6.2"
+    },
+    {
+      "label": "ИННОВАЦИОННОСТЬ",
+      "manual": "3.8",
+      "extracted": "3.8"
+    },
+    {
+      "label": "КОМПЛЕКСНОЕ РЕШЕНИЕ ПРОБЛЕМ",
+      "manual": "5.9",
+      "extracted": "5.9"
+    },
+    {
+      "label": "СТРЕМЛЕНИЕ К САМОРАЗВИТИЮ",
+      "manual": "5.5",
+      "extracted": "5.5"
+    }
+  ],
+  "mismatches": [
+    {
+      "label": "МОТИВАЦИЯ ДОСТИЖЕНИЙ",
+      "manual": "3.9",
+      "extracted": "3.4"
+    },
+    {
+      "label": "КОМАНДНОСТЬ",
+      "manual": "4.6",
+      "extracted": "4.8"
+    }
+  ],
+  "missing": [],
+  "extra": [
+    {
+      "label": "ВНУТРЕННЯЯ МОТИВАЦИЯ",
+      "extracted": "5.8"
+    },
+    {
+      "label": "АКТИВНОСТЬ",
+      "extracted": "3.7"
+    },
+    {
+      "label": "УРАВНОВЕШЕННОСТЬ",
+      "extracted": "3.9"
+    },
+    {
+      "label": "НЕЧУВСТВИТЕЛЬНОСТЬ",
+      "extracted": "3.2"
+    },
+    {
+      "label": "ЛЮБОЗНАТЕЛЬНОСТЬ",
+      "extracted": "1.7"
+    },
+    {
+      "label": "ОРИГИНАЛЬНОСТЬ",
+      "extracted": "4.6"
+    },
+    {
+      "label": "АБСТРАКТНОСТЬ",
+      "extracted": "4.2"
+    }
+  ]
+}

@@ -21,13 +21,20 @@
             <span>Участники</span>
           </el-menu-item>
 
-          <el-sub-menu v-if="authStore.isAdmin" index="admin">
+          <el-sub-menu
+            v-if="authStore.isAdmin"
+            index="admin"
+          >
             <template #title>
               <el-icon><Setting /></el-icon>
               <span>Админ</span>
             </template>
-            <el-menu-item index="/admin/users">Пользователи</el-menu-item>
-            <el-menu-item index="/admin/weights">Весовые таблицы</el-menu-item>
+            <el-menu-item index="/admin/users">
+              Пользователи
+            </el-menu-item>
+            <el-menu-item index="/admin/weights">
+              Весовые таблицы
+            </el-menu-item>
           </el-sub-menu>
         </el-menu>
 
@@ -40,11 +47,17 @@
           <template #dropdown>
             <el-dropdown-menu>
               <el-dropdown-item disabled>
-                <el-tag :type="authStore.isAdmin ? 'danger' : 'info'" size="small">
+                <el-tag
+                  :type="authStore.isAdmin ? 'danger' : 'info'"
+                  size="small"
+                >
                   {{ authStore.isAdmin ? 'ADMIN' : 'USER' }}
                 </el-tag>
               </el-dropdown-item>
-              <el-dropdown-item divided command="logout">
+              <el-dropdown-item
+                divided
+                command="logout"
+              >
                 <el-icon><SwitchButton /></el-icon>
                 Выход
               </el-dropdown-item>

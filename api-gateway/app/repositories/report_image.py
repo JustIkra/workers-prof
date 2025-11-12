@@ -5,10 +5,11 @@ Repository for report_image table operations.
 from __future__ import annotations
 
 import uuid
-from typing import Sequence
+from collections.abc import Sequence
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.db.models import ReportImage
 
@@ -64,6 +65,25 @@ class ReportImageRepository:
         """
         stmt = (
             select(ReportImage)
+            .where(ReportImage.report_id == report_id)
+            .order_by(ReportImage.order_index)
+        )
+        result = await self.session.execute(stmt)
+        return result.scalars().all()
+
+    async def get_by_report(self, report_id: uuid.UUID) -> Sequence[ReportImage]:
+        """
+        Get all images for a report with file_ref loaded, ordered by order_index.
+
+        Args:
+            report_id: UUID of the report
+
+        Returns:
+            List of ReportImage instances with file_ref loaded
+        """
+        stmt = (
+            select(ReportImage)
+            .options(selectinload(ReportImage.file_ref))
             .where(ReportImage.report_id == report_id)
             .order_by(ReportImage.order_index)
         )

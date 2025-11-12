@@ -3,9 +3,24 @@ Pytest configuration and shared fixtures for api-gateway tests.
 """
 
 import os
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncGenerator, Generator
 from pathlib import Path
-from typing import Any, Generator
+
+
+def _load_test_env() -> None:
+    """Load environment variables before importing app modules."""
+    from dotenv import load_dotenv
+
+    env_path = Path(__file__).parent.parent.parent / ".env"
+    if env_path.exists():
+        load_dotenv(env_path, override=False)
+    else:
+        env_path_local = Path(__file__).parent.parent / ".env"
+        if env_path_local.exists():
+            load_dotenv(env_path_local, override=False)
+
+
+_load_test_env()
 
 import pytest
 from httpx import ASGITransport, AsyncClient
@@ -15,7 +30,6 @@ from app.core.config import settings
 from app.db.base import Base
 from app.db.models import User
 from app.db.session import get_db
-from app.db.seeds.prof_activity import PROF_ACTIVITY_SEED_DATA
 from main import app
 
 
@@ -50,6 +64,7 @@ def test_env(clean_env: None) -> dict[str, str]:
         "POSTGRES_DSN": "postgresql+asyncpg://test:test@localhost:5432/test_db",
         "REDIS_URL": "redis://localhost:6379/1",
         "RABBITMQ_URL": "amqp://guest:guest@localhost:5672//",
+        "GEMINI_API_KEYS": "test_dummy_key_for_testing",
     }
 
     # Apply to os.environ
@@ -70,6 +85,7 @@ def dev_env(clean_env: None) -> dict[str, str]:
         "ENV": "dev",
         "JWT_SECRET": "dev_secret_key",
         "POSTGRES_DSN": "postgresql+asyncpg://dev:dev@localhost:5432/dev_db",
+        "GEMINI_API_KEYS": "dev_dummy_key_for_testing",
     }
 
     os.environ.update(env)
@@ -89,6 +105,7 @@ def ci_env(clean_env: None) -> dict[str, str]:
         "ENV": "ci",
         "JWT_SECRET": "ci_secret_key",
         "POSTGRES_DSN": "postgresql+asyncpg://ci:ci@localhost:5432/ci_db",
+        "GEMINI_API_KEYS": "ci_dummy_key_for_testing",
     }
 
     os.environ.update(env)
@@ -128,36 +145,22 @@ async def test_db_engine():
     Also seeds prof_activity data for tests.
     """
     # Create async engine for test database
-    engine = create_async_engine(settings.postgres_dsn, echo=False)
+    # Use READ COMMITTED isolation to see committed changes immediately
+    engine = create_async_engine(
+        settings.postgres_dsn, echo=False, isolation_level="READ COMMITTED"
+    )
 
     # Create all tables and seed data
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 
-        # Seed prof_activity data
-        def seed_prof_activities(connection):
-            from sqlalchemy import text
-            for seed in PROF_ACTIVITY_SEED_DATA:
-                stmt = text(
-                    """
-                    INSERT INTO prof_activity (id, code, name, description)
-                    VALUES (:id, :code, :name, :description)
-                    ON CONFLICT (code) DO UPDATE
-                    SET name = EXCLUDED.name,
-                        description = EXCLUDED.description
-                    """
-                )
-                connection.execute(
-                    stmt,
-                    {
-                        "id": str(seed.id),
-                        "code": seed.code,
-                        "name": seed.name,
-                        "description": seed.description,
-                    },
-                )
-
-        await conn.run_sync(seed_prof_activities)
+        # Seed prof_activity data removed (seeds directory removed in favor of direct DB management)
+        # def seed_prof_activities(connection):
+        #     from sqlalchemy import text
+        #     for seed in PROF_ACTIVITY_SEED_DATA:
+        #         stmt = text(...)
+        #         connection.execute(stmt, {...})
+        # await conn.run_sync(seed_prof_activities)
 
     yield engine
 
@@ -243,8 +246,6 @@ async def active_user_token(active_user: User) -> str:
     from app.services.auth import create_access_token
 
     token = create_access_token(
-        user_id=active_user.id,
-        email=active_user.email,
-        role=active_user.role
+        user_id=active_user.id, email=active_user.email, role=active_user.role
     )
     return token

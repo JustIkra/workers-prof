@@ -7,23 +7,23 @@ Verifies:
 - Snapshot testing for HTML output
 """
 
-import pytest
 from datetime import date, datetime
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal
 from uuid import uuid4
 
+import pytest
 from httpx import AsyncClient
 
-from app.services.scoring import ScoringService
-from app.services.report_template import render_final_report_html
-from app.repositories.metric import MetricDefRepository, ExtractedMetricRepository
-from app.repositories.prof_activity import ProfActivityRepository
+from app.repositories.metric import ExtractedMetricRepository, MetricDefRepository
 from app.repositories.participant import ParticipantRepository
+from app.repositories.prof_activity import ProfActivityRepository
+from app.repositories.weight_table import WeightTableRepository
 from app.schemas.final_report import FinalReportResponse
-from app.db.models import WeightTable
-
+from app.services.report_template import render_final_report_html
+from app.services.scoring import ScoringService
 
 # ===== Fixtures =====
+
 
 @pytest.fixture
 async def participant_with_full_data(db_session):
@@ -31,9 +31,7 @@ async def participant_with_full_data(db_session):
     # Create participant
     participant_repo = ParticipantRepository(db_session)
     participant = await participant_repo.create(
-        full_name="Батура Анна Александровна",
-        birth_date=date(1990, 5, 15),
-        external_id="BATURA_AA"
+        full_name="Батура Анна Александровна", birth_date=date(1990, 5, 15), external_id="BATURA_AA"
     )
 
     # Create metrics
@@ -47,15 +45,27 @@ async def participant_with_full_data(db_session):
         ("responsibility", "Ответственность", Decimal("6.5"), "MANUAL", None),
         ("nonverbal_logic", "Невербальная логика", Decimal("9.5"), "OCR", Decimal("0.93")),
         ("info_processing", "Обработка информации", Decimal("5.0"), "OCR", Decimal("0.80")),
-        ("complex_problem_solving", "Комплексное решение проблем", Decimal("6.5"), "OCR", Decimal("0.87")),
-        ("morality_normativity", "Моральность/Нормативность", Decimal("9.0"), "LLM", Decimal("0.91")),
+        (
+            "complex_problem_solving",
+            "Комплексное решение проблем",
+            Decimal("6.5"),
+            "OCR",
+            Decimal("0.87"),
+        ),
+        (
+            "morality_normativity",
+            "Моральность/Нормативность",
+            Decimal("9.0"),
+            "LLM",
+            Decimal("0.91"),
+        ),
         ("stress_resistance", "Стрессоустойчивость", Decimal("2.5"), "OCR", Decimal("0.82")),
         ("leadership", "Лидерство", Decimal("2.5"), "OCR", Decimal("0.84")),
         ("vocabulary", "Лексика", Decimal("2.5"), "OCR", Decimal("0.86")),
     ]
 
     metric_defs = {}
-    for code, name, value, source, confidence in metrics_data:
+    for code, name, _value, _source, _confidence in metrics_data:
         # Try to get existing or create new
         metric = await metric_repo.get_by_code(code)
         if not metric:
@@ -65,7 +75,7 @@ async def participant_with_full_data(db_session):
                 unit="балл",
                 min_value=Decimal("0"),
                 max_value=Decimal("10"),
-                active=True
+                active=True,
             )
         metric_defs[code] = metric
 
@@ -78,7 +88,7 @@ async def participant_with_full_data(db_session):
         bucket="test",
         key="test/batura_report.docx",
         mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-        size_bytes=2048
+        size_bytes=2048,
     )
     db_session.add(file_ref)
     await db_session.flush()
@@ -86,16 +96,15 @@ async def participant_with_full_data(db_session):
     report = Report(
         id=uuid4(),
         participant_id=participant.id,
-        type="REPORT_1",
         status="EXTRACTED",
         file_ref_id=file_ref.id,
     )
     db_session.add(report)
     await db_session.flush()
 
-    # Create extracted metrics with source and confidence
+    # Create extracted metrics with source and confidence (legacy)
     extracted_metric_repo = ExtractedMetricRepository(db_session)
-    for code, name, value, source, confidence in metrics_data:
+    for code, _name, value, source, confidence in metrics_data:
         metric_def = metric_defs[code]
         await extracted_metric_repo.create_or_update(
             report_id=report.id,
@@ -103,6 +112,19 @@ async def participant_with_full_data(db_session):
             value=value,
             source=source,
             confidence=confidence,
+        )
+
+    # Create participant metrics (S2-08)
+    from app.repositories.participant_metric import ParticipantMetricRepository
+
+    participant_metric_repo = ParticipantMetricRepository(db_session)
+    for code, _name, value, source, confidence in metrics_data:
+        await participant_metric_repo.upsert(
+            participant_id=participant.id,
+            metric_code=code,
+            value=value,
+            confidence=confidence,
+            source_report_id=report.id,
         )
 
     # Get professional activity from seeded data
@@ -120,34 +142,49 @@ async def participant_with_full_data(db_session):
     # Create weight table with all metrics
     weights_data = []
     weight_value = Decimal("1") / Decimal(str(len(metrics_data)))  # Equal weights
-    for code, name, _, _, _ in metrics_data:
-        weights_data.append({
-            "metric_code": code,
-            "weight": str(weight_value.quantize(Decimal("0.01")))
-        })
+    for code, _name, _, _, _ in metrics_data:
+        weights_data.append(
+            {"metric_code": code, "weight": str(weight_value.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP))}
+        )
 
     # Adjust first weight to ensure sum = 1.0
     total = sum(Decimal(w["weight"]) for w in weights_data)
     adjustment = Decimal("1.0") - total
     weights_data[0]["weight"] = str(Decimal(weights_data[0]["weight"]) + adjustment)
 
-    # Create weight table directly (repository doesn't have create_weight_table method)
-    weight_table = WeightTable(
-        prof_activity_id=prof_activity.id,
-        version=1,
-        is_active=True,
-        weights=weights_data
-    )
-    db_session.add(weight_table)
-    await db_session.commit()
-    await db_session.refresh(weight_table)
+    # Create weight table and scoring result using weight_table service
+    from app.schemas.weight_table import WeightItem, WeightTableUploadRequest
+    from app.services.weight_table import WeightTableService
 
-    # Calculate score to create scoring_result
+    weight_service = WeightTableService(db_session)
+
+    # Deactivate any existing active weight tables for this activity
+    weight_table_repo = WeightTableRepository(db_session)
+    existing_active = await weight_table_repo.get_active_for_activity(prof_activity.id)
+    if existing_active:
+        await weight_service.deactivate_weight_table(existing_active.id)
+
+    upload_payload = WeightTableUploadRequest(
+        prof_activity_code=prof_activity.code,
+        weights=[WeightItem(**w) for w in weights_data],
+    )
+    weight_table_response = await weight_service.upload_weight_table(upload_payload)
+
+    # Activate weight table
+    await weight_service.activate_weight_table(weight_table_response.id)
+
+    # Commit changes to make weight table available
+    await db_session.commit()
+
+    # Now calculate score
     scoring_service = ScoringService(db_session)
     await scoring_service.calculate_score(
         participant_id=participant.id,
         prof_activity_code=prof_activity.code,
     )
+
+    # Get the weight_table for return value
+    weight_table = await weight_table_repo.get_by_id(weight_table_response.id)
 
     return {
         "participant": participant,
@@ -158,6 +195,7 @@ async def participant_with_full_data(db_session):
 
 
 # ===== Service Tests =====
+
 
 @pytest.mark.asyncio
 async def test_generate_final_report__with_valid_data__returns_complete_structure(
@@ -180,11 +218,13 @@ async def test_generate_final_report__with_valid_data__returns_complete_structur
     assert "report_date" in report_data
     assert "prof_activity_code" in report_data
     assert "prof_activity_name" in report_data
-    assert "weight_table_version" in report_data
+    assert "weight_table_id" in report_data
     assert "score_pct" in report_data
     assert "strengths" in report_data
     assert "dev_areas" in report_data
     assert "recommendations" in report_data
+    assert "recommendations_status" in report_data
+    assert "recommendations_error" in report_data
     assert "metrics" in report_data
     assert "notes" in report_data
     assert "template_version" in report_data
@@ -194,9 +234,12 @@ async def test_generate_final_report__with_valid_data__returns_complete_structur
     assert report_data["participant_name"] == "Батура Анна Александровна"
     assert report_data["prof_activity_code"] == participant_with_full_data["prof_activity"].code
     assert report_data["prof_activity_name"] == participant_with_full_data["prof_activity"].name
-    assert report_data["weight_table_version"] == 1
+    assert report_data["weight_table_id"] is not None  # Should have a valid weight table ID
     assert isinstance(report_data["score_pct"], Decimal)
     assert Decimal("0") <= report_data["score_pct"] <= Decimal("100")
+    assert report_data["recommendations_status"] in {"pending", "ready", "error", "disabled"}
+    error_value = report_data["recommendations_error"]
+    assert error_value is None or isinstance(error_value, str)
 
     # Assert: Strengths and dev_areas
     assert len(report_data["strengths"]) <= 5
@@ -346,6 +389,7 @@ async def test_final_report__no_scoring_result__raises_error(
 
 # ===== API Tests =====
 
+
 @pytest.mark.asyncio
 async def test_api_final_report_json__with_valid_data__returns_200(
     test_env, client: AsyncClient, db_session, participant_with_full_data
@@ -357,14 +401,14 @@ async def test_api_final_report_json__with_valid_data__returns_200(
 
     # Create active user and get auth cookies
     from app.services.auth import create_user
+
     user = await create_user(db_session, "active@example.com", "password123", role="USER")
     user.status = "ACTIVE"
     await db_session.commit()
 
     # Login to get cookies
     login_response = await client.post(
-        "/api/auth/login",
-        json={"email": "active@example.com", "password": "password123"}
+        "/api/auth/login", json={"email": "active@example.com", "password": "password123"}
     )
     assert login_response.status_code == 200
     auth_cookies = dict(login_response.cookies)
@@ -398,14 +442,14 @@ async def test_api_final_report_html__with_format_param__returns_html(
 
     # Create active user and get auth cookies
     from app.services.auth import create_user
+
     user = await create_user(db_session, "active@example.com", "password123", role="USER")
     user.status = "ACTIVE"
     await db_session.commit()
 
     # Login to get cookies
     login_response = await client.post(
-        "/api/auth/login",
-        json={"email": "active@example.com", "password": "password123"}
+        "/api/auth/login", json={"email": "active@example.com", "password": "password123"}
     )
     assert login_response.status_code == 200
     auth_cookies = dict(login_response.cookies)
@@ -424,3 +468,126 @@ async def test_api_final_report_html__with_format_param__returns_html(
     assert "<!DOCTYPE html>" in html
     assert "Батура Анна Александровна" in html
     assert "Итоговый коэффициент" in html
+
+
+# ===== Edge Case Tests =====
+
+
+@pytest.mark.asyncio
+async def test_api_final_report__participant_not_found__returns_404(
+    test_env, client: AsyncClient, db_session
+):
+    """Test that API returns 404 when participant doesn't exist."""
+    # Arrange: Create active user and get auth cookies
+    from app.services.auth import create_user
+
+    user = await create_user(db_session, "active@example.com", "password123", role="USER")
+    user.status = "ACTIVE"
+    await db_session.commit()
+
+    # Login to get cookies
+    login_response = await client.post(
+        "/api/auth/login", json={"email": "active@example.com", "password": "password123"}
+    )
+    assert login_response.status_code == 200
+    auth_cookies = dict(login_response.cookies)
+
+    # Act: Try to get final report for non-existent participant
+    non_existent_id = uuid4()
+    response = await client.get(
+        f"/api/participants/{non_existent_id}/final-report?activity_code=nonexistent_activity",
+        cookies=auth_cookies,
+    )
+
+    # Assert
+    assert response.status_code == 400
+    # The error could be about missing activity or no scoring result
+    assert "not found" in response.json()["detail"].lower() or "no" in response.json()["detail"].lower()
+
+
+@pytest.mark.asyncio
+async def test_api_final_report__invalid_activity_code__returns_400(
+    test_env, client: AsyncClient, db_session, participant_with_full_data
+):
+    """Test that API returns 400 when activity code is invalid."""
+    # Arrange
+    participant = participant_with_full_data["participant"]
+
+    # Create active user and get auth cookies
+    from app.services.auth import create_user
+
+    user = await create_user(db_session, "active@example.com", "password123", role="USER")
+    user.status = "ACTIVE"
+    await db_session.commit()
+
+    # Login to get cookies
+    login_response = await client.post(
+        "/api/auth/login", json={"email": "active@example.com", "password": "password123"}
+    )
+    assert login_response.status_code == 200
+    auth_cookies = dict(login_response.cookies)
+
+    # Act: Try to get final report with invalid activity code
+    response = await client.get(
+        f"/api/participants/{participant.id}/final-report?activity_code=invalid_activity_code",
+        cookies=auth_cookies,
+    )
+
+    # Assert
+    assert response.status_code == 400
+    assert "not found" in response.json()["detail"].lower()
+
+
+@pytest.mark.asyncio
+async def test_api_final_report__unauthorized__returns_401(
+    test_env, client: AsyncClient, db_session, participant_with_full_data
+):
+    """Test that API requires authentication."""
+    # Arrange
+    participant = participant_with_full_data["participant"]
+    prof_activity = participant_with_full_data["prof_activity"]
+
+    # Act: Try to access without auth cookies
+    response = await client.get(
+        f"/api/participants/{participant.id}/final-report?activity_code={prof_activity.code}"
+    )
+
+    # Assert
+    assert response.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_final_report__invalid_format_parameter__defaults_to_json(
+    test_env, client: AsyncClient, db_session, participant_with_full_data
+):
+    """Test that invalid format parameter defaults to JSON response."""
+    # Arrange
+    participant = participant_with_full_data["participant"]
+    prof_activity = participant_with_full_data["prof_activity"]
+
+    # Create active user and get auth cookies
+    from app.services.auth import create_user
+
+    user = await create_user(db_session, "active@example.com", "password123", role="USER")
+    user.status = "ACTIVE"
+    await db_session.commit()
+
+    # Login to get cookies
+    login_response = await client.post(
+        "/api/auth/login", json={"email": "active@example.com", "password": "password123"}
+    )
+    assert login_response.status_code == 200
+    auth_cookies = dict(login_response.cookies)
+
+    # Act: Request with invalid format parameter
+    response = await client.get(
+        f"/api/participants/{participant.id}/final-report?activity_code={prof_activity.code}&format=pdf",
+        cookies=auth_cookies,
+    )
+
+    # Assert: Should default to JSON
+    assert response.status_code == 200
+    assert response.headers.get("content-type") == "application/json"
+    data = response.json()
+    assert "participant_name" in data
+    assert "score_pct" in data

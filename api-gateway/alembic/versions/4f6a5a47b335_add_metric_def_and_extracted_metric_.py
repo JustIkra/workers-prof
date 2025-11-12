@@ -8,18 +8,19 @@ Creates tables for S2-01:
 - metric_def: Dictionary of metrics with validation ranges
 - extracted_metric: Extracted metric values from reports with uniqueness constraint
 """
-from typing import Sequence, Union
 
-from alembic import op
+from collections.abc import Sequence
+
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
+from alembic import op
 
 # revision identifiers, used by Alembic.
-revision: str = '4f6a5a47b335'
-down_revision: Union[str, None] = '8d1f97e2cf8d'
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+revision: str = "4f6a5a47b335"
+down_revision: str | None = "8d1f97e2cf8d"
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
@@ -42,7 +43,7 @@ def upgrade() -> None:
         sa.UniqueConstraint("code", name="metric_def_code_unique"),
         sa.CheckConstraint(
             "min_value IS NULL OR max_value IS NULL OR min_value <= max_value",
-            name="metric_def_range_check"
+            name="metric_def_range_check",
         ),
     )
     op.create_index("ix_metric_def_code", "metric_def", ["code"], unique=True)
@@ -72,21 +73,22 @@ def upgrade() -> None:
             ondelete="RESTRICT",
         ),
         sa.UniqueConstraint(
-            "report_id",
-            "metric_def_id",
-            name="extracted_metric_report_metric_unique"
+            "report_id", "metric_def_id", name="extracted_metric_report_metric_unique"
         ),
         sa.CheckConstraint(
-            "source IN ('OCR', 'LLM', 'MANUAL')",
-            name="extracted_metric_source_check"
+            "source IN ('OCR', 'LLM', 'MANUAL')", name="extracted_metric_source_check"
         ),
         sa.CheckConstraint(
             "confidence IS NULL OR (confidence >= 0 AND confidence <= 1)",
-            name="extracted_metric_confidence_check"
+            name="extracted_metric_confidence_check",
         ),
     )
-    op.create_index("ix_extracted_metric_report_id", "extracted_metric", ["report_id"], unique=False)
-    op.create_index("ix_extracted_metric_metric_def_id", "extracted_metric", ["metric_def_id"], unique=False)
+    op.create_index(
+        "ix_extracted_metric_report_id", "extracted_metric", ["report_id"], unique=False
+    )
+    op.create_index(
+        "ix_extracted_metric_metric_def_id", "extracted_metric", ["metric_def_id"], unique=False
+    )
 
 
 def downgrade() -> None:

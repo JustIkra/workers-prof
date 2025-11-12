@@ -25,13 +25,11 @@ class WeightTableRepository:
     async def list_all(self, prof_activity_id: uuid.UUID | None = None) -> list[WeightTable]:
         """
         List weight tables, optionally filtered by professional activity.
-
-        Returns newest versions first within each activity.
         """
         stmt = (
             select(WeightTable)
             .options(selectinload(WeightTable.prof_activity))
-            .order_by(WeightTable.prof_activity_id, WeightTable.version.desc())
+            .order_by(WeightTable.prof_activity_id, WeightTable.created_at.desc())
         )
 
         if prof_activity_id:
@@ -50,46 +48,22 @@ class WeightTableRepository:
         result = await self.db.execute(stmt)
         return result.scalar_one_or_none()
 
-    async def get_active_for_activity(
-        self,
-        prof_activity_id: uuid.UUID,
-        exclude_id: uuid.UUID | None = None,
-    ) -> WeightTable | None:
+    async def get_by_activity(self, prof_activity_id: uuid.UUID) -> WeightTable | None:
         """
-        Get currently active weight table for given professional activity.
-
-        Optionally exclude a specific weight table ID.
+        Get weight table for given professional activity.
         """
         stmt = (
             select(WeightTable)
             .options(selectinload(WeightTable.prof_activity))
-            .where(
-                WeightTable.prof_activity_id == prof_activity_id,
-                WeightTable.is_active.is_(True),
-            )
+            .where(WeightTable.prof_activity_id == prof_activity_id)
         )
-
-        if exclude_id:
-            stmt = stmt.where(WeightTable.id != exclude_id)
 
         result = await self.db.execute(stmt)
         return result.scalar_one_or_none()
 
-    async def get_next_version(self, prof_activity_id: uuid.UUID) -> int:
-        """Determine the next version number for a professional activity."""
-        stmt = select(func.max(WeightTable.version)).where(
-            WeightTable.prof_activity_id == prof_activity_id
-        )
-        result = await self.db.execute(stmt)
-        current_max = result.scalar_one()
-        if current_max is None:
-            return 1
-        return int(current_max) + 1
-
     async def create(
         self,
         prof_activity_id: uuid.UUID,
-        version: int,
         weights: list[dict[str, Any]],
         metadata: dict[str, Any] | None,
     ) -> WeightTable:
@@ -97,10 +71,8 @@ class WeightTableRepository:
         weight_table = WeightTable(
             id=uuid.uuid4(),
             prof_activity_id=prof_activity_id,
-            version=version,
             weights=weights,
             metadata_json=metadata,
-            is_active=False,
         )
 
         self.db.add(weight_table)
@@ -108,9 +80,16 @@ class WeightTableRepository:
         await self.db.refresh(weight_table)
         return weight_table
 
-    async def activate(self, weight_table: WeightTable) -> WeightTable:
-        """Mark given weight table as active."""
-        weight_table.is_active = True
+    async def update(
+        self,
+        weight_table: WeightTable,
+        weights: list[dict[str, Any]],
+        metadata: dict[str, Any] | None,
+    ) -> WeightTable:
+        """Update existing weight table."""
+        weight_table.weights = weights
+        weight_table.metadata_json = metadata
+
         await self.db.commit()
         await self.db.refresh(weight_table)
         return weight_table

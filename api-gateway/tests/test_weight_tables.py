@@ -2,9 +2,9 @@
 Tests for weight table endpoints.
 
 Validates:
-- Successful upload of weight table JSON with versioning
+- Successful upload of weight table JSON
 - Validation failure when weights do not sum to 1.0
-- Activation guard preventing multiple active versions per activity
+- Update existing weight table
 """
 
 import pytest
@@ -12,7 +12,7 @@ from httpx import AsyncClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.models import ProfActivity, WeightTable, User
+from app.db.models import ProfActivity, User, WeightTable
 from app.services.auth import create_user
 from app.services.prof_activity import ProfActivityService
 
@@ -80,12 +80,12 @@ async def test_upload_weight_table_success(
         cookies=admin_cookies,
     )
 
+    if response.status_code != 201:
+        print(f"Error response: {response.json()}")
     assert response.status_code == 201
     data = response.json()
 
     assert data["prof_activity_code"] == "meeting_facilitation"
-    assert data["version"] == 1
-    assert data["is_active"] is False
     assert data["metadata"] == {"source": "unit-test"}
     assert [entry["metric_code"] for entry in data["weights"]] == [
         "agenda_preparation",
@@ -93,11 +93,10 @@ async def test_upload_weight_table_success(
         "follow_up",
     ]
 
-    # Ensure persisted in database with version 1
+    # Ensure persisted in database
     result = await db_session.execute(select(WeightTable))
     tables = list(result.scalars().all())
     assert len(tables) == 1
-    assert tables[0].version == 1
 
 
 @pytest.mark.asyncio
@@ -124,34 +123,25 @@ async def test_upload_weight_table_invalid_sum_rejected(
 
     assert response.status_code == 422
     assert any(
-        "Sum of weights must equal 1.0" in error["msg"]
-        for error in response.json()["detail"]
+        "Sum of weights must equal 1.0" in error["msg"] for error in response.json()["detail"]
     )
 
 
 @pytest.mark.asyncio
-async def test_activate_second_weight_table_rejected(
+async def test_update_existing_weight_table(
     test_env,
     client: AsyncClient,
     db_session: AsyncSession,
     admin_cookies: dict[str, str],
     prof_activity_seeded: None,
 ):
-    """Activating a second table while another is active is rejected."""
-    # Upload two versions
+    """Updating an existing weight table replaces its weights."""
+    # Create initial table
     payload_v1 = {
         "prof_activity_code": "meeting_facilitation",
         "weights": [
             {"metric_code": "agenda_preparation", "weight": "0.5"},
             {"metric_code": "moderation", "weight": "0.5"},
-        ],
-    }
-    payload_v2 = {
-        "prof_activity_code": "meeting_facilitation",
-        "weights": [
-            {"metric_code": "agenda_preparation", "weight": "0.2"},
-            {"metric_code": "moderation", "weight": "0.3"},
-            {"metric_code": "follow_up", "weight": "0.5"},
         ],
     }
 
@@ -161,38 +151,38 @@ async def test_activate_second_weight_table_rejected(
         cookies=admin_cookies,
     )
     assert resp_v1.status_code == 201
-    resp_v2 = await client.post(
-        "/api/admin/weights/upload",
+    table_id = resp_v1.json()["id"]
+
+    # Update the table with new weights
+    payload_v2 = {
+        "prof_activity_code": "meeting_facilitation",
+        "weights": [
+            {"metric_code": "agenda_preparation", "weight": "0.2"},
+            {"metric_code": "moderation", "weight": "0.3"},
+            {"metric_code": "follow_up", "weight": "0.5"},
+        ],
+    }
+
+    update_resp = await client.put(
+        f"/api/admin/weights/{table_id}",
         json=payload_v2,
         cookies=admin_cookies,
     )
-    assert resp_v2.status_code == 201
+    assert update_resp.status_code == 200
+    updated_data = update_resp.json()
 
-    id_v1 = resp_v1.json()["id"]
-    id_v2 = resp_v2.json()["id"]
+    # Verify weights were updated
+    assert len(updated_data["weights"]) == 3
+    assert [entry["metric_code"] for entry in updated_data["weights"]] == [
+        "agenda_preparation",
+        "moderation",
+        "follow_up",
+    ]
 
-    # Activate first table
-    activate_resp = await client.post(
-        f"/api/admin/weights/{id_v1}/activate",
-        cookies=admin_cookies,
-    )
-    assert activate_resp.status_code == 200
-    assert activate_resp.json()["is_active"] is True
-
-    # Attempt to activate second while first is still active
-    conflict_resp = await client.post(
-        f"/api/admin/weights/{id_v2}/activate",
-        cookies=admin_cookies,
-    )
-    assert conflict_resp.status_code == 400
-    assert "another active weight table" in conflict_resp.json()["detail"].lower()
-
-    # Confirm DB still has single active record
+    # Confirm DB still has only one table for this activity
     result = await db_session.execute(
-        select(WeightTable)
-        .join(ProfActivity)
-        .where(ProfActivity.code == "meeting_facilitation")
+        select(WeightTable).join(ProfActivity).where(ProfActivity.code == "meeting_facilitation")
     )
     tables = list(result.scalars().all())
-    assert any(table.is_active for table in tables)
-    assert sum(1 for table in tables if table.is_active) == 1
+    assert len(tables) == 1
+    assert len(tables[0].weights) == 3

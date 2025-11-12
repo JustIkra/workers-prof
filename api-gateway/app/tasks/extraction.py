@@ -9,44 +9,30 @@ import logging
 import threading
 import time
 import uuid
-from datetime import datetime, timezone
-from typing import Any, Coroutine, Optional
+from collections.abc import Coroutine
+from datetime import UTC, datetime
+from typing import Any
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
-from sqlalchemy.orm import sessionmaker, selectinload
+from sqlalchemy.orm import selectinload, sessionmaker
 
 from app.core.celery_app import celery_app
 from app.core.config import Settings
 from app.core.logging import log_context
-from app.db.models import FileRef, Report, ReportImage
+from app.db.models import FileRef, Report
 from app.repositories.report_image import ReportImageRepository
 from app.services.docx_extraction import DocxExtractionError, DocxImageExtractor
 from app.services.storage import LocalReportStorage
-
 
 logger = logging.getLogger(__name__)
 
 
 settings = Settings()
 
-# Create async engine for Celery tasks
-async_engine = create_async_engine(
-    settings.postgres_dsn,
-    echo=False,
-    pool_pre_ping=True,
-)
-
-AsyncSessionLocal = sessionmaker(
-    async_engine,
-    class_=AsyncSession,
-    expire_on_commit=False,
-)
-
-
 # Background loop for nested execution (tests running inside existing loop)
-_TASK_LOOP: Optional[asyncio.AbstractEventLoop] = None
-_TASK_LOOP_THREAD: Optional[threading.Thread] = None
+_TASK_LOOP: asyncio.AbstractEventLoop | None = None
+_TASK_LOOP_THREAD: threading.Thread | None = None
 _TASK_LOOP_LOCK = threading.Lock()
 
 
@@ -109,6 +95,18 @@ def extract_images_from_report(self, report_id: str, request_id: str | None = No
 
     async def _async_extract() -> dict:
         """Inner async function to perform extraction."""
+        # IMPORTANT: создаём async-engine и sessionmaker внутри текущего event loop,
+        # чтобы избежать "Future attached to a different loop" в Celery/fork.
+        async_engine = create_async_engine(
+            settings.postgres_dsn,
+            echo=False,
+            pool_pre_ping=True,
+        )
+        AsyncSessionLocal = sessionmaker(
+            async_engine,
+            class_=AsyncSession,
+            expire_on_commit=False,
+        )
         report_uuid = uuid.UUID(report_id)
 
         logger.info("task_report_lookup", extra={"report_id": report_id})
@@ -128,14 +126,14 @@ def extract_images_from_report(self, report_id: str, request_id: str | None = No
                     logger.error("task_report_missing", extra={"report_id": report_id})
                     raise ValueError(f"Report {report_id} not found")
 
-                if report.status != "UPLOADED":
+                if report.status not in ("UPLOADED", "PROCESSING"):
                     logger.warning(
                         "task_report_skipped",
                         extra={"report_id": report_id, "status": report.status},
                     )
                     return {
                         "status": "skipped",
-                        "reason": f"Report status is {report.status}, not UPLOADED",
+                        "reason": f"Report status is {report.status}, expected UPLOADED or PROCESSING",
                     }
 
                 # 2. Get file path
@@ -167,11 +165,29 @@ def extract_images_from_report(self, report_id: str, request_id: str | None = No
                     extra={"report_id": report_id, "image_count": len(extracted_images)},
                 )
 
+                # Load existing images once to avoid duplicate processing on retries
+                existing_images = await report_image_repo.get_by_report_id(report_uuid)
+                existing_order_indices = {ri.order_index for ri in existing_images}
+
                 for img in extracted_images:
                     # Generate storage key for image
                     participant_id = str(report.participant_id)
                     image_filename = f"image_{img.order_index}.png"
                     image_key = f"reports/{participant_id}/{report_id}/images/{image_filename}"
+
+                    # Check if ReportImage already exists for this report and order_index
+                    # (handles retry scenarios)
+                    if img.order_index in existing_order_indices:
+                        logger.debug(
+                            "task_report_image_skipped_exists",
+                            extra={
+                                "report_id": report_id,
+                                "order_index": img.order_index,
+                                "image_key": image_key,
+                            },
+                        )
+                        saved_count += 1
+                        continue
 
                     # Convert to PNG for consistency
                     png_data = extractor.convert_to_png(img.data)
@@ -190,17 +206,36 @@ def extract_images_from_report(self, report_id: str, request_id: str | None = No
                         },
                     )
 
-                    # Create FileRef
-                    file_ref = FileRef(
-                        id=uuid.uuid4(),
-                        storage="LOCAL",
-                        bucket="local",
-                        key=image_key,
-                        mime="image/png",
-                        size_bytes=len(png_data),
+                    # Check if FileRef already exists (handles retry scenarios)
+                    stmt_file_ref = select(FileRef).where(
+                        FileRef.storage == "LOCAL",
+                        FileRef.bucket == "local",
+                        FileRef.key == image_key,
                     )
-                    session.add(file_ref)
-                    await session.flush()
+                    result_file_ref = await session.execute(stmt_file_ref)
+                    file_ref = result_file_ref.scalar_one_or_none()
+
+                    if file_ref:
+                        logger.debug(
+                            "task_file_ref_reused",
+                            extra={
+                                "report_id": report_id,
+                                "file_ref_id": str(file_ref.id),
+                                "image_key": image_key,
+                            },
+                        )
+                    else:
+                        # Create FileRef
+                        file_ref = FileRef(
+                            id=uuid.uuid4(),
+                            storage="LOCAL",
+                            bucket="local",
+                            key=image_key,
+                            mime="image/png",
+                            size_bytes=len(png_data),
+                        )
+                        session.add(file_ref)
+                        await session.flush()
 
                     # Create ReportImage
                     await report_image_repo.create(
@@ -212,10 +247,91 @@ def extract_images_from_report(self, report_id: str, request_id: str | None = No
                     )
                     saved_count += 1
 
-                # 5. Update report status
-                report.status = "EXTRACTED"
-                report.extracted_at = datetime.now(timezone.utc)
-                report.extract_error = None
+                # 5. Extract metrics from images using Gemini Vision
+                metrics_result = {}
+                try:
+                    # Import here to avoid circular dependency
+                    from app.services.metric_extraction import MetricExtractionService
+
+                    # Load report images with file_ref for extraction
+                    report_images = await report_image_repo.get_by_report(report_uuid)
+
+                    if report_images:
+                        metric_service = MetricExtractionService(session)
+                        metrics_result = await metric_service.extract_metrics_from_report_images(
+                            report_uuid, report_images
+                        )
+                        await metric_service.close()
+
+                        logger.info(
+                            "task_metrics_extracted",
+                            extra={
+                                "report_id": report_id,
+                                "metrics_extracted": metrics_result.get("metrics_extracted", 0),
+                                "metrics_saved": metrics_result.get("metrics_saved", 0),
+                                "errors": len(metrics_result.get("errors", [])),
+                            },
+                        )
+                    else:
+                        logger.warning(
+                            "task_no_images_for_metrics",
+                            extra={"report_id": report_id},
+                        )
+
+                except Exception as exc:
+                    # Log error but don't fail the entire task
+                    logger.error(
+                        "task_metrics_extraction_failed",
+                        extra={"report_id": report_id, "error": str(exc)},
+                        exc_info=True,
+                    )
+                    # Store error in metrics_result for response
+                    metrics_result = {
+                        "metrics_extracted": 0,
+                        "metrics_saved": 0,
+                        "errors": [{"error": f"Metric extraction failed: {str(exc)}"}],
+                    }
+
+                # 6. Update report status based on metrics_saved
+                metrics_saved = metrics_result.get("metrics_saved", 0)
+                errors = metrics_result.get("errors", [])
+
+                if metrics_saved > 0:
+                    # Success: at least some metrics were saved to participant_metric
+                    report.status = "EXTRACTED"
+                    report.extracted_at = datetime.now(UTC)
+                    report.extract_error = None
+                    logger.info(
+                        "task_report_status_extracted",
+                        extra={
+                            "report_id": report_id,
+                            "metrics_saved": metrics_saved,
+                        },
+                    )
+                else:
+                    # Failure: no metrics saved to participant_metric
+                    if errors:
+                        # Critical error during metric extraction/saving
+                        error_msg = errors[0].get("error", "Unknown error")
+                        report.status = "FAILED"
+                        report.extract_error = f"Failed to save metrics: {error_msg}"
+                        logger.error(
+                            "task_report_status_error_no_metrics_saved",
+                            extra={
+                                "report_id": report_id,
+                                "error": error_msg,
+                                "total_errors": len(errors),
+                            },
+                        )
+                    else:
+                        # No errors, but no metrics found (e.g., empty images)
+                        report.status = "EXTRACTED"
+                        report.extracted_at = datetime.now(UTC)
+                        report.extract_error = None
+                        logger.warning(
+                            "task_report_status_extracted_no_metrics",
+                            extra={"report_id": report_id},
+                        )
 
                 await session.commit()
 
@@ -224,6 +340,8 @@ def extract_images_from_report(self, report_id: str, request_id: str | None = No
                     extra={
                         "report_id": report_id,
                         "images_extracted": saved_count,
+                        "metrics_extracted": metrics_result.get("metrics_extracted", 0),
+                        "metrics_saved": metrics_result.get("metrics_saved", 0),
                     },
                 )
 
@@ -231,6 +349,9 @@ def extract_images_from_report(self, report_id: str, request_id: str | None = No
                     "status": "success",
                     "report_id": report_id,
                     "images_extracted": saved_count,
+                    "metrics_extracted": metrics_result.get("metrics_extracted", 0),
+                    "metrics_saved": metrics_result.get("metrics_saved", 0),
+                    "metric_errors": metrics_result.get("errors", []),
                 }
 
             except DocxExtractionError as exc:
@@ -272,6 +393,9 @@ def extract_images_from_report(self, report_id: str, request_id: str | None = No
                     "report_id": report_id,
                     "error": str(exc),
                 }
+            finally:
+                # Явно закрываем пул соединений после выполнения задачи
+                await async_engine.dispose()
 
     task_id = getattr(self.request, "id", None)
     start = time.perf_counter()

@@ -12,8 +12,18 @@
           Редактировать
         </el-button>
         <div v-else>
-          <el-button size="small" @click="cancelEditing">Отмена</el-button>
-          <el-button type="primary" size="small" @click="saveMetrics" :loading="saving">
+          <el-button
+            size="small"
+            @click="cancelEditing"
+          >
+            Отмена
+          </el-button>
+          <el-button
+            type="primary"
+            size="small"
+            :loading="saving"
+            @click="saveMetrics"
+          >
             Сохранить
           </el-button>
         </div>
@@ -25,8 +35,8 @@
       type="error"
       :title="error"
       closable
-      @close="error = null"
       style="margin-bottom: 16px;"
+      @close="error = null"
     />
 
     <el-alert
@@ -56,19 +66,21 @@
           <el-form-item
             :label="`${metricDef.name} ${metricDef.unit ? '(' + metricDef.unit + ')' : ''}`"
             :prop="`metrics.${metricDef.id}`"
-            :rules="getValidationRules(metricDef)"
           >
-            <el-input-number
+            <MetricInput
               v-model="formData.metrics[metricDef.id]"
               :min="metricDef.min_value || 1"
               :max="metricDef.max_value || 10"
               :precision="1"
               :step="0.1"
-              :controls="true"
-              style="width: 100%;"
-              placeholder="Введите значение"
+              :disabled="!isEditing"
+              :show-controls="true"
+              placeholder="Введите значение (например: 7,5)"
             />
-            <div v-if="metricDef.description" class="metric-description">
+            <div
+              v-if="metricDef.description"
+              class="metric-description"
+            >
               {{ metricDef.description }}
             </div>
           </el-form-item>
@@ -76,7 +88,10 @@
       </el-row>
     </el-form>
 
-    <div v-if="metrics && metrics.length > 0" class="metrics-info">
+    <div
+      v-if="metrics && metrics.length > 0"
+      class="metrics-info"
+    >
       <el-divider />
       <div class="info-row">
         <span class="info-label">Источник данных:</span>
@@ -90,7 +105,10 @@
           {{ getSourceLabel(source) }}
         </el-tag>
       </div>
-      <div class="info-row" v-if="lastUpdated">
+      <div
+        v-if="lastUpdated"
+        class="info-row"
+      >
         <span class="info-label">Последнее обновление:</span>
         <span>{{ formatDate(lastUpdated) }}</span>
       </div>
@@ -100,9 +118,10 @@
 
 <script setup>
 import { ref, computed, watch, onMounted } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage } from 'element-plus'
+import MetricInput from './MetricInput.vue'
 import { metricsApi } from '@/api'
-import { formatNumber, parseNumber, formatForApi, formatFromApi } from '@/utils/numberFormat'
+import { parseNumber, formatForApi } from '@/utils/numberFormat'
 
 const props = defineProps({
   reportId: {
@@ -169,31 +188,6 @@ const loadMetrics = async () => {
   } finally {
     loading.value = false
   }
-}
-
-const getValidationRules = (metricDef) => {
-  return [
-    {
-      validator: (rule, value, callback) => {
-        if (value === null || value === undefined || value === '') {
-          callback()
-          return
-        }
-
-        const min = metricDef.min_value || 1
-        const max = metricDef.max_value || 10
-
-        if (value < min) {
-          callback(new Error(`Значение должно быть не меньше ${min}`))
-        } else if (value > max) {
-          callback(new Error(`Значение должно быть не больше ${max}`))
-        } else {
-          callback()
-        }
-      },
-      trigger: 'change'
-    }
-  ]
 }
 
 const startEditing = () => {

@@ -15,7 +15,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import settings
 from app.db.models import FileRef, Report
 from app.repositories.report import ReportRepository
-from app.schemas.report import ReportResponse, ReportType, ReportUploadResponse
+from app.repositories.report_image import ReportImageRepository
+from app.repositories.metric import ExtractedMetricRepository
+from app.schemas.report import ReportResponse, ReportUploadResponse
 from app.services.storage import FileTooLargeError, LocalReportStorage, StorageError
 
 
@@ -53,22 +55,15 @@ class ReportService:
     async def upload_report(
         self,
         participant_id: uuid.UUID,
-        report_type: ReportType,
         upload: UploadFile,
     ) -> ReportUploadResponse:
         """Handle report upload pipeline."""
         if not await self.repo.participant_exists(participant_id):
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Participant not found")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Participant not found"
+            )
 
         await self._validate_file(upload)
-
-        # Prevent duplicates per participant/type
-        existing = await self.repo.get_by_participant_and_type(participant_id, report_type.value)
-        if existing:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail=f"Report of type {report_type.value} already exists for this participant",
-            )
 
         report_id = uuid.uuid4()
         file_ref_id = uuid.uuid4()
@@ -76,7 +71,10 @@ class ReportService:
         # Build storage key prior to saving the file
         key = self.storage.report_key(str(participant_id), str(report_id))
 
-        mime = upload.content_type or "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        mime = (
+            upload.content_type
+            or "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        )
 
         try:
             stored = await self.storage.save_report(upload, key, settings.report_max_size_bytes)
@@ -96,13 +94,13 @@ class ReportService:
             storage="LOCAL",
             bucket="local",
             key=stored.key,
+            filename=upload.filename,
             mime=mime,
             size_bytes=stored.size_bytes,
         )
         report = Report(
             id=report_id,
             participant_id=participant_id,
-            type=report_type.value,
             status="UPLOADED",
             file_ref_id=file_ref_id,
         )
@@ -114,7 +112,7 @@ class ReportService:
             self.storage.delete_file(stored.path)
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
-                detail="Report already exists for this participant and type",
+                detail="Failed to create report due to constraint violation",
             ) from exc
         except Exception:
             await self.db.rollback()
@@ -130,6 +128,14 @@ class ReportService:
         if not report:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Report not found")
         return report
+
+    async def get_participant_reports(self, participant_id: uuid.UUID) -> list[Report]:
+        """Get all reports for a participant."""
+        if not await self.repo.participant_exists(participant_id):
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Participant not found"
+            )
+        return await self.repo.get_all_by_participant(participant_id)
 
     async def get_download_context(self, report_id: uuid.UUID) -> ReportDownloadContext:
         """Resolve report and file path for download."""
@@ -184,7 +190,7 @@ class ReportService:
     @staticmethod
     def format_etag(etag: str) -> str:
         """Wrap ETag hash in quotes for HTTP headers."""
-        return f"\"{etag}\""
+        return f'"{etag}"'
 
     @staticmethod
     def matches_etag(if_none_match: str | None, etag: str) -> bool:
@@ -202,3 +208,40 @@ class ReportService:
             if candidate == etag:
                 return True
         return False
+
+    async def delete_report(self, report_id: uuid.UUID) -> None:
+        """
+        Delete report and all related entities and files.
+        - Removes extracted metrics for the report
+        - Removes report images and their files
+        - Removes original report file
+        - Deletes report and its file_ref
+        """
+        # Load report with file_ref or 404
+        report = await self.get_report_by_id(report_id)
+
+        # Delete extracted metrics
+        metrics_repo = ExtractedMetricRepository(self.db)
+        await metrics_repo.delete_by_report(report.id)
+
+        # Delete report images' files, then DB records
+        image_repo = ReportImageRepository(self.db)
+        images_with_files = await image_repo.get_by_report(report.id)
+        for image in images_with_files:
+            if image.file_ref and image.file_ref.storage == "LOCAL":
+                image_path = self.storage.resolve_path(image.file_ref.key)
+                self.storage.delete_file(image_path)
+        await image_repo.delete_by_report_id(report.id)
+
+        # Delete original report file
+        if report.file_ref and report.file_ref.storage == "LOCAL":
+            report_path = self.storage.resolve_path(report.file_ref.key)
+            self.storage.delete_file(report_path)
+
+        # Delete report and associated file_ref in a single commit
+        file_ref = report.file_ref
+        await self.db.delete(report)
+        await self.db.flush()
+        if file_ref is not None:
+            await self.db.delete(file_ref)
+        await self.db.commit()

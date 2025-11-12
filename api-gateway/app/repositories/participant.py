@@ -5,7 +5,6 @@ Handles all database operations for participants with proper sorting and filteri
 """
 
 from datetime import date
-from typing import Optional
 from uuid import UUID
 
 from sqlalchemy import func, or_, select
@@ -18,6 +17,7 @@ from app.db.models import Participant
 CASEFOLD_TRANSLATE_UPPER = "ABCDEFGHIJKLMNOPQRSTUVWXYZАБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ"
 CASEFOLD_TRANSLATE_LOWER = "abcdefghijklmnopqrstuvwxyzабвгдеёжзийклмнопрстуфхцчшщъыьэюя"
 
+
 class ParticipantRepository:
     """Repository for participant database operations."""
 
@@ -25,7 +25,7 @@ class ParticipantRepository:
         self.db = db
 
     async def create(
-        self, full_name: str, birth_date: Optional[date] = None, external_id: Optional[str] = None
+        self, full_name: str, birth_date: date | None = None, external_id: str | None = None
     ) -> Participant:
         """
         Create a new participant.
@@ -38,13 +38,15 @@ class ParticipantRepository:
         Returns:
             Created Participant instance
         """
-        participant = Participant(full_name=full_name, birth_date=birth_date, external_id=external_id)
+        participant = Participant(
+            full_name=full_name, birth_date=birth_date, external_id=external_id
+        )
         self.db.add(participant)
         await self.db.commit()
         await self.db.refresh(participant)
         return participant
 
-    async def get_by_id(self, participant_id: UUID) -> Optional[Participant]:
+    async def get_by_id(self, participant_id: UUID) -> Participant | None:
         """
         Get a participant by ID.
 
@@ -60,10 +62,10 @@ class ParticipantRepository:
     async def update(
         self,
         participant_id: UUID,
-        full_name: Optional[str] = None,
-        birth_date: Optional[date] = None,
-        external_id: Optional[str] = None,
-    ) -> Optional[Participant]:
+        full_name: str | None = None,
+        birth_date: date | None = None,
+        external_id: str | None = None,
+    ) -> Participant | None:
         """
         Update a participant.
 
@@ -111,8 +113,8 @@ class ParticipantRepository:
 
     async def search(
         self,
-        query: Optional[str] = None,
-        external_id: Optional[str] = None,
+        query: str | None = None,
+        external_id: str | None = None,
         page: int = 1,
         size: int = 20,
     ) -> tuple[list[Participant], int]:

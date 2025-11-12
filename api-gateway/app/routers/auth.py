@@ -8,8 +8,8 @@ from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.dependencies import get_current_active_user, get_current_user
 from app.core.config import settings
+from app.core.dependencies import get_current_active_user, get_current_user
 from app.db.models import User
 from app.db.session import get_db
 from app.schemas.auth import (
@@ -52,14 +52,14 @@ async def register(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(e),
-        )
-    except SQLAlchemyError:
+        ) from e
+    except SQLAlchemyError as e:
         # Common cause: database not initialized or migrations not applied
         # Return 503 with actionable message instead of 500
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Database unavailable or schema not initialized. Please run migrations (alembic upgrade head).",
-        )
+        ) from e
 
 
 @router.post("/login", response_model=TokenResponse)
@@ -85,13 +85,13 @@ async def login(
     # Authenticate user
     try:
         user = await authenticate_user(db, request.email, request.password)
-    except SQLAlchemyError:
+    except SQLAlchemyError as e:
         # Common cause: database not initialized or migrations not applied
         # Return 503 with actionable message instead of 500
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Database unavailable or schema not initialized. Please run migrations (alembic upgrade head).",
-        )
+        ) from e
 
     if not user:
         raise HTTPException(

@@ -10,7 +10,6 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 
 from app.core.config import settings
 
-
 # ===== Async Engine =====
 engine = create_async_engine(
     settings.postgres_dsn,

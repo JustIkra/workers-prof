@@ -1,0 +1,579 @@
+[
+  {
+    "docx": "Batura_A.A._Biznes-Profil_Biznes-otchyot_1718107.docx",
+    "metrics": [
+      {
+        "label": "РАБОТА С ДОКУМЕНТАМИ",
+        "value": "6.4",
+        "source": "image2.png",
+        "confidence": 1.0
+      },
+      {
+        "label": "ПРОДВИЖЕНИЕ",
+        "value": "7.6",
+        "source": "image2.png",
+        "confidence": 1.0
+      },
+      {
+        "label": "АНАЛИЗ И ПЛАНИРОВАНИЕ",
+        "value": "4.4",
+        "source": "image2.png",
+        "confidence": 1.0
+      },
+      {
+        "label": "ПРИНЯТИЕ РЕШЕНИЙ",
+        "value": "1.9",
+        "source": "image2.png",
+        "confidence": 1.0
+      },
+      {
+        "label": "РАЗРАБОТКА",
+        "value": "4.7",
+        "source": "image2.png",
+        "confidence": 1.0
+      },
+      {
+        "label": "ОБЕСПЕЧЕНИЕ ПРОЦЕССА",
+        "value": "8.4",
+        "source": "image2.png",
+        "confidence": 1.0
+      },
+      {
+        "label": "ПОДДЕРЖКА",
+        "value": "9",
+        "source": "image2.png",
+        "confidence": 1.0
+      },
+      {
+        "label": "КОНТРОЛЬ, АУДИТ",
+        "value": "4.5",
+        "source": "image2.png",
+        "confidence": 1.0
+      },
+      {
+        "label": "ПРОИЗВОДСТВО И ТЕХНОЛОГИИ",
+        "value": "3.2",
+        "source": "image2.png",
+        "confidence": 1.0
+      },
+      {
+        "label": "ГЕНЕРАТОР ИДЕЙ",
+        "value": "4.5",
+        "source": "image4.png",
+        "confidence": 1.0
+      },
+      {
+        "label": "ИССЛЕДОВАТЕЛЬ РЕСУРСОВ",
+        "value": "5.8",
+        "source": "image4.png",
+        "confidence": 1.0
+      },
+      {
+        "label": "СПЕЦИАЛИСТ",
+        "value": "5.9",
+        "source": "image4.png",
+        "confidence": 1.0
+      },
+      {
+        "label": "АНАЛИТИК",
+        "value": "4.4",
+        "source": "image4.png",
+        "confidence": 1.0
+      },
+      {
+        "label": "КООРДИНАТОР",
+        "value": "5",
+        "source": "image4.png",
+        "confidence": 1.0
+      },
+      {
+        "label": "МОТИВАТОР",
+        "value": "3",
+        "source": "image4.png",
+        "confidence": 1.0
+      },
+      {
+        "label": "ДУША КОМАНДЫ",
+        "value": "8.9",
+        "source": "image4.png",
+        "confidence": 1.0
+      },
+      {
+        "label": "РЕАЛИЗАТОР",
+        "value": "6.2",
+        "source": "image4.png",
+        "confidence": 1.0
+      },
+      {
+        "label": "КОНТРОЛЕР",
+        "value": "5.5",
+        "source": "image4.png",
+        "confidence": 1.0
+      },
+      {
+        "label": "КОНФЛИКТНОСТЬ",
+        "value": "2.6",
+        "source": "image5.png",
+        "confidence": 1.0
+      },
+      {
+        "label": "ПРОИЗВОДИТЕЛЬ",
+        "value": "2.8",
+        "source": "image6.png",
+        "confidence": 1.0
+      },
+      {
+        "label": "АДМИНИСТРАТОР",
+        "value": "4.5",
+        "source": "image6.png",
+        "confidence": 1.0
+      },
+      {
+        "label": "ПРЕДПРИНИМАТЕЛЬ",
+        "value": "2.6",
+        "source": "image6.png",
+        "confidence": 1.0
+      },
+      {
+        "label": "ИНТЕГРАТОР",
+        "value": "8.7",
+        "source": "image6.png",
+        "confidence": 1.0
+      }
+    ],
+    "labels": [
+      "РАБОТА С ДОКУМЕНТАМИ",
+      "ПРОДВИЖЕНИЕ",
+      "АНАЛИЗ И ПЛАНИРОВАНИЕ",
+      "ПРИНЯТИЕ РЕШЕНИЙ",
+      "РАЗРАБОТКА",
+      "ОБЕСПЕЧЕНИЕ ПРОЦЕССА",
+      "ПОДДЕРЖКА",
+      "КОНТРОЛЬ, АУДИТ",
+      "ПРОИЗВОДСТВО И ТЕХНОЛОГИИ",
+      "ГЕНЕРАТОР ИДЕЙ",
+      "ИССЛЕДОВАТЕЛЬ РЕСУРСОВ",
+      "СПЕЦИАЛИСТ",
+      "АНАЛИТИК",
+      "КООРДИНАТОР",
+      "МОТИВАТОР",
+      "ДУША КОМАНДЫ",
+      "РЕАЛИЗАТОР",
+      "КОНТРОЛЕР",
+      "КОНФЛИКТНОСТЬ",
+      "ПРОИЗВОДИТЕЛЬ",
+      "АДМИНИСТРАТОР",
+      "ПРЕДПРИНИМАТЕЛЬ",
+      "ИНТЕГРАТОР"
+    ],
+    "errors": []
+  },
+  {
+    "docx": "Batura_A.A._Biznes-Profil_Otchyot_dlya_respondenta_1718107.docx",
+    "metrics": [
+      {
+        "label": "ВНЕШНЯЯ МОТИВАЦИЯ",
+        "value": "5.8",
+        "source": "image2.png",
+        "confidence": 1.0
+      },
+      {
+        "label": "ВНУТРЕННЯЯ МОТИВАЦИЯ",
+        "value": "5.8",
+        "source": "image2.png",
+        "confidence": 1.0
+      },
+      {
+        "label": "ИНТЕРЕС",
+        "value": "6.9",
+        "source": "image2.png",
+        "confidence": 1.0
+      },
+      {
+        "label": "ТВОРЧЕСТВО",
+        "value": "2.1",
+        "source": "image2.png",
+        "confidence": 1.0
+      },
+      {
+        "label": "ПОМОЩЬ ЛЮДЯМ",
+        "value": "8.1",
+        "source": "image2.png",
+        "confidence": 1.0
+      },
+      {
+        "label": "СЛУЖЕНИЕ ОБЩЕСТВУ",
+        "value": "7.1",
+        "source": "image2.png",
+        "confidence": 1.0
+      },
+      {
+        "label": "ОБЩЕНИЕ",
+        "value": "8.2",
+        "source": "image2.png",
+        "confidence": 1.0
+      },
+      {
+        "label": "ВКЛЮЧЕННОСТЬ В КОМАНДУ",
+        "value": "6.5",
+        "source": "image2.png",
+        "confidence": 1.0
+      },
+      {
+        "label": "ПРИЗНАНИЕ",
+        "value": "3.2",
+        "source": "image2.png",
+        "confidence": 1.0
+      },
+      {
+        "label": "РУКОВОДСТВО",
+        "value": "1",
+        "source": "image2.png",
+        "confidence": 1.0
+      },
+      {
+        "label": "ДЕНЬГИ",
+        "value": "7.1",
+        "source": "image2.png",
+        "confidence": 1.0
+      },
+      {
+        "label": "СВЯЗИ",
+        "value": "5.1",
+        "source": "image2.png",
+        "confidence": 1.0
+      },
+      {
+        "label": "ЗДОРОВЬЕ",
+        "value": "6.8",
+        "source": "image2.png",
+        "confidence": 1.0
+      },
+      {
+        "label": "ТРАДИЦИИ",
+        "value": "5.2",
+        "source": "image2.png",
+        "confidence": 1.0
+      },
+      {
+        "label": "ВЫЧИСЛЕНИЯ",
+        "value": "2.9",
+        "source": "image3.png",
+        "confidence": 1.0
+      },
+      {
+        "label": "ЛЕКСИКА",
+        "value": "4.3",
+        "source": "image3.png",
+        "confidence": 1.0
+      },
+      {
+        "label": "ЭРУДИЦИЯ",
+        "value": "7.5",
+        "source": "image3.png",
+        "confidence": 1.0
+      },
+      {
+        "label": "ПРОСТРАНСТВЕННОЕ МЫШЛЕНИЕ",
+        "value": "4.6",
+        "source": "image3.png",
+        "confidence": 1.0
+      },
+      {
+        "label": "НЕВЕРБАЛЬНАЯ ЛОГИКА",
+        "value": "9",
+        "source": "image3.png",
+        "confidence": 1.0
+      },
+      {
+        "label": "ВЕРБАЛЬНАЯ ЛОГИКА",
+        "value": "5.3",
+        "source": "image3.png",
+        "confidence": 1.0
+      },
+      {
+        "label": "ОБРАБОТКА ИНФОРМАЦИИ",
+        "value": "5.1",
+        "source": "image3.png",
+        "confidence": 1.0
+      },
+      {
+        "label": "ОБЩИЙ БАЛЛ ИНТЕЛЛЕКТА",
+        "value": "5.5",
+        "source": "image3.png",
+        "confidence": 1.0
+      },
+      {
+        "label": "ЗАМКНУТОСТЬ",
+        "value": "8.4",
+        "source": "image4.png",
+        "confidence": 1.0
+      },
+      {
+        "label": "ОБЩИТЕЛЬНОСТЬ",
+        "value": "8.4",
+        "source": "image4.png",
+        "confidence": 1.0
+      },
+      {
+        "label": "ПАССИВНОСТЬ",
+        "value": "3.7",
+        "source": "image4.png",
+        "confidence": 1.0
+      },
+      {
+        "label": "АКТИВНОСТЬ",
+        "value": "3.7",
+        "source": "image4.png",
+        "confidence": 1.0
+      },
+      {
+        "label": "НЕДОВЕРЧИВОСТЬ",
+        "value": "6.8",
+        "source": "image4.png",
+        "confidence": 1.0
+      },
+      {
+        "label": "ДРУЖЕЛЮБИЕ",
+        "value": "6.8",
+        "source": "image4.png",
+        "confidence": 1.0
+      },
+      {
+        "label": "НЕЗАВИСИМОСТЬ",
+        "value": "10",
+        "source": "image4.png",
+        "confidence": 1.0
+      },
+      {
+        "label": "КОНФОРМИЗМ",
+        "value": "10",
+        "source": "image4.png",
+        "confidence": 1.0
+      },
+      {
+        "label": "МОРАЛЬНАЯ ГИБКОСТЬ",
+        "value": "8.8",
+        "source": "image4.png",
+        "confidence": 1.0
+      },
+      {
+        "label": "МОРАЛЬНОСТЬ",
+        "value": "8.8",
+        "source": "image4.png",
+        "confidence": 1.0
+      },
+      {
+        "label": "ИМПУЛЬСИВНОСТЬ",
+        "value": "5.8",
+        "source": "image4.png",
+        "confidence": 1.0
+      },
+      {
+        "label": "ОРГАНИЗОВАННОСТЬ",
+        "value": "5.8",
+        "source": "image4.png",
+        "confidence": 1.0
+      },
+      {
+        "label": "ТРЕВОЖНОСТЬ",
+        "value": "3.9",
+        "source": "image4.png",
+        "confidence": 1.0
+      },
+      {
+        "label": "УРАВНОВЕШЕННОСТЬ",
+        "value": "3.9",
+        "source": "image4.png",
+        "confidence": 1.0
+      },
+      {
+        "label": "СЕНЗИТИВНОСТЬ",
+        "value": "3.2",
+        "source": "image4.png",
+        "confidence": 1.0
+      },
+      {
+        "label": "НЕЧУВСТВИТЕЛЬНОСТЬ",
+        "value": "3.2",
+        "source": "image4.png",
+        "confidence": 1.0
+      },
+      {
+        "label": "ИНТЕЛЛЕКТУАЛЬНАЯ СДЕРЖАННОСТЬ",
+        "value": "1.7",
+        "source": "image4.png",
+        "confidence": 1.0
+      },
+      {
+        "label": "ЛЮБОЗНАТЕЛЬНОСТЬ",
+        "value": "1.7",
+        "source": "image4.png",
+        "confidence": 1.0
+      },
+      {
+        "label": "ТРАДИЦИОННОСТЬ",
+        "value": "4.6",
+        "source": "image4.png",
+        "confidence": 1.0
+      },
+      {
+        "label": "ОРИГИНАЛЬНОСТЬ",
+        "value": "4.6",
+        "source": "image4.png",
+        "confidence": 1.0
+      },
+      {
+        "label": "КОНКРЕТНОСТЬ",
+        "value": "4.2",
+        "source": "image4.png",
+        "confidence": 1.0
+      },
+      {
+        "label": "АБСТРАКТНОСТЬ",
+        "value": "4.2",
+        "source": "image4.png",
+        "confidence": 1.0
+      }
+    ],
+    "labels": [
+      "ВНЕШНЯЯ МОТИВАЦИЯ",
+      "ВНУТРЕННЯЯ МОТИВАЦИЯ",
+      "ИНТЕРЕС",
+      "ТВОРЧЕСТВО",
+      "ПОМОЩЬ ЛЮДЯМ",
+      "СЛУЖЕНИЕ ОБЩЕСТВУ",
+      "ОБЩЕНИЕ",
+      "ВКЛЮЧЕННОСТЬ В КОМАНДУ",
+      "ПРИЗНАНИЕ",
+      "РУКОВОДСТВО",
+      "ДЕНЬГИ",
+      "СВЯЗИ",
+      "ЗДОРОВЬЕ",
+      "ТРАДИЦИИ",
+      "ВЫЧИСЛЕНИЯ",
+      "ЛЕКСИКА",
+      "ЭРУДИЦИЯ",
+      "ПРОСТРАНСТВЕННОЕ МЫШЛЕНИЕ",
+      "НЕВЕРБАЛЬНАЯ ЛОГИКА",
+      "ВЕРБАЛЬНАЯ ЛОГИКА",
+      "ОБРАБОТКА ИНФОРМАЦИИ",
+      "ОБЩИЙ БАЛЛ ИНТЕЛЛЕКТА",
+      "ЗАМКНУТОСТЬ",
+      "ОБЩИТЕЛЬНОСТЬ",
+      "ПАССИВНОСТЬ",
+      "АКТИВНОСТЬ",
+      "НЕДОВЕРЧИВОСТЬ",
+      "ДРУЖЕЛЮБИЕ",
+      "НЕЗАВИСИМОСТЬ",
+      "КОНФОРМИЗМ",
+      "МОРАЛЬНАЯ ГИБКОСТЬ",
+      "МОРАЛЬНОСТЬ",
+      "ИМПУЛЬСИВНОСТЬ",
+      "ОРГАНИЗОВАННОСТЬ",
+      "ТРЕВОЖНОСТЬ",
+      "УРАВНОВЕШЕННОСТЬ",
+      "СЕНЗИТИВНОСТЬ",
+      "НЕЧУВСТВИТЕЛЬНОСТЬ",
+      "ИНТЕЛЛЕКТУАЛЬНАЯ СДЕРЖАННОСТЬ",
+      "ЛЮБОЗНАТЕЛЬНОСТЬ",
+      "ТРАДИЦИОННОСТЬ",
+      "ОРИГИНАЛЬНОСТЬ",
+      "КОНКРЕТНОСТЬ",
+      "АБСТРАКТНОСТЬ"
+    ],
+    "errors": []
+  },
+  {
+    "docx": "Batura_A.A._Biznes-Profil_Otchyot_po_kompetentsiyam_1718107.docx",
+    "metrics": [
+      {
+        "label": "ЛИДЕРСТВО",
+        "value": "4.1",
+        "source": "image1.png",
+        "confidence": 1.0
+      },
+      {
+        "label": "МОТИВАЦИЯ ДОСТИЖЕНИЙ",
+        "value": "3.4",
+        "source": "image1.png",
+        "confidence": 1.0
+      },
+      {
+        "label": "СТРЕССОУСТОЙЧИВОСТЬ",
+        "value": "4",
+        "source": "image1.png",
+        "confidence": 1.0
+      },
+      {
+        "label": "ОРИЕНТАЦИЯ НА КЛИЕНТА",
+        "value": "5.9",
+        "source": "image2.png",
+        "confidence": 1.0
+      },
+      {
+        "label": "КОММУНИКАБЕЛЬНОСТЬ",
+        "value": "7.2",
+        "source": "image2.png",
+        "confidence": 1.0
+      },
+      {
+        "label": "КОМАНДНОСТЬ",
+        "value": "4.8",
+        "source": "image2.png",
+        "confidence": 1.0
+      },
+      {
+        "label": "ОРГАНИЗОВАННОСТЬ",
+        "value": "5.9",
+        "source": "image3.png",
+        "confidence": 1.0
+      },
+      {
+        "label": "НОРМАТИВНОСТЬ",
+        "value": "7.6",
+        "source": "image3.png",
+        "confidence": 1.0
+      },
+      {
+        "label": "ОТВЕТСТВЕННОСТЬ",
+        "value": "6.2",
+        "source": "image3.png",
+        "confidence": 1.0
+      },
+      {
+        "label": "ИННОВАЦИОННОСТЬ",
+        "value": "3.8",
+        "source": "image4.png",
+        "confidence": 1.0
+      },
+      {
+        "label": "КОМПЛЕКСНОЕ РЕШЕНИЕ ПРОБЛЕМ",
+        "value": "5.9",
+        "source": "image4.png",
+        "confidence": 1.0
+      },
+      {
+        "label": "СТРЕМЛЕНИЕ К САМОРАЗВИТИЮ",
+        "value": "5.5",
+        "source": "image4.png",
+        "confidence": 1.0
+      }
+    ],
+    "labels": [
+      "ЛИДЕРСТВО",
+      "МОТИВАЦИЯ ДОСТИЖЕНИЙ",
+      "СТРЕССОУСТОЙЧИВОСТЬ",
+      "ОРИЕНТАЦИЯ НА КЛИЕНТА",
+      "КОММУНИКАБЕЛЬНОСТЬ",
+      "КОМАНДНОСТЬ",
+      "ОРГАНИЗОВАННОСТЬ",
+      "НОРМАТИВНОСТЬ",
+      "ОТВЕТСТВЕННОСТЬ",
+      "ИННОВАЦИОННОСТЬ",
+      "КОМПЛЕКСНОЕ РЕШЕНИЕ ПРОБЛЕМ",
+      "СТРЕМЛЕНИЕ К САМОРАЗВИТИЮ"
+    ],
+    "errors": []
+  }
+]

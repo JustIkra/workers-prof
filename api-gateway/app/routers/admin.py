@@ -13,7 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.dependencies import require_admin
 from app.db.models import User
 from app.db.session import get_db
-from app.schemas.auth import MessageResponse, UserResponse
+from app.schemas.auth import UserResponse
 from app.services.auth import approve_user, list_pending_users
 
 router = APIRouter()
@@ -69,4 +69,4 @@ async def approve_user_endpoint(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(e),
-        )
+        ) from e

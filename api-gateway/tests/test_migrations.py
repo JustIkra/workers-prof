@@ -7,14 +7,15 @@ can be rolled back, and enforce key constraints.
 
 import os
 import uuid
-from datetime import date, datetime
 
 import pytest
 from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.engine import make_url
 from sqlalchemy.exc import IntegrityError, OperationalError, ProgrammingError
-from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy.orm import sessionmaker
 
+from alembic import command
+from alembic.config import Config
 
 # ===== Test Configuration =====
 
@@ -126,9 +127,6 @@ def apply_migrations(engine):
     This runs alembic upgrade head to create all tables.
     After tests complete, runs downgrade to clean up.
     """
-    from alembic import command
-    from alembic.config import Config
-
     # Create Alembic config
     alembic_cfg = Config("alembic.ini")
     # Override database URL to use test engine
@@ -155,8 +153,17 @@ class TestMigrationStructure:
         inspector = inspect(engine)
         tables = inspector.get_table_names()
 
-        expected_tables = {"user", "participant", "file_ref", "report", "prof_activity", "weight_table"}
-        assert expected_tables.issubset(set(tables)), f"Missing tables: {expected_tables - set(tables)}"
+        expected_tables = {
+            "user",
+            "participant",
+            "file_ref",
+            "report",
+            "prof_activity",
+            "weight_table",
+        }
+        assert expected_tables.issubset(
+            set(tables)
+        ), f"Missing tables: {expected_tables - set(tables)}"
 
     def test_user_table_structure(self, engine):
         """User table should have correct columns and constraints."""
@@ -172,10 +179,21 @@ class TestMigrationStructure:
         assert "created_at" in columns
         assert "approved_at" in columns
 
-        # Check unique constraint on email
+        # Check unique constraint on email (can be either constraint or unique index)
         unique_constraints = inspector.get_unique_constraints("user")
-        email_unique = any("email" in uc.get("column_names", []) for uc in unique_constraints)
-        assert email_unique, "Email should have unique constraint"
+        email_unique_constraint = any(
+            "email" in uc.get("column_names", []) for uc in unique_constraints
+        )
+
+        # Also check unique indexes (PostgreSQL may implement constraints as indexes)
+        indexes = inspector.get_indexes("user")
+        email_unique_index = any(
+            "email" in idx.get("column_names", []) and idx.get("unique", False) for idx in indexes
+        )
+
+        assert (
+            email_unique_constraint or email_unique_index
+        ), "Email should have unique constraint or unique index"
 
     def test_participant_table_structure(self, engine):
         """Participant table should have correct columns."""
@@ -342,7 +360,7 @@ class TestConstraintEnforcement:
             {
                 "id": str(uuid.uuid4()),
                 "participant_id": participant_id,
-                "type": "REPORT_1",
+                
                 "status": "UPLOADED",
                 "file_ref_id": file_ref_id,
             },
@@ -376,7 +394,7 @@ class TestConstraintEnforcement:
                 {
                     "id": str(uuid.uuid4()),
                     "participant_id": participant_id,  # Same participant
-                    "type": "REPORT_1",  # Same type
+                      # Same type
                     "status": "EXTRACTED",
                     "file_ref_id": file_ref_id_2,
                 },
@@ -496,9 +514,7 @@ class TestConstraintEnforcement:
 
         with pytest.raises(IntegrityError):
             db_session.execute(
-                text(
-                    "UPDATE weight_table SET is_active = :is_active WHERE id = :id"
-                ),
+                text("UPDATE weight_table SET is_active = :is_active WHERE id = :id"),
                 {
                     "id": second_id,
                     "is_active": True,
@@ -543,7 +559,7 @@ class TestForeignKeyConstraints:
             {
                 "id": report_id,
                 "participant_id": participant_id,
-                "type": "REPORT_1",
+                
                 "status": "UPLOADED",
                 "file_ref_id": file_ref_id,
             },
@@ -551,12 +567,12 @@ class TestForeignKeyConstraints:
         db_session.commit()
 
         # Delete participant
-        db_session.execute(
-            text("DELETE FROM participant WHERE id = :id"), {"id": participant_id}
-        )
+        db_session.execute(text("DELETE FROM participant WHERE id = :id"), {"id": participant_id})
         db_session.commit()
 
         # Report should be deleted (cascade)
-        result = db_session.execute(text("SELECT COUNT(*) FROM report WHERE id = :id"), {"id": report_id})
+        result = db_session.execute(
+            text("SELECT COUNT(*) FROM report WHERE id = :id"), {"id": report_id}
+        )
         count = result.scalar()
         assert count == 0, "Report should be deleted when participant is deleted (CASCADE)"

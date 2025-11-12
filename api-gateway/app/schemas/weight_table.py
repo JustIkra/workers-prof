@@ -6,8 +6,8 @@ Defines upload payload validation and serialized responses for weight table vers
 
 from __future__ import annotations
 
-from decimal import Decimal
 from datetime import datetime
+from decimal import Decimal
 from typing import Any
 from uuid import UUID
 
@@ -29,8 +29,12 @@ class WeightItem(BaseModel):
 class WeightTableUploadRequest(BaseModel):
     """Payload for uploading a new weight table version."""
 
-    prof_activity_code: str = Field(..., min_length=1, max_length=50, description="Professional activity code")
-    weights: list[WeightItem] = Field(..., description="List of metric weights that must sum to 1.0")
+    prof_activity_code: str = Field(
+        ..., min_length=1, max_length=50, description="Professional activity code"
+    )
+    weights: list[WeightItem] = Field(
+        ..., description="List of metric weights that must sum to 1.0"
+    )
     metadata: dict[str, Any] | None = Field(
         None,
         description="Optional metadata about the weight table (e.g., source, notes)",
@@ -45,7 +49,7 @@ class WeightTableUploadRequest(BaseModel):
         return value
 
     @model_validator(mode="after")
-    def validate_sum_equals_one(self) -> "WeightTableUploadRequest":
+    def validate_sum_equals_one(self) -> WeightTableUploadRequest:
         """Ensure the sum of weights equals exactly 1.0 (with Decimal precision)."""
         total = sum(item.weight for item in self.weights)
         if total != Decimal("1"):
@@ -61,14 +65,12 @@ class WeightItemResponse(BaseModel):
 
 
 class WeightTableResponse(BaseModel):
-    """Serialized weight table version."""
+    """Serialized weight table."""
 
     id: UUID
     prof_activity_id: UUID
     prof_activity_code: str
     prof_activity_name: str
-    version: int
-    is_active: bool
     weights: list[WeightItemResponse]
     metadata: dict[str, Any] | None = None
     created_at: datetime

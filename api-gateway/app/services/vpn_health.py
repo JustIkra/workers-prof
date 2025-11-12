@@ -8,7 +8,7 @@ import asyncio
 import math
 import subprocess
 import time
-from typing import Sequence
+from collections.abc import Sequence
 
 import httpx
 
@@ -20,8 +20,8 @@ from app.schemas.vpn import (
     RouteEntry,
     VpnHealthResponse,
     VpnHealthStatus,
-    WireGuardOverview,
     VpnPeer,
+    WireGuardOverview,
 )
 
 COMMAND_TIMEOUT = 3.0
@@ -293,12 +293,20 @@ async def gather_vpn_health(
 ) -> VpnHealthResponse:
     """Aggregate diagnostics for the `/api/vpn/health` endpoint."""
     iface = interface or settings.wg_interface
-    domain = probe_domain or (settings.vpn_domains_list[0] if settings.vpn_domains_list else "generativelanguage.googleapis.com")
+    domain = probe_domain or (
+        settings.vpn_domains_list[0]
+        if settings.vpn_domains_list
+        else "generativelanguage.googleapis.com"
+    )
 
     if not settings.vpn_enabled:
-        interface_status = InterfaceStatus(name=iface, is_up=False, error="VPN disabled in configuration.")
+        interface_status = InterfaceStatus(
+            name=iface, is_up=False, error="VPN disabled in configuration."
+        )
         wireguard = WireGuardOverview(interface=iface, error="VPN disabled in configuration.")
-        probe_result = GeminiProbeResult(domain=domain, status=GeminiProbeStatus.SKIPPED, error="VPN disabled.")
+        probe_result = GeminiProbeResult(
+            domain=domain, status=GeminiProbeStatus.SKIPPED, error="VPN disabled."
+        )
         return VpnHealthResponse(
             status=VpnHealthStatus.DISABLED,
             interface=interface_status,
@@ -312,7 +320,9 @@ async def gather_vpn_health(
     wireguard_task = asyncio.to_thread(collect_wireguard_overview, iface)
     routes_task = asyncio.to_thread(collect_routes, iface)
 
-    interface_status, wireguard, routes = await asyncio.gather(interface_task, wireguard_task, routes_task)
+    interface_status, wireguard, routes = await asyncio.gather(
+        interface_task, wireguard_task, routes_task
+    )
 
     if not settings.allow_external_network:
         probe_result = GeminiProbeResult(

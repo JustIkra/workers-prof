@@ -4,9 +4,7 @@ Service layer for Participant business logic.
 Orchestrates participant operations with validation and error handling.
 """
 
-from datetime import date
 from math import ceil
-from typing import Optional
 from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -45,7 +43,7 @@ class ParticipantService:
         )
         return ParticipantResponse.model_validate(participant)
 
-    async def get_participant(self, participant_id: UUID) -> Optional[ParticipantResponse]:
+    async def get_participant(self, participant_id: UUID) -> ParticipantResponse | None:
         """
         Get a participant by ID.
 
@@ -62,7 +60,7 @@ class ParticipantService:
 
     async def update_participant(
         self, participant_id: UUID, request: ParticipantUpdateRequest
-    ) -> Optional[ParticipantResponse]:
+    ) -> ParticipantResponse | None:
         """
         Update a participant.
 

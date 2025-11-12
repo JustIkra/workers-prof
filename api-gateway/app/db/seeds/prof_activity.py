@@ -1,18 +1,12 @@
-"""
-Seed data for professional activities.
+"""Seed data for professional activities."""
 
-Provides deterministic identifiers and metadata for the `prof_activity` table.
-"""
-
-from __future__ import annotations
-
-from dataclasses import dataclass
 import uuid
+from dataclasses import dataclass
 
 
 @dataclass(frozen=True)
 class ProfActivitySeed:
-    """Seed payload for a single professional activity entry."""
+    """Seed data structure for professional activity."""
 
     id: uuid.UUID
     code: str
@@ -20,15 +14,25 @@ class ProfActivitySeed:
     description: str | None = None
 
 
-PROF_ACTIVITY_SEED_DATA: tuple[ProfActivitySeed, ...] = (
+# Default professional activities seed data
+PROF_ACTIVITY_SEED_DATA: list[ProfActivitySeed] = [
     ProfActivitySeed(
-        id=uuid.UUID("22fdacda-0f53-44d2-aba5-49f9239fd383"),
-        code="meeting_facilitation",
-        name="Организация и проведение совещаний",
-        description=(
-            "Трудовая функция по планированию, ведению и сопровождению рабочих совещаний. "
-            "Рассчитывается на развитые коммуникативные, организационные и аналитические "
-            "компетенции сотрудника."
-        ),
+        id=uuid.UUID("00000000-0000-0000-0000-000000000001"),
+        code="developer",
+        name="Разработчик",
+        description="Профессиональная деятельность в области разработки программного обеспечения",
     ),
-)
+    ProfActivitySeed(
+        id=uuid.UUID("00000000-0000-0000-0000-000000000002"),
+        code="analyst",
+        name="Аналитик",
+        description="Профессиональная деятельность в области анализа и проектирования систем",
+    ),
+    ProfActivitySeed(
+        id=uuid.UUID("00000000-0000-0000-0000-000000000003"),
+        code="manager",
+        name="Менеджер",
+        description="Профессиональная деятельность в области управления проектами и командами",
+    ),
+]
+

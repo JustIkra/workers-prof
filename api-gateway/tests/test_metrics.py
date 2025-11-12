@@ -18,9 +18,8 @@ import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.models import MetricDef, Participant, Report, User, FileRef
+from app.db.models import FileRef, MetricDef, Participant, Report, User
 from app.services.auth import create_user
-
 
 # ===== Helper Fixtures =====
 
@@ -39,8 +38,7 @@ async def active_user(db_session: AsyncSession) -> User:
 async def auth_cookies(client: AsyncClient, active_user: User) -> dict:
     """Get authentication cookies for active user."""
     response = await client.post(
-        "/api/auth/login",
-        json={"email": "metrics@example.com", "password": "password123"}
+        "/api/auth/login", json={"email": "metrics@example.com", "password": "password123"}
     )
     assert response.status_code == 200
     cookies = dict(response.cookies)
@@ -91,7 +89,7 @@ async def sample_report(db_session: AsyncSession) -> Report:
     # Create report
     report = Report(
         participant_id=participant.id,
-        type="REPORT_1",
+        
         status="UPLOADED",
         file_ref_id=file_ref.id,
     )
@@ -440,8 +438,7 @@ async def test_bulk_create_extracted_metrics__valid__returns_200(
         f"/api/reports/{sample_report.id}/metrics/bulk",
         json={
             "metrics": [
-                {"metric_def_id": str(m.id), "value": float(i + 5)}
-                for i, m in enumerate(metrics)
+                {"metric_def_id": str(m.id), "value": float(i + 5)} for i, m in enumerate(metrics)
             ]
         },
         cookies=auth_cookies,

@@ -13,13 +13,13 @@ import json
 import logging
 import re
 import sys
+from collections.abc import Iterator
 from contextlib import contextmanager
 from contextvars import ContextVar, Token
-from datetime import datetime, timezone
-from typing import Any, Iterator
+from datetime import UTC, datetime
+from typing import Any
 
 from app.core.config import settings
-
 
 # ===== Context Variables =====
 REQUEST_ID_VAR: ContextVar[str] = ContextVar("request_id", default="-")
@@ -37,17 +37,19 @@ SENSITIVE_KEYS: tuple[str, ...] = (
 )
 
 _UNQUOTED_PATTERN = re.compile(
-    r"(?P<prefix>(?:"
-    + "|".join(SENSITIVE_KEYS)
-    + r")\w*\s*(?:=|:)\s*)(?P<value>[^\s,]+)",
+    r"(?P<prefix>(?:" + "|".join(SENSITIVE_KEYS) + r")\w*\s*(?:=|:)\s*)(?P<value>[^\s,]+)",
     re.IGNORECASE,
 )
 _DOUBLE_QUOTED_PATTERN = re.compile(
-    r'(?P<prefix>(?:' + "|".join(SENSITIVE_KEYS) + r')\w*\s*(?:=|:)\s*")(?P<value>[^"]+)(?P<suffix>")',
+    r"(?P<prefix>(?:"
+    + "|".join(SENSITIVE_KEYS)
+    + r')\w*\s*(?:=|:)\s*")(?P<value>[^"]+)(?P<suffix>")',
     re.IGNORECASE,
 )
 _SINGLE_QUOTED_PATTERN = re.compile(
-    r"(?P<prefix>(?:" + "|".join(SENSITIVE_KEYS) + r")\w*\s*(?:=|:)\s*')(?P<value>[^']+)(?P<suffix>')",
+    r"(?P<prefix>(?:"
+    + "|".join(SENSITIVE_KEYS)
+    + r")\w*\s*(?:=|:)\s*')(?P<value>[^']+)(?P<suffix>')",
     re.IGNORECASE,
 )
 _BEARER_PATTERN = re.compile(r"(Bearer\s+)([A-Za-z0-9\.\-_+/=]+)", re.IGNORECASE)
@@ -116,7 +118,7 @@ class StructuredJSONFormatter(logging.Formatter):
 
     def format(self, record: logging.LogRecord) -> str:
         """Build JSON payload for every log record."""
-        timestamp = datetime.fromtimestamp(record.created, tz=timezone.utc).isoformat()
+        timestamp = datetime.fromtimestamp(record.created, tz=UTC).isoformat()
         message = mask_sensitive(record.getMessage())
 
         payload: dict[str, Any] = {

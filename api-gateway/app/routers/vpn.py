@@ -6,8 +6,8 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Response, status
 
-from app.services.vpn_health import gather_vpn_health
 from app.schemas.vpn import VpnHealthResponse, VpnHealthStatus
+from app.services.vpn_health import gather_vpn_health
 
 router = APIRouter(prefix="/api/vpn", tags=["VPN"])
 
@@ -26,7 +26,11 @@ async def vpn_health() -> Response:
     Return interface state, routes, and Gemini probe results for WireGuard.
     """
     report = await gather_vpn_health()
-    status_code = status.HTTP_200_OK if report.status is VpnHealthStatus.HEALTHY else status.HTTP_503_SERVICE_UNAVAILABLE
+    status_code = (
+        status.HTTP_200_OK
+        if report.status is VpnHealthStatus.HEALTHY
+        else status.HTTP_503_SERVICE_UNAVAILABLE
+    )
     return Response(
         status_code=status_code,
         media_type="application/json",

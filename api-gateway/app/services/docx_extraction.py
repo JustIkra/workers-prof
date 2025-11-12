@@ -9,14 +9,11 @@ from __future__ import annotations
 
 import io
 import logging
-import uuid
 import zipfile
 from dataclasses import dataclass
 from pathlib import Path
-from typing import BinaryIO
 
 from PIL import Image
-
 
 logger = logging.getLogger(__name__)
 
@@ -169,7 +166,9 @@ class DocxImageExtractor:
                     background = Image.new("RGB", img.size, (255, 255, 255))
                     if img.mode == "P":
                         img = img.convert("RGBA")
-                    background.paste(img, mask=img.split()[-1] if img.mode in ("RGBA", "LA") else None)
+                    background.paste(
+                        img, mask=img.split()[-1] if img.mode in ("RGBA", "LA") else None
+                    )
                     img = background
                 elif img.mode != "RGB":
                     img = img.convert("RGB")

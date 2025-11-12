@@ -8,12 +8,10 @@ export const reportsApi = {
   /**
    * Загрузить отчёт для участника
    * @param {string} participantId - UUID
-   * @param {string} reportType - REPORT_1 | REPORT_2 | REPORT_3
    * @param {File} file - DOCX файл
    */
-  async upload(participantId, reportType, file) {
+  async upload(participantId, file) {
     const formData = new FormData()
-    formData.append('report_type', reportType)
     formData.append('file', file)
 
     const response = await apiClient.post(`/participants/${participantId}/reports`, formData, {
@@ -68,6 +66,15 @@ export const reportsApi = {
    */
   async getMetrics(reportId) {
     const response = await apiClient.get(`/reports/${reportId}/metrics`)
+    return response.data
+  },
+
+  /**
+   * Get all reports for a participant
+   * @param {string} participantId - UUID
+   */
+  async getList(participantId) {
+    const response = await apiClient.get(`/participants/${participantId}/reports`)
     return response.data
   }
 }

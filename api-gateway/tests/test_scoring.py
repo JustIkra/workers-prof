@@ -1,25 +1,27 @@
 """
-Tests for scoring service and API (S2-02, S2-03).
+Tests for scoring service and API (S2-02, S2-03, S2-06).
 
 Verifies:
 - Correct calculation of professional fitness scores (S2-02)
 - Generation of strengths and development areas (S2-03)
+- Scoring history retrieval for participants (S2-06)
 """
 
-import pytest
 from datetime import date
 from decimal import Decimal
 from uuid import uuid4
 
-from app.services.scoring import ScoringService
-from app.repositories.metric import MetricDefRepository, ExtractedMetricRepository
-from app.repositories.prof_activity import ProfActivityRepository
-from app.repositories.participant import ParticipantRepository
-from app.repositories.scoring_result import ScoringResultRepository
-from app.db.models import WeightTable, Report
+import pytest
 
+from app.db.models import Report
+from app.repositories.metric import ExtractedMetricRepository, MetricDefRepository
+from app.repositories.participant import ParticipantRepository
+from app.repositories.prof_activity import ProfActivityRepository
+from app.repositories.scoring_result import ScoringResultRepository
+from app.services.scoring import ScoringService
 
 # ===== Fixtures =====
+
 
 @pytest.fixture
 async def participant_with_metrics(db_session):
@@ -27,9 +29,7 @@ async def participant_with_metrics(db_session):
     # Create participant
     participant_repo = ParticipantRepository(db_session)
     participant = await participant_repo.create(
-        full_name="Test Participant",
-        birth_date=date(1985, 1, 1),
-        external_id="TEST001"
+        full_name="Test Participant", birth_date=date(1985, 1, 1), external_id="TEST001"
     )
 
     # Create metrics (13 metrics from the example)
@@ -61,7 +61,7 @@ async def participant_with_metrics(db_session):
                 unit="балл",
                 min_value=Decimal("0"),
                 max_value=Decimal("10"),
-                active=True
+                active=True,
             )
         metric_defs[code] = metric
 
@@ -74,7 +74,7 @@ async def participant_with_metrics(db_session):
         bucket="test",
         key="test/report.docx",
         mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-        size_bytes=1024
+        size_bytes=1024,
     )
     db_session.add(file_ref)
     await db_session.flush()
@@ -82,23 +82,36 @@ async def participant_with_metrics(db_session):
     report = Report(
         id=uuid4(),
         participant_id=participant.id,
-        type="REPORT_1",
+        
         status="EXTRACTED",
         file_ref_id=file_ref.id,
     )
     db_session.add(report)
     await db_session.flush()
 
-    # Create extracted metrics
+    # Create extracted metrics (legacy)
     extracted_metric_repo = ExtractedMetricRepository(db_session)
-    for code, name, value in metrics_data:
+    for code, _name, value in metrics_data:
         metric_def = metric_defs[code]
         await extracted_metric_repo.create_or_update(
             report_id=report.id,
             metric_def_id=metric_def.id,
             value=value,
             source="MANUAL",
-            confidence=Decimal("1.0")
+            confidence=Decimal("1.0"),
+        )
+
+    # Create participant metrics (S2-08)
+    from app.repositories.participant_metric import ParticipantMetricRepository
+
+    participant_metric_repo = ParticipantMetricRepository(db_session)
+    for code, _name, value in metrics_data:
+        await participant_metric_repo.upsert(
+            participant_id=participant.id,
+            metric_code=code,
+            value=value,
+            confidence=Decimal("1.0"),
+            source_report_id=report.id,
         )
 
     await db_session.commit()
@@ -110,6 +123,8 @@ async def participant_with_metrics(db_session):
 @pytest.fixture
 async def weight_table_with_batura_weights(db_session, participant_with_metrics):
     """Create a weight table with weights from the Batura A.A. example."""
+    from app.db.models import WeightTable
+
     _, metric_defs = participant_with_metrics
 
     # Get prof activity
@@ -118,45 +133,41 @@ async def weight_table_with_batura_weights(db_session, participant_with_metrics)
     prof_activity = next((pa for pa in prof_activities if "совещ" in pa.name.lower()), None)
 
     if not prof_activity:
-        pytest.skip("Professional activity 'meeting_facilitation' not found. Run seed migrations first.")
+        pytest.skip(
+            "Professional activity 'meeting_facilitation' not found. Run seed migrations first."
+        )
 
     # Check if active weight table exists
     existing = await prof_activity_repo.get_active_weight_table(prof_activity.id)
     if existing:
         return prof_activity, existing
 
-    # Create weight table with Batura A.A. weights
-    weights_data = {
-        "communicability": Decimal("0.18"),
-        "teamwork": Decimal("0.10"),
-        "low_conflict": Decimal("0.07"),
-        "team_soul": Decimal("0.08"),
-        "organization": Decimal("0.08"),
-        "responsibility": Decimal("0.07"),
-        "nonverbal_logic": Decimal("0.10"),
-        "info_processing": Decimal("0.05"),
-        "complex_problem_solving": Decimal("0.05"),
-        "morality_normativity": Decimal("0.10"),
-        "stress_resistance": Decimal("0.05"),
-        "leadership": Decimal("0.04"),
-        "vocabulary": Decimal("0.03"),
-    }
-
-    weights_json = []
-    for code, weight in weights_data.items():
-        metric = metric_defs[code]
-        weights_json.append({
-            "metric_code": metric.code,
-            "metric_name": metric.name,
-            "weight": str(weight)
-        })
+    # Create weight table directly (not via service) to stay in same session
+    weights_data = [
+        {"metric_code": "communicability", "weight": "0.18"},
+        {"metric_code": "teamwork", "weight": "0.10"},
+        {"metric_code": "low_conflict", "weight": "0.07"},
+        {"metric_code": "team_soul", "weight": "0.08"},
+        {"metric_code": "organization", "weight": "0.08"},
+        {"metric_code": "responsibility", "weight": "0.07"},
+        {"metric_code": "nonverbal_logic", "weight": "0.10"},
+        {"metric_code": "info_processing", "weight": "0.05"},
+        {"metric_code": "complex_problem_solving", "weight": "0.05"},
+        {"metric_code": "morality_normativity", "weight": "0.10"},
+        {"metric_code": "stress_resistance", "weight": "0.05"},
+        {"metric_code": "leadership", "weight": "0.04"},
+        {"metric_code": "vocabulary", "weight": "0.03"},
+    ]
 
     weight_table = WeightTable(
+        id=uuid4(),
         prof_activity_id=prof_activity.id,
         version=1,
-        is_active=True,
-        weights=weights_json
+        weights=weights_data,
+        is_active=True,  # Directly set as active
+        metadata_json={"source": "test_fixture"},
     )
+
     db_session.add(weight_table)
     await db_session.commit()
     await db_session.refresh(weight_table)
@@ -166,11 +177,10 @@ async def weight_table_with_batura_weights(db_session, participant_with_metrics)
 
 # ===== Service Tests =====
 
+
 @pytest.mark.asyncio
 async def test_calculate_score__with_batura_data__returns_71_25_percent(
-    db_session,
-    participant_with_metrics,
-    weight_table_with_batura_weights
+    db_session, participant_with_metrics, weight_table_with_batura_weights
 ):
     """
     Test scoring calculation with Batura A.A. reference data.
@@ -184,8 +194,7 @@ async def test_calculate_score__with_batura_data__returns_71_25_percent(
     scoring_service = ScoringService(db_session)
 
     result = await scoring_service.calculate_score(
-        participant_id=participant.id,
-        prof_activity_code=prof_activity.code
+        participant_id=participant.id, prof_activity_code=prof_activity.code
     )
 
     # Verify score matches calculation
@@ -206,8 +215,7 @@ async def test_calculate_score__with_batura_data__returns_71_25_percent(
 
 @pytest.mark.asyncio
 async def test_calculate_score__missing_metrics__raises_error(
-    db_session,
-    weight_table_with_batura_weights
+    db_session, weight_table_with_batura_weights
 ):
     """
     Test that missing metrics raise a ValueError.
@@ -217,24 +225,20 @@ async def test_calculate_score__missing_metrics__raises_error(
     # Create participant without metrics
     participant_repo = ParticipantRepository(db_session)
     participant = await participant_repo.create(
-        full_name="Empty Participant",
-        birth_date=date(1990, 1, 1),
-        external_id="EMPTY001"
+        full_name="Empty Participant", birth_date=date(1990, 1, 1), external_id="EMPTY001"
     )
 
     scoring_service = ScoringService(db_session)
 
     with pytest.raises(ValueError, match="Missing extracted metrics"):
         await scoring_service.calculate_score(
-            participant_id=participant.id,
-            prof_activity_code=prof_activity.code
+            participant_id=participant.id, prof_activity_code=prof_activity.code
         )
 
 
 @pytest.mark.asyncio
 async def test_calculate_score__no_active_weight_table__raises_error(
-    db_session,
-    participant_with_metrics
+    db_session, participant_with_metrics
 ):
     """
     Test that missing active weight table raises a ValueError.
@@ -246,12 +250,12 @@ async def test_calculate_score__no_active_weight_table__raises_error(
 
     with pytest.raises(ValueError, match="Professional activity .* not found"):
         await scoring_service.calculate_score(
-            participant_id=participant.id,
-            prof_activity_code="nonexistent_activity"
+            participant_id=participant.id, prof_activity_code="nonexistent_activity"
         )
 
 
 # ===== API Tests =====
+
 
 @pytest.mark.asyncio
 async def test_api_calculate_score__with_valid_data__returns_200(
@@ -259,7 +263,7 @@ async def test_api_calculate_score__with_valid_data__returns_200(
     db_session,
     participant_with_metrics,
     weight_table_with_batura_weights,
-    active_user_token
+    active_user_token,
 ):
     """
     Test API endpoint for scoring calculation (S2-02, S2-03).
@@ -270,7 +274,7 @@ async def test_api_calculate_score__with_valid_data__returns_200(
     response = await client.post(
         f"/api/scoring/participants/{participant.id}/calculate",
         params={"activity_code": prof_activity.code},
-        cookies={"access_token": active_user_token}
+        cookies={"access_token": active_user_token},
     )
 
     assert response.status_code == 200
@@ -290,6 +294,8 @@ async def test_api_calculate_score__with_valid_data__returns_200(
     assert isinstance(data["dev_areas"], list)
     assert len(data["strengths"]) <= 5
     assert len(data["dev_areas"]) <= 5
+    assert data["recommendations_status"] in {"pending", "ready", "error", "disabled"}
+    assert "recommendations_error" in data
 
     # Check strengths structure
     if len(data["strengths"]) > 0:
@@ -307,13 +313,12 @@ async def test_api_calculate_score__with_valid_data__returns_200(
     assert saved_result.score_pct == Decimal("71.25")
     assert saved_result.strengths is not None
     assert saved_result.dev_areas is not None
+    assert saved_result.recommendations_status in {"pending", "ready", "error", "disabled"}
 
 
 @pytest.mark.asyncio
 async def test_api_calculate_score__unauthorized__returns_401(
-    client,
-    participant_with_metrics,
-    weight_table_with_batura_weights
+    client, participant_with_metrics, weight_table_with_batura_weights
 ):
     """
     Test that unauthorized requests are rejected.
@@ -323,7 +328,7 @@ async def test_api_calculate_score__unauthorized__returns_401(
 
     response = await client.post(
         f"/api/scoring/participants/{participant.id}/calculate",
-        params={"activity_code": prof_activity.code}
+        params={"activity_code": prof_activity.code},
     )
 
     assert response.status_code == 401
@@ -331,11 +336,10 @@ async def test_api_calculate_score__unauthorized__returns_401(
 
 # ===== S2-03: Strengths/Dev Areas Tests =====
 
+
 @pytest.mark.asyncio
 async def test_strengths_dev_areas__with_batura_data__returns_correct_items(
-    db_session,
-    participant_with_metrics,
-    weight_table_with_batura_weights
+    db_session, participant_with_metrics, weight_table_with_batura_weights
 ):
     """
     Test that strengths and dev_areas are correctly generated (S2-03).
@@ -359,8 +363,7 @@ async def test_strengths_dev_areas__with_batura_data__returns_correct_items(
 
     scoring_service = ScoringService(db_session)
     result = await scoring_service.calculate_score(
-        participant_id=participant.id,
-        prof_activity_code=prof_activity.code
+        participant_id=participant.id, prof_activity_code=prof_activity.code
     )
 
     # Verify strengths structure
@@ -416,9 +419,7 @@ async def test_strengths_dev_areas__with_batura_data__returns_correct_items(
 
 @pytest.mark.asyncio
 async def test_strengths_dev_areas__stable_sorting__same_values_sorted_by_code(
-    db_session,
-    participant_with_metrics,
-    weight_table_with_batura_weights
+    db_session, participant_with_metrics, weight_table_with_batura_weights
 ):
     """
     Test that metrics with same values are sorted by code for stability (S2-03 AC).
@@ -431,8 +432,7 @@ async def test_strengths_dev_areas__stable_sorting__same_values_sorted_by_code(
 
     scoring_service = ScoringService(db_session)
     result = await scoring_service.calculate_score(
-        participant_id=participant.id,
-        prof_activity_code=prof_activity.code
+        participant_id=participant.id, prof_activity_code=prof_activity.code
     )
 
     dev_areas = result["dev_areas"]
@@ -445,15 +445,14 @@ async def test_strengths_dev_areas__stable_sorting__same_values_sorted_by_code(
 
     # Check they are sorted alphabetically by metric_code
     codes_with_2_5 = [item["metric_code"] for item in metrics_with_2_5]
-    assert codes_with_2_5 == sorted(codes_with_2_5), \
-        f"Metrics with same value should be sorted by code. Got: {codes_with_2_5}"
+    assert codes_with_2_5 == sorted(
+        codes_with_2_5
+    ), f"Metrics with same value should be sorted by code. Got: {codes_with_2_5}"
 
 
 @pytest.mark.asyncio
 async def test_strengths_dev_areas__no_duplicates__each_metric_once(
-    db_session,
-    participant_with_metrics,
-    weight_table_with_batura_weights
+    db_session, participant_with_metrics, weight_table_with_batura_weights
 ):
     """
     Test that no metric appears more than once in strengths or dev_areas (S2-03 AC).
@@ -463,8 +462,7 @@ async def test_strengths_dev_areas__no_duplicates__each_metric_once(
 
     scoring_service = ScoringService(db_session)
     result = await scoring_service.calculate_score(
-        participant_id=participant.id,
-        prof_activity_code=prof_activity.code
+        participant_id=participant.id, prof_activity_code=prof_activity.code
     )
 
     # Check no duplicates in strengths
@@ -478,9 +476,7 @@ async def test_strengths_dev_areas__no_duplicates__each_metric_once(
 
 @pytest.mark.asyncio
 async def test_strengths_dev_areas__reproducibility__same_input_same_output(
-    db_session,
-    participant_with_metrics,
-    weight_table_with_batura_weights
+    db_session, participant_with_metrics, weight_table_with_batura_weights
 ):
     """
     Test that repeated calculations produce identical results (S2-03 AC: reproducibility).
@@ -492,14 +488,12 @@ async def test_strengths_dev_areas__reproducibility__same_input_same_output(
 
     # First calculation
     result1 = await scoring_service.calculate_score(
-        participant_id=participant.id,
-        prof_activity_code=prof_activity.code
+        participant_id=participant.id, prof_activity_code=prof_activity.code
     )
 
     # Second calculation (should create new scoring_result but with same strengths/dev_areas)
     result2 = await scoring_service.calculate_score(
-        participant_id=participant.id,
-        prof_activity_code=prof_activity.code
+        participant_id=participant.id, prof_activity_code=prof_activity.code
     )
 
     # Verify results are identical (except scoring_result_id which is new)
@@ -513,9 +507,7 @@ async def test_strengths_dev_areas__reproducibility__same_input_same_output(
 
 @pytest.mark.asyncio
 async def test_strengths_dev_areas__max_five_elements__enforced(
-    db_session,
-    participant_with_metrics,
-    weight_table_with_batura_weights
+    db_session, participant_with_metrics, weight_table_with_batura_weights
 ):
     """
     Test that strengths and dev_areas are limited to maximum 5 elements (S2-03 AC).
@@ -525,10 +517,429 @@ async def test_strengths_dev_areas__max_five_elements__enforced(
 
     scoring_service = ScoringService(db_session)
     result = await scoring_service.calculate_score(
-        participant_id=participant.id,
-        prof_activity_code=prof_activity.code
+        participant_id=participant.id, prof_activity_code=prof_activity.code
     )
 
     # Explicit check for ≤5 constraint
-    assert len(result["strengths"]) <= 5, f"Strengths must have ≤5 elements, got {len(result['strengths'])}"
-    assert len(result["dev_areas"]) <= 5, f"Dev areas must have ≤5 elements, got {len(result['dev_areas'])}"
+    assert (
+        len(result["strengths"]) <= 5
+    ), f"Strengths must have ≤5 elements, got {len(result['strengths'])}"
+    assert (
+        len(result["dev_areas"]) <= 5
+    ), f"Dev areas must have ≤5 elements, got {len(result['dev_areas'])}"
+
+
+# ===== BUG-02: Decimal Quantize Tests =====
+
+
+@pytest.mark.asyncio
+async def test_calculate_score__with_fractional_decimal_values__no_quantize_error(
+    db_session, weight_table_with_batura_weights
+):
+    """
+    Test that fractional Decimal values (e.g., 7.5, 0.075) don't cause quantize errors (BUG-02).
+
+    This test verifies that the scoring calculation handles Decimal multiplication
+    and quantization correctly when dealing with fractional values that have
+    more precision than the target format (0.01).
+
+    Regression test for: Decimal quantize requires exponent error
+    """
+    from app.repositories.participant_metric import ParticipantMetricRepository
+
+    # Create participant with fractional metric values
+    participant_repo = ParticipantRepository(db_session)
+    participant = await participant_repo.create(
+        full_name="Fractional Test Participant",
+        birth_date=date(1990, 1, 1),
+        external_id="FRAC001",
+    )
+
+    # Create a dummy report
+    from app.db.models import FileRef, Report
+
+    file_ref = FileRef(
+        id=uuid4(),
+        storage="LOCAL",
+        bucket="test",
+        key="test/report.docx",
+        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        size_bytes=1024,
+    )
+    db_session.add(file_ref)
+    await db_session.flush()
+
+    report = Report(
+        id=uuid4(),
+        participant_id=participant.id,
+        status="EXTRACTED",
+        file_ref_id=file_ref.id,
+    )
+    db_session.add(report)
+    await db_session.flush()
+
+    # Add participant metrics with fractional values (like those from Gemini extraction)
+    participant_metric_repo = ParticipantMetricRepository(db_session)
+
+    fractional_metrics = [
+        ("communicability", Decimal("7.5")),
+        ("teamwork", Decimal("6.3")),
+        ("low_conflict", Decimal("9.7")),
+        ("team_soul", Decimal("9.1")),
+        ("organization", Decimal("6.8")),
+        ("responsibility", Decimal("6.4")),
+        ("nonverbal_logic", Decimal("9.2")),
+        ("info_processing", Decimal("5.5")),
+        ("complex_problem_solving", Decimal("6.7")),
+        ("morality_normativity", Decimal("8.9")),
+        ("stress_resistance", Decimal("2.3")),
+        ("leadership", Decimal("2.1")),
+        ("vocabulary", Decimal("2.6")),
+    ]
+
+    for code, value in fractional_metrics:
+        await participant_metric_repo.upsert(
+            participant_id=participant.id,
+            metric_code=code,
+            value=value,
+            confidence=Decimal("0.85"),  # Also fractional confidence
+            source_report_id=report.id,
+        )
+
+    await db_session.commit()
+
+    prof_activity, _ = weight_table_with_batura_weights
+
+    # This should NOT raise "Decimal quantize requires exponent" error
+    scoring_service = ScoringService(db_session)
+
+    result = await scoring_service.calculate_score(
+        participant_id=participant.id, prof_activity_code=prof_activity.code
+    )
+
+    # Verify calculation completed successfully
+    assert "score_pct" in result
+    assert isinstance(result["score_pct"], Decimal)
+    assert result["score_pct"] > Decimal("0")
+    assert result["score_pct"] <= Decimal("100")
+
+    # Verify all details have properly quantized contributions
+    assert len(result["details"]) == 13
+    for detail in result["details"]:
+        assert "contribution" in detail
+        contribution = Decimal(detail["contribution"])
+        # Verify contribution is quantized to 0.01
+        assert contribution == contribution.quantize(Decimal("0.01"))
+
+
+@pytest.mark.asyncio
+async def test_generate_final_report__with_fractional_values__no_quantize_error(
+    db_session, weight_table_with_batura_weights
+):
+    """
+    Test that generate_final_report handles fractional Decimal values correctly (BUG-02).
+
+    This specifically tests the generate_final_report method which had the missing
+    rounding parameter on line 343 of scoring.py.
+    """
+    from app.repositories.participant_metric import ParticipantMetricRepository
+
+    # Create participant
+    participant_repo = ParticipantRepository(db_session)
+    participant = await participant_repo.create(
+        full_name="Final Report Test",
+        birth_date=date(1990, 1, 1),
+        external_id="FR001",
+    )
+
+    # Create report
+    from app.db.models import FileRef, Report
+
+    file_ref = FileRef(
+        id=uuid4(),
+        storage="LOCAL",
+        bucket="test",
+        key="test/report.docx",
+        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        size_bytes=1024,
+    )
+    db_session.add(file_ref)
+    await db_session.flush()
+
+    report = Report(
+        id=uuid4(),
+        participant_id=participant.id,
+        status="EXTRACTED",
+        file_ref_id=file_ref.id,
+    )
+    db_session.add(report)
+    await db_session.flush()
+
+    # Add metrics with fractional values
+    participant_metric_repo = ParticipantMetricRepository(db_session)
+    metrics = [
+        ("communicability", Decimal("7.5")),
+        ("teamwork", Decimal("6.5")),
+        ("low_conflict", Decimal("9.5")),
+        ("team_soul", Decimal("9.5")),
+        ("organization", Decimal("6.5")),
+        ("responsibility", Decimal("6.5")),
+        ("nonverbal_logic", Decimal("9.5")),
+        ("info_processing", Decimal("5.0")),
+        ("complex_problem_solving", Decimal("6.5")),
+        ("morality_normativity", Decimal("9.0")),
+        ("stress_resistance", Decimal("2.5")),
+        ("leadership", Decimal("2.5")),
+        ("vocabulary", Decimal("2.5")),
+    ]
+
+    for code, value in metrics:
+        await participant_metric_repo.upsert(
+            participant_id=participant.id,
+            metric_code=code,
+            value=value,
+            confidence=Decimal("0.85"),
+            source_report_id=report.id,
+        )
+
+    await db_session.commit()
+
+    prof_activity, _ = weight_table_with_batura_weights
+
+    # First calculate score to create scoring_result
+    scoring_service = ScoringService(db_session)
+    await scoring_service.calculate_score(
+        participant_id=participant.id, prof_activity_code=prof_activity.code
+    )
+
+    # Now generate final report - this should NOT raise quantize error
+    final_report = await scoring_service.generate_final_report(
+        participant_id=participant.id, prof_activity_code=prof_activity.code
+    )
+
+    # Verify final report was generated successfully
+    assert "score_pct" in final_report
+    assert "metrics" in final_report
+    assert len(final_report["metrics"]) == 13
+
+    # Verify all metric contributions are properly quantized
+    for metric in final_report["metrics"]:
+        assert "contribution" in metric
+        contribution = metric["contribution"]
+        # Verify it's a Decimal quantized to 0.01
+        assert contribution == contribution.quantize(Decimal("0.01"))
+
+
+# ===== S2-06: Scoring History Tests =====
+
+
+@pytest.mark.asyncio
+async def test_api_get_scoring_history__with_multiple_results__returns_200_sorted_desc(
+    client,
+    db_session,
+    participant_with_metrics,
+    weight_table_with_batura_weights,
+    active_user_token,
+):
+    """
+    Test API endpoint for scoring history retrieval (S2-06).
+
+    Verifies:
+    - Returns 200 with list of scoring results
+    - Results are sorted by created_at DESC
+    - Contains all required fields
+    """
+    participant, _ = participant_with_metrics
+    prof_activity, _ = weight_table_with_batura_weights
+
+    # Create multiple scoring results
+    scoring_service = ScoringService(db_session)
+
+    # First calculation
+    result1 = await scoring_service.calculate_score(
+        participant_id=participant.id, prof_activity_code=prof_activity.code
+    )
+
+    # Second calculation
+    result2 = await scoring_service.calculate_score(
+        participant_id=participant.id, prof_activity_code=prof_activity.code
+    )
+
+    # Get scoring history
+    response = await client.get(
+        f"/api/scoring/participants/{participant.id}/scores",
+        cookies={"access_token": active_user_token},
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+
+    assert "items" in data
+    assert isinstance(data["items"], list)
+    assert len(data["items"]) >= 2
+
+    # Verify sorting: most recent first
+    first_item = data["items"][0]
+    second_item = data["items"][1]
+
+    # Most recent result should be first (result2)
+    assert first_item["id"] == str(result2["scoring_result_id"])
+    assert second_item["id"] == str(result1["scoring_result_id"])
+
+    # Verify structure of first item
+    assert first_item["participant_id"] == str(participant.id)
+    assert first_item["prof_activity_code"] == prof_activity.code
+    assert first_item["prof_activity_name"] == prof_activity.name
+    assert Decimal(str(first_item["score_pct"])) == Decimal("71.25")
+    assert "strengths" in first_item
+    assert "dev_areas" in first_item
+    assert "recommendations" in first_item
+    assert "created_at" in first_item
+
+    # Verify ISO 8601 datetime format
+    assert "T" in first_item["created_at"]
+
+
+@pytest.mark.asyncio
+async def test_api_get_scoring_history__with_limit__respects_limit(
+    client,
+    db_session,
+    participant_with_metrics,
+    weight_table_with_batura_weights,
+    active_user_token,
+):
+    """
+    Test that limit parameter is respected (S2-06).
+    """
+    participant, _ = participant_with_metrics
+    prof_activity, _ = weight_table_with_batura_weights
+
+    # Create 5 scoring results
+    scoring_service = ScoringService(db_session)
+    for _ in range(5):
+        await scoring_service.calculate_score(
+            participant_id=participant.id, prof_activity_code=prof_activity.code
+        )
+
+    # Get history with limit=3
+    response = await client.get(
+        f"/api/scoring/participants/{participant.id}/scores",
+        params={"limit": 3},
+        cookies={"access_token": active_user_token},
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+
+    assert len(data["items"]) == 3
+
+
+@pytest.mark.asyncio
+async def test_api_get_scoring_history__no_results__returns_empty_list(
+    client, db_session, participant_with_metrics, active_user_token
+):
+    """
+    Test that empty list is returned when participant has no scoring results (S2-06).
+    """
+    participant, _ = participant_with_metrics
+
+    response = await client.get(
+        f"/api/scoring/participants/{participant.id}/scores",
+        cookies={"access_token": active_user_token},
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+
+    assert "items" in data
+    assert data["items"] == []
+
+
+@pytest.mark.asyncio
+async def test_api_get_scoring_history__participant_not_found__returns_404(
+    client, active_user_token
+):
+    """
+    Test that 404 is returned for non-existent participant (S2-06).
+    """
+    non_existent_id = uuid4()
+
+    response = await client.get(
+        f"/api/scoring/participants/{non_existent_id}/scores",
+        cookies={"access_token": active_user_token},
+    )
+
+    assert response.status_code == 404
+    assert "not found" in response.json()["detail"].lower()
+
+
+@pytest.mark.asyncio
+async def test_api_get_scoring_history__unauthorized__returns_401(client, participant_with_metrics):
+    """
+    Test that unauthorized requests are rejected (S2-06).
+    """
+    participant, _ = participant_with_metrics
+
+    response = await client.get(f"/api/scoring/participants/{participant.id}/scores")
+
+    assert response.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_api_get_scoring_history__with_recommendations__returns_structured_items(
+    client, db_session, participant_with_metrics, active_user_token
+):
+    """
+    Test that recommendations are returned as full objects in scoring history (AI-09 fix).
+    """
+    participant, _ = participant_with_metrics
+
+    # Create a scoring result with recommendations
+    scoring_repo = ScoringResultRepository(db_session)
+    prof_activity_repo = ProfActivityRepository(db_session)
+
+    # Get developer activity and its weight table
+    prof_activity = await prof_activity_repo.get_by_code("developer")
+    weight_table = await prof_activity_repo.get_active_weight_table(prof_activity.id)
+
+    # Create scoring result with recommendations in dict format
+    recommendations_data = [
+        {"title": "Курс по стрессоустойчивости", "link_url": "https://example.com/stress", "priority": 1},
+        {"title": "Тренинг по лидерству", "link_url": "https://example.com/leadership", "priority": 2},
+        {"title": "Курс по расширению словарного запаса", "link_url": "", "priority": 3},
+    ]
+
+    scoring_result = await scoring_repo.create(
+        participant_id=participant.id,
+        weight_table_id=weight_table.id,
+        score_pct=Decimal("65.50"),
+        strengths=[],
+        dev_areas=[],
+        recommendations=recommendations_data,
+        compute_notes="Test scoring with recommendations",
+        recommendations_status="ready",
+    )
+
+    # Get scoring history via API
+    response = await client.get(
+        f"/api/participants/{participant.id}/scores",
+        cookies={"access_token": active_user_token},
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+
+    assert "results" in data
+    assert len(data["results"]) == 1
+
+    history_item = data["results"][0]
+    assert "recommendations" in history_item
+    assert history_item["recommendations"] is not None
+    assert len(history_item["recommendations"]) == 3
+
+    # Verify recommendations are returned as dicts with expected keys
+    first_rec = history_item["recommendations"][0]
+    assert set(first_rec.keys()) == {"title", "link_url", "priority"}
+    assert first_rec["title"] == "Курс по стрессоустойчивости"
+    assert history_item["recommendations_status"] == "ready"
+    assert history_item["recommendations_error"] is None

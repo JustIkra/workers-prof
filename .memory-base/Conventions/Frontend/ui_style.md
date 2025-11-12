@@ -72,6 +72,7 @@ UI стиль: «офисный» для гос-сферы
 
 Темизация через CSS‑переменные (совместимо с Element Plus/Naive UI)
 - Базовые токены задаются в `:root` (см. `theme-tokens.css`).
+ - Рекомендуемое расположение токенов в проекте: `frontend/public/assets/theme-tokens.css` (в продакшене доступно по пути `/assets/theme-tokens.css`).
 - Для Element Plus сопоставить:
   - `--el-color-primary: var(--color-primary)`
   - `--el-font-size-base: 14px`

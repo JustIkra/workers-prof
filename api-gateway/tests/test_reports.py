@@ -7,9 +7,9 @@ from docx import Document
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
 from app.db.models import Participant, User
 from app.services.auth import create_user
-from app.core.config import settings
 
 
 def build_docx_bytes(text: str = "Sample report") -> bytes:
@@ -77,8 +77,13 @@ async def test_upload_report_success(
 
     response = await client.post(
         f"/api/participants/{sample_participant.id}/reports",
-        data={"report_type": "REPORT_1"},
-        files={"file": ("original.docx", payload, "application/vnd.openxmlformats-officedocument.wordprocessingml.document")},
+        files={
+            "file": (
+                "original.docx",
+                payload,
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            )
+        },
         cookies=auth_cookies,
     )
 
@@ -86,7 +91,6 @@ async def test_upload_report_success(
     data = response.json()
 
     assert data["participant_id"] == str(sample_participant.id)
-    assert data["type"] == "REPORT_1"
     assert data["status"] == "UPLOADED"
     assert data["etag"]
     assert data["file_ref"]["key"].endswith("original.docx")
@@ -108,7 +112,6 @@ async def test_upload_report_invalid_mime_returns_415(
     """Uploading non-DOCX content should return 415."""
     response = await client.post(
         f"/api/participants/{sample_participant.id}/reports",
-        data={"report_type": "REPORT_1"},
         files={"file": ("report.txt", b"plain text", "text/plain")},
         cookies=auth_cookies,
     )
@@ -117,34 +120,46 @@ async def test_upload_report_invalid_mime_returns_415(
 
 
 @pytest.mark.asyncio
-async def test_upload_report_duplicate_returns_409(
+async def test_upload_multiple_reports_for_participant(
     test_env,
     reports_storage,
     client: AsyncClient,
     auth_cookies: dict[str, str],
     sample_participant: Participant,
 ):
-    """Uploading second report of same type for participant should conflict."""
-    payload = build_docx_bytes("First")
+    """Participant can have multiple reports uploaded."""
+    payload1 = build_docx_bytes("First")
+    payload2 = build_docx_bytes("Second")
 
     # First upload succeeds
     first = await client.post(
         f"/api/participants/{sample_participant.id}/reports",
-        data={"report_type": "REPORT_1"},
-        files={"file": ("original.docx", payload, "application/vnd.openxmlformats-officedocument.wordprocessingml.document")},
+        files={
+            "file": (
+                "report1.docx",
+                payload1,
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            )
+        },
         cookies=auth_cookies,
     )
     assert first.status_code == 201
 
-    # Second upload with same type should fail
+    # Second upload also succeeds
     second = await client.post(
         f"/api/participants/{sample_participant.id}/reports",
-        data={"report_type": "REPORT_1"},
-        files={"file": ("duplicate.docx", payload, "application/vnd.openxmlformats-officedocument.wordprocessingml.document")},
+        files={
+            "file": (
+                "report2.docx",
+                payload2,
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            )
+        },
         cookies=auth_cookies,
     )
 
-    assert second.status_code == 409
+    assert second.status_code == 201
+    assert first.json()["id"] != second.json()["id"]
 
 
 @pytest.mark.asyncio
@@ -163,8 +178,13 @@ async def test_upload_report_over_limit_returns_413(
 
     response = await client.post(
         f"/api/participants/{sample_participant.id}/reports",
-        data={"report_type": "REPORT_2"},
-        files={"file": ("big.docx", oversized_payload, "application/vnd.openxmlformats-officedocument.wordprocessingml.document")},
+        files={
+            "file": (
+                "big.docx",
+                oversized_payload,
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            )
+        },
         cookies=auth_cookies,
     )
 
@@ -184,8 +204,13 @@ async def test_download_report_returns_file_with_etag(
 
     upload_response = await client.post(
         f"/api/participants/{sample_participant.id}/reports",
-        data={"report_type": "REPORT_3"},
-        files={"file": ("original.docx", payload, "application/vnd.openxmlformats-officedocument.wordprocessingml.document")},
+        files={
+            "file": (
+                "original.docx",
+                payload,
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            )
+        },
         cookies=auth_cookies,
     )
     assert upload_response.status_code == 201
@@ -197,8 +222,8 @@ async def test_download_report_returns_file_with_etag(
     )
 
     assert download_response.status_code == 200
-    assert download_response.headers["etag"].startswith("\"")
-    assert download_response.headers["etag"].endswith("\"")
+    assert download_response.headers["etag"].startswith('"')
+    assert download_response.headers["etag"].endswith('"')
     assert "original.docx" in download_response.headers["content-disposition"]
     assert download_response.content == payload
 
@@ -225,8 +250,13 @@ async def test_upload_requires_auth(
 
     response = await client.post(
         f"/api/participants/{sample_participant.id}/reports",
-        data={"report_type": "REPORT_1"},
-        files={"file": ("report.docx", payload, "application/vnd.openxmlformats-officedocument.wordprocessingml.document")},
+        files={
+            "file": (
+                "report.docx",
+                payload,
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            )
+        },
     )
 
     assert response.status_code == 401
@@ -245,8 +275,13 @@ async def test_download_requires_auth(
 
     upload_response = await client.post(
         f"/api/participants/{sample_participant.id}/reports",
-        data={"report_type": "REPORT_1"},
-        files={"file": ("report.docx", payload, "application/vnd.openxmlformats-officedocument.wordprocessingml.document")},
+        files={
+            "file": (
+                "report.docx",
+                payload,
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            )
+        },
         cookies=auth_cookies,
     )
     assert upload_response.status_code == 201
@@ -254,3 +289,69 @@ async def test_download_requires_auth(
 
     download_response = await client.get(f"/api/reports/{report_id}/download")
     assert download_response.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_delete_report_success(
+    test_env,
+    reports_storage,
+    client: AsyncClient,
+    auth_cookies: dict[str, str],
+    sample_participant: Participant,
+):
+    """Deleting existing report removes files and returns 204."""
+    payload = build_docx_bytes("To delete")
+    upload_response = await client.post(
+        f"/api/participants/{sample_participant.id}/reports",
+        files={
+            "file": (
+                "original.docx",
+                payload,
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            )
+        },
+        cookies=auth_cookies,
+    )
+    assert upload_response.status_code == 201
+    data = upload_response.json()
+    report_id = data["id"]
+
+    # File exists
+    stored_path = reports_storage / data["file_ref"]["key"]
+    assert stored_path.exists()
+
+    # Delete
+    delete_response = await client.delete(f"/api/reports/{report_id}", cookies=auth_cookies)
+    assert delete_response.status_code == 204
+
+    # File removed
+    assert not stored_path.exists()
+
+    # Subsequent download should 404
+    download_response = await client.get(
+        f"/api/reports/{report_id}/download", cookies=auth_cookies
+    )
+    assert download_response.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_delete_report_404(
+    test_env,
+    client: AsyncClient,
+    auth_cookies: dict[str, str],
+):
+    """Deleting non-existing report returns 404."""
+    unknown_id = "00000000-0000-0000-0000-000000000001"
+    response = await client.delete(f"/api/reports/{unknown_id}", cookies=auth_cookies)
+    assert response.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_delete_report_requires_auth(
+    test_env,
+    client: AsyncClient,
+):
+    """Deleting without authentication should return 401."""
+    unknown_id = "00000000-0000-0000-0000-000000000002"
+    response = await client.delete(f"/api/reports/{unknown_id}")
+    assert response.status_code == 401

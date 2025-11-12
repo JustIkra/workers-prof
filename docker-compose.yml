@@ -28,6 +28,8 @@ services:
         condition: service_healthy
     volumes:
       - reports:/app/storage
+      # Mount repo for CLI tools and access to local files in dev
+      - ./:/workspace
     command: ["./docker-entrypoint.sh"]
     restart: unless-stopped
 
@@ -46,8 +48,7 @@ services:
       FILE_STORAGE_BASE: ${FILE_STORAGE_BASE:-/app/storage}
       ENV: ${ENV:-prod}
       VPN_ENABLED: ${VPN_ENABLED:-0}
-    # Placeholder worker. Replace with Celery command when implemented.
-    command: ["python", "-c", "import time; print('Worker started (placeholder)'); time.sleep(10**9)"]
+    command: ["/app/docker-entrypoint-worker.sh"]
     depends_on:
       postgres:
         condition: service_healthy
@@ -71,6 +72,8 @@ services:
       POSTGRES_DB: app
       POSTGRES_USER: app
       POSTGRES_PASSWORD: app
+    ports:
+      - "5432:5432"
     volumes:
       - db-data:/var/lib/postgresql/data
     healthcheck:
@@ -83,6 +86,8 @@ services:
   redis:
     image: redis:7-alpine
     container_name: workers-prof-redis
+    ports:
+      - "6379:6379"
     command: ["redis-server", "--appendonly", "yes"]
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
@@ -94,6 +99,8 @@ services:
   rabbitmq:
     image: rabbitmq:3.13
     container_name: workers-prof-rabbitmq
+    ports:
+      - "5672:5672"
     healthcheck:
       test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
       interval: 10s

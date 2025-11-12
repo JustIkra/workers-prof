@@ -13,17 +13,19 @@ Creates core tables for S1-04:
 
 All tables include proper indexes, constraints, and foreign keys.
 """
-from typing import Sequence, Union
 
-from alembic import op
+from collections.abc import Sequence
+
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
+from alembic import op
+
 # revision identifiers, used by Alembic.
 revision: str = "097c8293450b"
-down_revision: Union[str, None] = None
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+down_revision: str | None = None
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
@@ -49,9 +51,7 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint("id", name="user_pkey"),
         sa.UniqueConstraint("email", name="user_email_unique"),
         sa.CheckConstraint("role IN ('ADMIN', 'USER')", name="user_role_check"),
-        sa.CheckConstraint(
-            "status IN ('PENDING', 'ACTIVE', 'DISABLED')", name="user_status_check"
-        ),
+        sa.CheckConstraint("status IN ('PENDING', 'ACTIVE', 'DISABLED')", name="user_status_check"),
     )
     op.create_index("ix_user_email", "user", ["email"], unique=True)
 

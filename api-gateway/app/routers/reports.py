@@ -22,11 +22,33 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.dependencies import get_current_active_user
 from app.db.models import User
 from app.db.session import get_db
-from app.schemas.report import ReportType, ReportUploadResponse
+from app.schemas.report import ReportListResponse, ReportResponse, ReportUploadResponse
 from app.services.report import ReportService
 from app.tasks.extraction import extract_images_from_report
 
 router = APIRouter(tags=["reports"])
+
+
+@router.get(
+    "/participants/{participant_id}/reports",
+    response_model=ReportListResponse,
+)
+async def get_participant_reports(
+    participant_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+) -> ReportListResponse:
+    """
+    Get all reports for a participant.
+
+    Returns list of reports with their current status (UPLOADED, EXTRACTED, FAILED).
+
+    Requires active authentication.
+    """
+    service = ReportService(db)
+    reports = await service.get_participant_reports(participant_id)
+    items = [ReportResponse.model_validate(r) for r in reports]
+    return ReportListResponse(items=items, total=len(items))
 
 
 @router.post(
@@ -36,7 +58,6 @@ router = APIRouter(tags=["reports"])
 )
 async def upload_report(
     participant_id: UUID,
-    report_type: ReportType = Form(..., description="Report type (REPORT_1/REPORT_2/REPORT_3)"),
     file: UploadFile = File(..., description="DOCX report file"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
@@ -47,7 +68,7 @@ async def upload_report(
     Requires active authentication.
     """
     service = ReportService(db)
-    return await service.upload_report(participant_id, report_type, file)
+    return await service.upload_report(participant_id, file)
 
 
 @router.get("/reports/{report_id}/download")
@@ -77,6 +98,23 @@ async def download_report(
         headers=headers,
     )
 
+@router.delete(
+    "/reports/{report_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+async def delete_report(
+    report_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+) -> Response:
+    """
+    Delete report with all related data and files.
+    Returns 204 No Content on success, 404 if not found.
+    """
+    service = ReportService(db)
+    await service.delete_report(report_id)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
 
 @router.post(
     "/reports/{report_id}/extract",
@@ -100,6 +138,10 @@ async def extract_report(
 
     # Verify report exists and belongs to accessible participant
     report = await service.get_report_by_id(report_id)
+
+    # Update report status to PROCESSING
+    report.status = "PROCESSING"
+    await db.commit()
 
     # Queue extraction task
     request_id = getattr(request.state, "request_id", None)

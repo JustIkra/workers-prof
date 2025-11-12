@@ -12,8 +12,6 @@ Tests AC for S1-03:
 import os
 from importlib import reload
 
-import pytest
-
 
 def reload_settings():
     """
@@ -246,7 +244,7 @@ class TestProfileValidation:
         """Test profile should pass validation."""
         from app.core.config import validate_config
 
-        settings = reload_settings()
+        reload_settings()
 
         # Should not raise
         validate_config()
@@ -255,7 +253,7 @@ class TestProfileValidation:
         """Dev profile should pass validation."""
         from app.core.config import validate_config
 
-        settings = reload_settings()
+        reload_settings()
 
         # Should not raise
         validate_config()
@@ -264,7 +262,7 @@ class TestProfileValidation:
         """CI profile should pass validation with offline mode."""
         from app.core.config import validate_config
 
-        settings = reload_settings()
+        reload_settings()
 
         # Should not raise (Gemini keys not required when offline)
         validate_config()

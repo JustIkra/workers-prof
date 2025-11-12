@@ -21,7 +21,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.models import Participant, User
 from app.services.auth import create_user
 
-
 # ===== Helper Fixtures =====
 
 
@@ -40,8 +39,7 @@ async def auth_cookies(client: AsyncClient, active_user: User) -> dict:
     """Get authentication cookies for active user."""
     # Login to get JWT cookie
     response = await client.post(
-        "/api/auth/login",
-        json={"email": "active@example.com", "password": "password123"}
+        "/api/auth/login", json={"email": "active@example.com", "password": "password123"}
     )
     assert response.status_code == 200
     cookies = dict(response.cookies)
@@ -98,8 +96,8 @@ async def test_create_participant__minimal_fields__returns_201(
 ):
     """Test participant creation with only required field (full_name)."""
     response = await client.post(
-        "/api/participants",
-        json={"full_name": "Мария Сидорова"}, cookies=auth_cookies)
+        "/api/participants", json={"full_name": "Мария Сидорова"}, cookies=auth_cookies
+    )
 
     assert response.status_code == 201
     data = response.json()
@@ -114,9 +112,7 @@ async def test_create_participant__empty_name__returns_422(
     test_env, client: AsyncClient, auth_cookies: dict
 ):
     """Test participant creation with empty full_name returns 422."""
-    response = await client.post(
-        "/api/participants",
-        json={"full_name": ""}, cookies=auth_cookies)
+    response = await client.post("/api/participants", json={"full_name": ""}, cookies=auth_cookies)
 
     assert response.status_code == 422
 
@@ -124,9 +120,7 @@ async def test_create_participant__empty_name__returns_422(
 @pytest.mark.asyncio
 async def test_create_participant__no_auth__returns_401(test_env, client: AsyncClient):
     """Test participant creation without authentication returns 401."""
-    response = await client.post(
-        "/api/participants",
-        json={"full_name": "Петр Петров"})
+    response = await client.post("/api/participants", json={"full_name": "Петр Петров"})
 
     assert response.status_code == 401
 
@@ -182,7 +176,9 @@ async def test_update_participant__full_name__returns_200(
     """Test updating participant full_name."""
     response = await client.put(
         f"/api/participants/{sample_participant.id}",
-        json={"full_name": "Иванов Иван Иванович"}, cookies=auth_cookies)
+        json={"full_name": "Иванов Иван Иванович"},
+        cookies=auth_cookies,
+    )
 
     assert response.status_code == 200
     data = response.json()
@@ -205,7 +201,9 @@ async def test_update_participant__multiple_fields__returns_200(
             "full_name": "Новое Имя",
             "birth_date": "1992-05-10",
             "external_id": "NEWEXT",
-        }, cookies=auth_cookies)
+        },
+        cookies=auth_cookies,
+    )
 
     assert response.status_code == 200
     data = response.json()
@@ -222,8 +220,8 @@ async def test_update_participant__not_exists__returns_404(
     """Test updating non-existent participant returns 404."""
     fake_id = uuid.uuid4()
     response = await client.put(
-        f"/api/participants/{fake_id}",
-        json={"full_name": "New Name"}, cookies=auth_cookies)
+        f"/api/participants/{fake_id}", json={"full_name": "New Name"}, cookies=auth_cookies
+    )
 
     assert response.status_code == 404
 
@@ -234,8 +232,8 @@ async def test_update_participant__no_auth__returns_401(
 ):
     """Test updating participant without authentication returns 401."""
     response = await client.put(
-        f"/api/participants/{sample_participant.id}",
-        json={"full_name": "New Name"})
+        f"/api/participants/{sample_participant.id}", json={"full_name": "New Name"}
+    )
 
     assert response.status_code == 401
 
@@ -245,16 +243,23 @@ async def test_update_participant__no_auth__returns_401(
 
 @pytest.mark.asyncio
 async def test_delete_participant__exists__returns_200(
-    test_env, client: AsyncClient, auth_cookies: dict, sample_participant: Participant, db_session: AsyncSession
+    test_env,
+    client: AsyncClient,
+    auth_cookies: dict,
+    sample_participant: Participant,
+    db_session: AsyncSession,
 ):
     """Test deleting an existing participant."""
-    response = await client.delete(f"/api/participants/{sample_participant.id}", cookies=auth_cookies)
+    response = await client.delete(
+        f"/api/participants/{sample_participant.id}", cookies=auth_cookies
+    )
 
     assert response.status_code == 200
     assert "deleted" in response.json()["message"].lower()
 
     # Verify participant is deleted from database
     from sqlalchemy import select
+
     result = await db_session.execute(
         select(Participant).where(Participant.id == sample_participant.id)
     )
@@ -445,7 +450,9 @@ async def test_search_participants__combined_filters__returns_matching(
     await db_session.commit()
 
     # Search for "иван" OR external_id "EXT001"
-    response = await client.get("/api/participants?query=иван&external_id=EXT001", cookies=auth_cookies)
+    response = await client.get(
+        "/api/participants?query=иван&external_id=EXT001", cookies=auth_cookies
+    )
 
     assert response.status_code == 200
     data = response.json()

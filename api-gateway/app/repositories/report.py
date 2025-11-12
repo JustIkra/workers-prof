@@ -4,7 +4,6 @@ Repository for report and file_ref operations.
 
 from __future__ import annotations
 
-from typing import Optional
 from uuid import UUID
 
 from sqlalchemy import select
@@ -26,18 +25,6 @@ class ReportRepository:
         result = await self.db.execute(stmt)
         return result.scalar_one_or_none() is not None
 
-    async def get_by_participant_and_type(
-        self, participant_id: UUID, report_type: str
-    ) -> Optional[Report]:
-        """Get report for participant by type."""
-        stmt = (
-            select(Report)
-            .options(selectinload(Report.file_ref))
-            .where(Report.participant_id == participant_id, Report.type == report_type)
-        )
-        result = await self.db.execute(stmt)
-        return result.scalar_one_or_none()
-
     async def create(self, report: Report, file_ref: FileRef) -> Report:
         """Persist report with associated file reference."""
         self.db.add(file_ref)
@@ -48,15 +35,22 @@ class ReportRepository:
         await self.db.refresh(report, attribute_names=["file_ref"])
         return report
 
-    async def get_with_file_ref(self, report_id: UUID) -> Optional[Report]:
+    async def get_with_file_ref(self, report_id: UUID) -> Report | None:
         """Get report by ID with joined file reference."""
+        stmt = select(Report).options(selectinload(Report.file_ref)).where(Report.id == report_id)
+        result = await self.db.execute(stmt)
+        return result.scalar_one_or_none()
+
+    async def get_all_by_participant(self, participant_id: UUID) -> list[Report]:
+        """Get all reports for a participant."""
         stmt = (
             select(Report)
             .options(selectinload(Report.file_ref))
-            .where(Report.id == report_id)
+            .where(Report.participant_id == participant_id)
+            .order_by(Report.uploaded_at.desc())
         )
         result = await self.db.execute(stmt)
-        return result.scalar_one_or_none()
+        return list(result.scalars().all())
 
     async def delete(self, report: Report) -> None:
         """Delete report and commit."""

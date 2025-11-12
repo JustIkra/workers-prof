@@ -15,9 +15,7 @@ import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.models import User
-from app.services.auth import create_user, hash_password
-
+from app.services.auth import create_user
 
 # ===== Registration Tests =====
 
@@ -42,7 +40,9 @@ async def test_register__valid__creates_pending_user(test_env, client: AsyncClie
 
 
 @pytest.mark.asyncio
-async def test_register__duplicate_email__returns_400(test_env, client: AsyncClient, db_session: AsyncSession):
+async def test_register__duplicate_email__returns_400(
+    test_env, client: AsyncClient, db_session: AsyncSession
+):
     """Test registration with duplicate email returns 400."""
     # Create existing user
     await create_user(db_session, "existing@example.com", "password123")
@@ -137,7 +137,9 @@ async def test_login__invalid_email__returns_401(test_env, client: AsyncClient):
 
 
 @pytest.mark.asyncio
-async def test_login__wrong_password__returns_401(test_env, client: AsyncClient, db_session: AsyncSession):
+async def test_login__wrong_password__returns_401(
+    test_env, client: AsyncClient, db_session: AsyncSession
+):
     """Test login with wrong password returns 401."""
     # Create user
     await create_user(db_session, "user@example.com", "correctpassword123")
@@ -153,7 +155,9 @@ async def test_login__wrong_password__returns_401(test_env, client: AsyncClient,
 
 
 @pytest.mark.asyncio
-async def test_login__pending_user__returns_403(test_env, client: AsyncClient, db_session: AsyncSession):
+async def test_login__pending_user__returns_403(
+    test_env, client: AsyncClient, db_session: AsyncSession
+):
     """Test login with PENDING user (not approved) returns 403."""
     # Create user (default status is PENDING)
     await create_user(db_session, "pending@example.com", "password123")
@@ -169,7 +173,9 @@ async def test_login__pending_user__returns_403(test_env, client: AsyncClient, d
 
 
 @pytest.mark.asyncio
-async def test_login__disabled_user__returns_403(test_env, client: AsyncClient, db_session: AsyncSession):
+async def test_login__disabled_user__returns_403(
+    test_env, client: AsyncClient, db_session: AsyncSession
+):
     """Test login with DISABLED user returns 403."""
     # Create and disable user
     user = await create_user(db_session, "disabled@example.com", "password123")
@@ -190,7 +196,9 @@ async def test_login__disabled_user__returns_403(test_env, client: AsyncClient, 
 
 
 @pytest.mark.asyncio
-async def test_get_me__authenticated__returns_user(test_env, client: AsyncClient, db_session: AsyncSession):
+async def test_get_me__authenticated__returns_user(
+    test_env, client: AsyncClient, db_session: AsyncSession
+):
     """Test /me endpoint with valid authentication returns user."""
     # Create and activate user
     user = await create_user(db_session, "active@example.com", "password123")
@@ -305,7 +313,9 @@ async def test_approve_user__admin__approves_pending_user(
     )
 
     # Approve user (pass cookies from login)
-    response = await client.post(f"/api/admin/approve/{pending_user_id}", cookies=dict(login_response.cookies))
+    response = await client.post(
+        f"/api/admin/approve/{pending_user_id}", cookies=dict(login_response.cookies)
+    )
 
     assert response.status_code == 200
     data = response.json()
@@ -334,7 +344,9 @@ async def test_approve_user__regular_user__returns_403(
     )
 
     # Try to approve user (pass cookies from login)
-    response = await client.post(f"/api/admin/approve/{pending_user_id}", cookies=dict(login_response.cookies))
+    response = await client.post(
+        f"/api/admin/approve/{pending_user_id}", cookies=dict(login_response.cookies)
+    )
 
     assert response.status_code == 403
     assert "Administrator privileges required" in response.json()["detail"]

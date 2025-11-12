@@ -4,7 +4,10 @@
       <el-card class="header-card">
         <div class="header-content">
           <h1>Участники</h1>
-          <el-button type="primary" @click="showCreateDialog = true">
+          <el-button
+            type="primary"
+            @click="showCreateDialog = true"
+          >
             <el-icon><Plus /></el-icon>
             Добавить участника
           </el-button>
@@ -12,7 +15,10 @@
       </el-card>
 
       <el-card class="search-card">
-        <el-form :inline="true" :model="searchForm">
+        <el-form
+          :inline="true"
+          :model="searchForm"
+        >
           <el-form-item label="Поиск">
             <el-input
               v-model="searchForm.query"
@@ -21,7 +27,9 @@
               style="width: 300px"
               @change="handleSearch"
             >
-              <template #prefix><el-icon><Search /></el-icon></template>
+              <template #prefix>
+                <el-icon><Search /></el-icon>
+              </template>
             </el-input>
           </el-form-item>
           <el-form-item label="Внешний ID">
@@ -36,19 +44,52 @@
         </el-form>
       </el-card>
 
-      <el-card class="table-card" v-loading="participantsStore.loading">
-        <el-table :data="participantsStore.participants" stripe>
-          <el-table-column prop="full_name" label="ФИО" min-width="200" />
-          <el-table-column prop="birth_date" label="Дата рождения" width="150" />
-          <el-table-column prop="external_id" label="Внешний ID" width="150" />
-          <el-table-column label="Действия" width="180" fixed="right">
+      <el-card
+        v-loading="participantsStore.loading"
+        class="table-card"
+      >
+        <el-table
+          :data="participantsStore.participants"
+          stripe
+        >
+          <el-table-column
+            prop="full_name"
+            label="ФИО"
+            min-width="200"
+          />
+          <el-table-column
+            prop="birth_date"
+            label="Дата рождения"
+            width="150"
+          />
+          <el-table-column
+            prop="external_id"
+            label="Внешний ID"
+            width="150"
+          />
+          <el-table-column
+            label="Действия"
+            width="180"
+            fixed="right"
+          >
             <template #default="{ row }">
-              <el-button type="primary" size="small" @click="viewParticipant(row.id)">
-                Открыть
-              </el-button>
-              <el-button type="danger" size="small" @click="confirmDelete(row)">
-                Удалить
-              </el-button>
+              <div class="actions-group">
+                <el-button
+                  type="primary"
+                  size="small"
+                  @click="viewParticipant(row.id)"
+                >
+                  Открыть
+                </el-button>
+                <el-button
+                  class="actions-group__danger"
+                  type="danger"
+                  size="small"
+                  @click="confirmDelete(row)"
+                >
+                  Удалить
+                </el-button>
+              </div>
             </template>
           </el-table-column>
         </el-table>
@@ -67,12 +108,30 @@
       </el-card>
 
       <!-- Диалог создания -->
-      <el-dialog v-model="showCreateDialog" title="Добавить участника" width="500px">
-        <el-form ref="createFormRef" :model="createForm" :rules="createRules" label-position="top">
-          <el-form-item label="ФИО" prop="full_name">
-            <el-input v-model="createForm.full_name" placeholder="Введите полное имя" />
+      <el-dialog
+        v-model="showCreateDialog"
+        title="Добавить участника"
+        width="500px"
+      >
+        <el-form
+          ref="createFormRef"
+          :model="createForm"
+          :rules="createRules"
+          label-position="top"
+        >
+          <el-form-item
+            label="ФИО"
+            prop="full_name"
+          >
+            <el-input
+              v-model="createForm.full_name"
+              placeholder="Введите полное имя"
+            />
           </el-form-item>
-          <el-form-item label="Дата рождения" prop="birth_date">
+          <el-form-item
+            label="Дата рождения"
+            prop="birth_date"
+          >
             <el-date-picker
               v-model="createForm.birth_date"
               type="date"
@@ -82,13 +141,25 @@
               style="width: 100%"
             />
           </el-form-item>
-          <el-form-item label="Внешний ID" prop="external_id">
-            <el-input v-model="createForm.external_id" placeholder="Внешний идентификатор (необязательно)" />
+          <el-form-item
+            label="Внешний ID"
+            prop="external_id"
+          >
+            <el-input
+              v-model="createForm.external_id"
+              placeholder="Внешний идентификатор (необязательно)"
+            />
           </el-form-item>
         </el-form>
         <template #footer>
-          <el-button @click="showCreateDialog = false">Отмена</el-button>
-          <el-button type="primary" :loading="participantsStore.loading" @click="handleCreate">
+          <el-button @click="showCreateDialog = false">
+            Отмена
+          </el-button>
+          <el-button
+            type="primary"
+            :loading="participantsStore.loading"
+            @click="handleCreate"
+          >
             Создать
           </el-button>
         </template>
@@ -217,5 +288,22 @@ onMounted(() => {
   margin-top: 20px;
   display: flex;
   justify-content: flex-end;
+}
+
+.actions-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-start;
+}
+
+.actions-group .el-button {
+  width: 140px;
+  justify-content: center;
+  margin: 0;
+}
+
+.actions-group__danger {
+  margin: 0;
 }
 </style>

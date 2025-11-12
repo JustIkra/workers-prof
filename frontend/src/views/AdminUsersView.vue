@@ -6,28 +6,61 @@
         <p>Одобрение новых пользователей системы</p>
       </el-card>
 
-      <el-card class="users-card" v-loading="adminStore.loading">
+      <el-card
+        v-loading="adminStore.loading"
+        class="users-card"
+      >
         <h3>Ожидают одобрения ({{ adminStore.pendingUsers.length }})</h3>
 
-        <el-empty v-if="adminStore.pendingUsers.length === 0" description="Нет пользователей, ожидающих одобрения" />
+        <el-empty
+          v-if="adminStore.pendingUsers.length === 0"
+          description="Нет пользователей, ожидающих одобрения"
+        />
 
-        <el-table v-else :data="adminStore.pendingUsers" stripe>
-          <el-table-column prop="email" label="Email" min-width="250" />
-          <el-table-column label="Статус" width="120">
+        <el-table
+          v-else
+          :data="adminStore.pendingUsers"
+          stripe
+        >
+          <el-table-column
+            prop="email"
+            label="Email"
+            min-width="250"
+          />
+          <el-table-column
+            label="Статус"
+            width="120"
+          >
             <template #default="{ row }">
-              <el-tag type="warning">{{ row.status }}</el-tag>
+              <el-tag type="warning">
+                {{ row.status }}
+              </el-tag>
             </template>
           </el-table-column>
-          <el-table-column prop="created_at" label="Дата регистрации" width="180">
+          <el-table-column
+            prop="created_at"
+            label="Дата регистрации"
+            width="180"
+          >
             <template #default="{ row }">
               {{ new Date(row.created_at).toLocaleDateString('ru-RU') }}
             </template>
           </el-table-column>
-          <el-table-column label="Действия" width="150" fixed="right">
+          <el-table-column
+            label="Действия"
+            width="150"
+            fixed="right"
+          >
             <template #default="{ row }">
-              <el-button type="success" size="small" @click="handleApprove(row)">
-                Одобрить
-              </el-button>
+              <div class="actions-group">
+                <el-button
+                  type="success"
+                  size="small"
+                  @click="handleApprove(row)"
+                >
+                  Одобрить
+                </el-button>
+              </div>
             </template>
           </el-table-column>
         </el-table>

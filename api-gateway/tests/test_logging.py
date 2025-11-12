@@ -51,9 +51,7 @@ async def test_request_logs_include_request_id(logging_client: AsyncClient, capl
     assert response.headers["x-request-id"] == request_id
 
     completed = [
-        record
-        for record in caplog.records
-        if getattr(record, "event", "") == "request_completed"
+        record for record in caplog.records if getattr(record, "event", "") == "request_completed"
     ]
     assert completed, "request_completed log not emitted"
     assert completed[0].request_id == request_id
@@ -95,9 +93,7 @@ async def test_request_error_logs_at_error_level(logging_client: AsyncClient, ca
         await logging_client.get("/error", headers={"X-Request-ID": request_id})
 
     failed_logs = [
-        record
-        for record in caplog.records
-        if getattr(record, "event", "") == "request_failed"
+        record for record in caplog.records if getattr(record, "event", "") == "request_failed"
     ]
     assert failed_logs, "request_failed log missing"
 

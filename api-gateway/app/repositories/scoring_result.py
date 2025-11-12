@@ -5,7 +5,6 @@ Handles all database operations for scoring results.
 """
 
 from decimal import Decimal
-from typing import Optional
 from uuid import UUID
 
 from sqlalchemy import select
@@ -26,10 +25,12 @@ class ScoringResultRepository:
         participant_id: UUID,
         weight_table_id: UUID,
         score_pct: Decimal,
-        strengths: Optional[list[dict]] = None,
-        dev_areas: Optional[list[dict]] = None,
-        recommendations: Optional[list[dict]] = None,
-        compute_notes: Optional[str] = None,
+        strengths: list[dict] | None = None,
+        dev_areas: list[dict] | None = None,
+        recommendations: list[dict] | None = None,
+        compute_notes: str | None = None,
+        recommendations_status: str = "pending",
+        recommendations_error: str | None = None,
     ) -> ScoringResult:
         """
         Create a new scoring result.
@@ -54,13 +55,15 @@ class ScoringResultRepository:
             dev_areas=dev_areas,
             recommendations=recommendations,
             compute_notes=compute_notes,
+            recommendations_status=recommendations_status,
+            recommendations_error=recommendations_error,
         )
         self.db.add(scoring_result)
         await self.db.commit()
         await self.db.refresh(scoring_result)
         return scoring_result
 
-    async def get_by_id(self, scoring_result_id: UUID) -> Optional[ScoringResult]:
+    async def get_by_id(self, scoring_result_id: UUID) -> ScoringResult | None:
         """
         Get a scoring result by ID.
 
@@ -93,11 +96,13 @@ class ScoringResultRepository:
         Returns:
             List of ScoringResult instances, ordered by computed_at DESC
         """
+        from app.db.models import WeightTable
+
         result = await self.db.execute(
             select(ScoringResult)
             .options(
                 selectinload(ScoringResult.participant),
-                selectinload(ScoringResult.weight_table),
+                selectinload(ScoringResult.weight_table).selectinload(WeightTable.prof_activity),
             )
             .where(ScoringResult.participant_id == participant_id)
             .order_by(ScoringResult.computed_at.desc())
@@ -107,7 +112,7 @@ class ScoringResultRepository:
 
     async def get_latest_by_participant_and_weight_table(
         self, participant_id: UUID, weight_table_id: UUID
-    ) -> Optional[ScoringResult]:
+    ) -> ScoringResult | None:
         """
         Get the latest scoring result for a participant and weight table.
 

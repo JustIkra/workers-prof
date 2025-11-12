@@ -102,9 +102,7 @@ class TestMigrationContent:
         # Check for specific important indexes
         expected_indexes = ["ix_user_email", "idx_report_status", "ix_prof_activity_code"]
         for index in expected_indexes:
-            assert (
-                index in upgrade_source
-            ), f"Index '{index}' should be created"
+            assert index in upgrade_source, f"Index '{index}' should be created"
 
     def test_upgrade_creates_foreign_keys(self, migration_file):
         """Verify that foreign keys are created."""

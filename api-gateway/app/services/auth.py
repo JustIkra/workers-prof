@@ -5,7 +5,7 @@ Handles password hashing, JWT token creation/validation, and user management.
 """
 
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import jwt
@@ -15,7 +15,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.db.models import User
-
 
 # ===== Password Hashing =====
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -61,7 +60,7 @@ def create_access_token(user_id: uuid.UUID, email: str, role: str) -> str:
     Returns:
         Encoded JWT token
     """
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     expires_at = now + timedelta(minutes=settings.access_token_ttl_min)
 
     payload = {
@@ -211,7 +210,7 @@ async def approve_user(db: AsyncSession, user_id: uuid.UUID) -> User:
 
     # Update status
     user.status = "ACTIVE"
-    user.approved_at = datetime.now(timezone.utc)
+    user.approved_at = datetime.now(UTC)
 
     await db.commit()
     await db.refresh(user)
@@ -229,5 +228,7 @@ async def list_pending_users(db: AsyncSession) -> list[User]:
     Returns:
         List of pending users
     """
-    result = await db.execute(select(User).where(User.status == "PENDING").order_by(User.created_at))
+    result = await db.execute(
+        select(User).where(User.status == "PENDING").order_by(User.created_at)
+    )
     return list(result.scalars().all())

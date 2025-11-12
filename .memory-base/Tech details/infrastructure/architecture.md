@@ -6,7 +6,7 @@
 
 - Сервисы (Docker Compose)
   - api-gateway (FastAPI): REST API, аутентификация (JWT), оркестровка Celery
-  - ai-request-sender (Celery workers): PaddleOCR/PP-Structure, интеграция с Gemini API (fallback)
+  - ai-request-sender (Celery workers): интеграция с Gemini Vision (основной поток)
   - frontend (Vue 3): SPA, общается с API через NPM
   - postgres: основная БД
   - redis: кэш/фоновые результаты
@@ -16,7 +16,7 @@
 - Потоки
   1) Пользователь загружает .docx → api-gateway сохраняет файл (LOCAL/MinIO) и создаёт `report`
   2) api-gateway ставит задачу Celery на извлечение → ai-request-sender
-  3) OCR: PaddleOCR (локально); при низкой уверенности — запрос в Gemini Vision
+  3) Распознавание: Gemini Vision (основной поток)
   4) Нормализация значений → сохранение в `extracted_metric`
   5) Расчёт с активной `weight_table` → `scoring_result` + рекомендации
 
@@ -27,4 +27,3 @@
 - Хранение
   - По умолчанию LOCAL (volume); пути стандартизированы
   - MinIO — опция для масштабирования и стабильных ссылок
-
