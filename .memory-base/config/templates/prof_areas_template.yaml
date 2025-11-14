@@ -1,0 +1,387 @@
+# Шаблон проф. областей и маппинга метрик (AI-07)
+#
+# Сгенерирован автоматически на основе результатов извлечения AI-06
+# Финальная привязка в MetricDef.code и веса будут утверждаться вручную
+#
+# Инструкция:
+# 1. Проверьте и утвердите metric_code для каждой метрики
+# 2. Заполните веса для каждой профессиональной области
+# 3. Проверьте, что сумма весов в каждой области = 1.00
+# 4. Заполните header_map для каждого типа отчета
+
+# ===== Профессиональные области =====
+
+prof_areas:
+  - code: DEFAULT
+    name: Общее
+    description: Общая оценка без специфики профессиональной области
+    weights:
+      # Заполняется после утверждения MetricDef и маппинга
+      # Примеры (необходимо заполнить реальные веса):
+      # - metric_code: RABOTA_S_DOKUMENTAMI
+      #   weight: 0.05
+      # - metric_code: PRODVIZHENIE
+      #   weight: 0.05
+      # ...
+      # Сумма весов должна быть равна 1.00
+
+# ===== Кандидаты метрик для маппинга =====
+# Всего: 78 метрик
+
+metric_candidates:
+  - name: "РАБОТА С ДОКУМЕНТАМИ"
+    code: RABOTA_S_DOKUMENTAMI
+    sample_value: 6.4
+    source: image2.png
+  - name: "ПРОДВИЖЕНИЕ"
+    code: PRODVIZHENIE
+    sample_value: 7.6
+    source: image2.png
+  - name: "АНАЛИЗ И ПЛАНИРОВАНИЕ"
+    code: ANALIZ_I_PLANIROVANIE
+    sample_value: 4.4
+    source: image2.png
+  - name: "ПРИНЯТИЕ РЕШЕНИЙ"
+    code: PRINYATIE_RESHENIY
+    sample_value: 1.9
+    source: image2.png
+  - name: "РАЗРАБОТКА"
+    code: RAZRABOTKA
+    sample_value: 4.7
+    source: image2.png
+  - name: "ОБЕСПЕЧЕНИЕ ПРОЦЕССА"
+    code: OBESPECHENIE_PROTSESSA
+    sample_value: 8.4
+    source: image2.png
+  - name: "ПОДДЕРЖКА"
+    code: PODDERZHKA
+    sample_value: 9
+    source: image2.png
+  - name: "КОНТРОЛЬ, АУДИТ"
+    code: KONTROL_AUDIT
+    sample_value: 4.5
+    source: image2.png
+  - name: "ПРОИЗВОДСТВО И ТЕХНОЛОГИИ"
+    code: PROIZVODSTVO_I_TEKHNOLOGII
+    sample_value: 3.2
+    source: image2.png
+  - name: "ГЕНЕРАТОР ИДЕЙ"
+    code: GENERATOR_IDEY
+    sample_value: 4.5
+    source: image4.png
+  - name: "ИССЛЕДОВАТЕЛЬ РЕСУРСОВ"
+    code: ISSLEDOVATEL_RESURSOV
+    sample_value: 5.8
+    source: image4.png
+  - name: "СПЕЦИАЛИСТ"
+    code: SPETSIALIST
+    sample_value: 5.9
+    source: image4.png
+  - name: "АНАЛИТИК"
+    code: ANALITIK
+    sample_value: 4.4
+    source: image4.png
+  - name: "КООРДИНАТОР"
+    code: KOORDINATOR
+    sample_value: 5
+    source: image4.png
+  - name: "МОТИВАТОР"
+    code: MOTIVATOR
+    sample_value: 3
+    source: image4.png
+  - name: "ДУША КОМАНДЫ"
+    code: DUSHA_KOMANDY
+    sample_value: 8.9
+    source: image4.png
+  - name: "РЕАЛИЗАТОР"
+    code: REALIZATOR
+    sample_value: 6.2
+    source: image4.png
+  - name: "КОНТРОЛЕР"
+    code: KONTROLER
+    sample_value: 5.5
+    source: image4.png
+  - name: "КОНФЛИКТНОСТЬ"
+    code: KONFLIKTNOST
+    sample_value: 2.6
+    source: image5.png
+  - name: "ПРОИЗВОДИТЕЛЬ"
+    code: PROIZVODITEL
+    sample_value: 2.8
+    source: image6.png
+  - name: "АДМИНИСТРАТОР"
+    code: ADMINISTRATOR
+    sample_value: 4.5
+    source: image6.png
+  - name: "ПРЕДПРИНИМАТЕЛЬ"
+    code: PREDPRINIMATEL
+    sample_value: 2.6
+    source: image6.png
+  - name: "ИНТЕГРАТОР"
+    code: INTEGRATOR
+    sample_value: 8.7
+    source: image6.png
+  - name: "ВНЕШНЯЯ МОТИВАЦИЯ"
+    code: VNESHNYAYA_MOTIVATSIYA
+    sample_value: 5.8
+    source: image2.png
+  - name: "ВНУТРЕННЯЯ МОТИВАЦИЯ"
+    code: VNUTRENNYAYA_MOTIVATSIYA
+    sample_value: 5.8
+    source: image2.png
+  - name: "ИНТЕРЕС"
+    code: INTERES
+    sample_value: 6.9
+    source: image2.png
+  - name: "ТВОРЧЕСТВО"
+    code: TVORCHESTVO
+    sample_value: 2.1
+    source: image2.png
+  - name: "ПОМОЩЬ ЛЮДЯМ"
+    code: POMOSHCH_LYUDYAM
+    sample_value: 8.1
+    source: image2.png
+  - name: "СЛУЖЕНИЕ ОБЩЕСТВУ"
+    code: SLUZHENIE_OBSHCHESTVU
+    sample_value: 7.1
+    source: image2.png
+  - name: "ОБЩЕНИЕ"
+    code: OBSHCHENIE
+    sample_value: 8.2
+    source: image2.png
+  - name: "ВКЛЮЧЕННОСТЬ В КОМАНДУ"
+    code: VKLYUCHENNOST_V_KOMANDU
+    sample_value: 6.5
+    source: image2.png
+  - name: "ПРИЗНАНИЕ"
+    code: PRIZNANIE
+    sample_value: 3.2
+    source: image2.png
+  - name: "РУКОВОДСТВО"
+    code: RUKOVODSTVO
+    sample_value: 1
+    source: image2.png
+  - name: "ДЕНЬГИ"
+    code: DENGI
+    sample_value: 7.1
+    source: image2.png
+  - name: "СВЯЗИ"
+    code: SVYAZI
+    sample_value: 5.1
+    source: image2.png
+  - name: "ЗДОРОВЬЕ"
+    code: ZDOROVE
+    sample_value: 6.8
+    source: image2.png
+  - name: "ТРАДИЦИИ"
+    code: TRADITSII
+    sample_value: 5.2
+    source: image2.png
+  - name: "ВЫЧИСЛЕНИЯ"
+    code: VYCHISLENIYA
+    sample_value: 2.9
+    source: image3.png
+  - name: "ЛЕКСИКА"
+    code: LEKSIKA
+    sample_value: 4.3
+    source: image3.png
+  - name: "ЭРУДИЦИЯ"
+    code: ERUDITSIYA
+    sample_value: 7.5
+    source: image3.png
+  - name: "ПРОСТРАНСТВЕННОЕ МЫШЛЕНИЕ"
+    code: PROSTRANSTVENNOE_MYSHLENIE
+    sample_value: 4.6
+    source: image3.png
+  - name: "НЕВЕРБАЛЬНАЯ ЛОГИКА"
+    code: NEVERBALNAYA_LOGIKA
+    sample_value: 9
+    source: image3.png
+  - name: "ВЕРБАЛЬНАЯ ЛОГИКА"
+    code: VERBALNAYA_LOGIKA
+    sample_value: 5.3
+    source: image3.png
+  - name: "ОБРАБОТКА ИНФОРМАЦИИ"
+    code: OBRABOTKA_INFORMATSII
+    sample_value: 5.1
+    source: image3.png
+  - name: "ОБЩИЙ БАЛЛ ИНТЕЛЛЕКТА"
+    code: OBSHCHIY_BALL_INTELLEKTA
+    sample_value: 5.5
+    source: image3.png
+  - name: "ЗАМКНУТОСТЬ"
+    code: ZAMKNUTOST
+    sample_value: 8.4
+    source: image4.png
+  - name: "ОБЩИТЕЛЬНОСТЬ"
+    code: OBSHCHITELNOST
+    sample_value: 8.4
+    source: image4.png
+  - name: "ПАССИВНОСТЬ"
+    code: PASSIVNOST
+    sample_value: 3.7
+    source: image4.png
+  - name: "АКТИВНОСТЬ"
+    code: AKTIVNOST
+    sample_value: 3.7
+    source: image4.png
+  - name: "НЕДОВЕРЧИВОСТЬ"
+    code: NEDOVERCHIVOST
+    sample_value: 6.8
+    source: image4.png
+  - name: "ДРУЖЕЛЮБИЕ"
+    code: DRUZHELYUBIE
+    sample_value: 6.8
+    source: image4.png
+  - name: "НЕЗАВИСИМОСТЬ"
+    code: NEZAVISIMOST
+    sample_value: 10
+    source: image4.png
+  - name: "КОНФОРМИЗМ"
+    code: KONFORMIZM
+    sample_value: 10
+    source: image4.png
+  - name: "МОРАЛЬНАЯ ГИБКОСТЬ"
+    code: MORALNAYA_GIBKOST
+    sample_value: 8.8
+    source: image4.png
+  - name: "МОРАЛЬНОСТЬ"
+    code: MORALNOST
+    sample_value: 8.8
+    source: image4.png
+  - name: "ИМПУЛЬСИВНОСТЬ"
+    code: IMPULSIVNOST
+    sample_value: 5.8
+    source: image4.png
+  - name: "ОРГАНИЗОВАННОСТЬ"
+    code: ORGANIZOVANNOST
+    sample_value: 5.8
+    source: image4.png
+  - name: "ТРЕВОЖНОСТЬ"
+    code: TREVOZHNOST
+    sample_value: 3.9
+    source: image4.png
+  - name: "УРАВНОВЕШЕННОСТЬ"
+    code: URAVNOVESHENNOST
+    sample_value: 3.9
+    source: image4.png
+  - name: "СЕНЗИТИВНОСТЬ"
+    code: SENZITIVNOST
+    sample_value: 3.2
+    source: image4.png
+  - name: "НЕЧУВСТВИТЕЛЬНОСТЬ"
+    code: NECHUVSTVITELNOST
+    sample_value: 3.2
+    source: image4.png
+  - name: "ИНТЕЛЛЕКТУАЛЬНАЯ СДЕРЖАННОСТЬ"
+    code: INTELLEKTUALNAYA_SDERZHANNOST
+    sample_value: 1.7
+    source: image4.png
+  - name: "ЛЮБОЗНАТЕЛЬНОСТЬ"
+    code: LYUBOZNATELNOST
+    sample_value: 1.7
+    source: image4.png
+  - name: "ТРАДИЦИОННОСТЬ"
+    code: TRADITSIONNOST
+    sample_value: 4.6
+    source: image4.png
+  - name: "ОРИГИНАЛЬНОСТЬ"
+    code: ORIGINALNOST
+    sample_value: 4.6
+    source: image4.png
+  - name: "КОНКРЕТНОСТЬ"
+    code: KONKRETNOST
+    sample_value: 4.2
+    source: image4.png
+  - name: "АБСТРАКТНОСТЬ"
+    code: ABSTRAKTNOST
+    sample_value: 4.2
+    source: image4.png
+  - name: "ЛИДЕРСТВО"
+    code: LIDERSTVO
+    sample_value: 4.1
+    source: image1.png
+  - name: "МОТИВАЦИЯ ДОСТИЖЕНИЙ"
+    code: MOTIVATSIYA_DOSTIZHENIY
+    sample_value: 3.4
+    source: image1.png
+  - name: "СТРЕССОУСТОЙЧИВОСТЬ"
+    code: STRESSOUSTOYCHIVOST
+    sample_value: 4
+    source: image1.png
+  - name: "ОРИЕНТАЦИЯ НА КЛИЕНТА"
+    code: ORIENTATSIYA_NA_KLIENTA
+    sample_value: 5.9
+    source: image2.png
+  - name: "КОММУНИКАБЕЛЬНОСТЬ"
+    code: KOMMUNIKABELNOST
+    sample_value: 7.2
+    source: image2.png
+  - name: "КОМАНДНОСТЬ"
+    code: KOMANDNOST
+    sample_value: 4.8
+    source: image2.png
+  - name: "НОРМАТИВНОСТЬ"
+    code: NORMATIVNOST
+    sample_value: 7.6
+    source: image3.png
+  - name: "ОТВЕТСТВЕННОСТЬ"
+    code: OTVETSTVENNOST
+    sample_value: 6.2
+    source: image3.png
+  - name: "ИННОВАЦИОННОСТЬ"
+    code: INNOVATSIONNOST
+    sample_value: 3.8
+    source: image4.png
+  - name: "КОМПЛЕКСНОЕ РЕШЕНИЕ ПРОБЛЕМ"
+    code: KOMPLEKSNOE_RESHENIE_PROBLEM
+    sample_value: 5.9
+    source: image4.png
+  - name: "СТРЕМЛЕНИЕ К САМОРАЗВИТИЮ"
+    code: STREMLENIE_K_SAMORAZVITIYU
+    sample_value: 5.5
+    source: image4.png
+
+# ===== Маппинг для различных типов отчетов =====
+# Для каждого типа отчета указывается соответствие заголовков в отчете к metric_code
+
+report_mappings:
+  REPORT_1:
+    description: "Бизнес-отчет (Biznes-otchyot)"
+    header_map:
+      # Примеры (необходимо заполнить реальные маппинги):
+      # "РАБОТА С ДОКУМЕНТАМИ": RABOTA_S_DOKUMENTAMI
+      # "ПРОДВИЖЕНИЕ": PRODVIZHENIE
+      # "АНАЛИЗ И ПЛАНИРОВАНИЕ": ANALIZ_I_PLANIROVANIE
+      # ...
+    number:
+      decimal: ","
+
+  REPORT_2:
+    description: "Отчет для respondента (Otchyot_dlya_respondenta)"
+    header_map:
+      # Примеры (необходимо заполнить реальные маппинги):
+      # "ГЕНЕРАТОР ИДЕЙ": GENERATOR_IDEY
+      # "ИССЛЕДОВАТЕЛЬ РЕСУРСОВ": ISSLEDOVATEL_RESURSOV
+      # ...
+    number:
+      decimal: ","
+
+  REPORT_3:
+    description: "Отчет по компетенциям (Otchyot_po_kompetentsiyam)"
+    header_map:
+      # Примеры (необходимо заполнить реальные маппинги):
+      # "ЛИДЕРСТВО": LIDERSTVO
+      # "СТРЕССОУСТОЙЧИВОСТЬ": STRESSOUSTOYCHIVIST
+      # ...
+    number:
+      decimal: ","
+
+# ===== Заметки =====
+# - Metric codes генерируются автоматически через транслитерацию
+# - Некоторые коды могут потребовать ручной коррекции
+# - Пары противоположностей (например, ЗАМКНУТОСТЬ/ОБЩИТЕЛЬНОСТЬ) извлечены отдельно
+# - Перед использованием необходимо:
+#   1. Создать записи MetricDef в БД с этими кодами
+#   2. Заполнить веса для профессиональных областей
+#   3. Заполнить header_map для каждого типа отчета

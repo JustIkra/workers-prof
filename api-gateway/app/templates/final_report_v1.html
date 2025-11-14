@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Итоговый отчёт — {{ participant_name }}</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Arial, sans-serif;
+            font-size: 14px;
+            line-height: 1.6;
+            color: #333;
+            background: #f5f5f5;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            background: white;
+            padding: 40px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        /* Header */
+        .header {
+            border-bottom: 3px solid #00798D;
+            padding-bottom: 20px;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            color: #00798D;
+            font-size: 28px;
+            font-weight: 600;
+            margin-bottom: 10px;
+        }
+
+        .header-meta {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            margin-top: 15px;
+            font-size: 13px;
+            color: #666;
+        }
+
+        .header-meta-item {
+            display: flex;
+        }
+
+        .header-meta-label {
+            font-weight: 600;
+            min-width: 180px;
+        }
+
+        /* Score Section */
+        .score-section {
+            background: linear-gradient(135deg, #00798D 0%, #005f6f 100%);
+            color: white;
+            padding: 30px;
+            border-radius: 8px;
+            margin-bottom: 30px;
+            text-align: center;
+        }
+
+        .score-section h2 {
+            font-size: 16px;
+            font-weight: 400;
+            margin-bottom: 15px;
+            opacity: 0.9;
+        }
+
+        .score-value {
+            font-size: 56px;
+            font-weight: 700;
+            line-height: 1;
+        }
+
+        .score-label {
+            font-size: 14px;
+            margin-top: 10px;
+            opacity: 0.85;
+        }
+
+        /* Section */
+        .section {
+            margin-bottom: 35px;
+        }
+
+        .section h2 {
+            color: #00798D;
+            font-size: 20px;
+            font-weight: 600;
+            margin-bottom: 15px;
+            padding-bottom: 8px;
+            border-bottom: 2px solid #e0e0e0;
+        }
+
+        /* Items (strengths/dev_areas) */
+        .items-list {
+            list-style: none;
+        }
+
+        .item {
+            background: #f9f9f9;
+            padding: 15px 20px;
+            margin-bottom: 12px;
+            border-left: 4px solid #00798D;
+            border-radius: 4px;
+        }
+
+        .item-title {
+            font-weight: 600;
+            font-size: 15px;
+            color: #333;
+            margin-bottom: 8px;
+        }
+
+        .item-content {
+            font-size: 13px;
+            color: #666;
+            line-height: 1.5;
+        }
+
+        .item-actions {
+            margin-top: 8px;
+        }
+
+        .item-actions ul {
+            list-style: disc;
+            margin-left: 20px;
+        }
+
+        .item-actions li {
+            font-size: 13px;
+            color: #666;
+            margin-top: 4px;
+        }
+
+        /* Dev areas specific styling */
+        .dev-area-item {
+            border-left-color: #d9534f;
+        }
+
+        /* Recommendations */
+        .recommendations-list {
+            list-style: none;
+        }
+
+        .recommendation {
+            background: #fff8e1;
+            padding: 12px 18px;
+            margin-bottom: 10px;
+            border-left: 4px solid #ffc107;
+            border-radius: 4px;
+        }
+
+        .recommendation-title {
+            font-weight: 600;
+            font-size: 14px;
+            color: #333;
+        }
+
+        .recommendation-skill-focus {
+            margin-top: 8px;
+            font-size: 13px;
+            color: #606266;
+        }
+
+        .recommendation-advice {
+            margin-top: 8px;
+            font-size: 13px;
+            color: #303133;
+            line-height: 1.5;
+        }
+
+        .recommendation-formats {
+            margin-top: 10px;
+            font-size: 13px;
+            color: #606266;
+        }
+
+        .recommendation-formats .formats-list {
+            margin: 5px 0 0 20px;
+            padding: 0;
+            list-style-type: disc;
+        }
+
+        .recommendation-formats .formats-list li {
+            margin-top: 4px;
+        }
+
+        .recommendations-alert {
+            padding: 14px 18px;
+            border-radius: 4px;
+            font-size: 13px;
+            margin-bottom: 12px;
+        }
+
+        .recommendations-alert.pending {
+            background: #e3f2fd;
+            border-left: 4px solid #2196f3;
+            color: #0d47a1;
+        }
+
+        .recommendations-alert.error {
+            background: #fdecea;
+            border-left: 4px solid #f56c6c;
+            color: #c0392b;
+        }
+
+        .recommendations-alert.disabled {
+            background: #f5f7fa;
+            border-left: 4px solid #909399;
+            color: #606266;
+        }
+
+        .recommendations-empty {
+            font-size: 13px;
+            color: #666;
+        }
+
+        /* Metrics Table */
+        .metrics-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 12px;
+            margin-top: 15px;
+        }
+
+        .metrics-table thead {
+            background: #00798D;
+            color: white;
+        }
+
+        .metrics-table th {
+            padding: 10px 8px;
+            text-align: left;
+            font-weight: 600;
+            font-size: 12px;
+        }
+
+        .metrics-table td {
+            padding: 8px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .metrics-table tbody tr:hover {
+            background: #f5f5f5;
+        }
+
+        .metrics-table .metric-code {
+            font-family: 'Courier New', monospace;
+            color: #666;
+            font-size: 11px;
+        }
+
+        .metrics-table .metric-value {
+            font-weight: 600;
+            color: #00798D;
+        }
+
+        .metrics-table .metric-source {
+            font-size: 11px;
+            color: #999;
+        }
+
+        /* Notes */
+        .notes {
+            background: #f0f0f0;
+            padding: 15px 20px;
+            border-radius: 4px;
+            font-size: 12px;
+            color: #666;
+            margin-top: 15px;
+        }
+
+        .notes strong {
+            color: #333;
+        }
+
+        /* Footer */
+        .footer {
+            margin-top: 40px;
+            padding-top: 20px;
+            border-top: 1px solid #e0e0e0;
+            text-align: center;
+            font-size: 11px;
+            color: #999;
+        }
+
+        /* Print styles */
+        @media print {
+            body {
+                background: white;
+                padding: 0;
+            }
+
+            .container {
+                box-shadow: none;
+                padding: 20px;
+            }
+
+            .score-section {
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <h1>Итоговый отчёт по профессиональной пригодности</h1>
+            <div class="header-meta">
+                <div class="header-meta-item">
+                    <span class="header-meta-label">Участник:</span>
+                    <span>{{ participant_name }}</span>
+                </div>
+                <div class="header-meta-item">
+                    <span class="header-meta-label">Дата формирования:</span>
+                    <span>{{ report_date.strftime('%d.%m.%Y %H:%M') }}</span>
+                </div>
+                <div class="header-meta-item">
+                    <span class="header-meta-label">Профессиональная деятельность:</span>
+                    <span>{{ prof_activity_name }} ({{ prof_activity_code }})</span>
+                </div>
+                <div class="header-meta-item">
+                    <span class="header-meta-label">ID весовой таблицы:</span>
+                    <span>{{ weight_table_id }}</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Score -->
+        <div class="score-section">
+            <h2>Итоговый коэффициент профессиональной пригодности</h2>
+            <div class="score-value">{{ "%.2f"|format(score_pct) }}%</div>
+            <div class="score-label">из 100%</div>
+        </div>
+
+        <!-- Strengths -->
+        {% if strengths %}
+        <div class="section">
+            <h2>Сильные стороны</h2>
+            <ul class="items-list">
+                {% for strength in strengths %}
+                <li class="item">
+                    <div class="item-title">{{ strength.title }}</div>
+                    <div class="item-content">{{ strength.reason }}</div>
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
+        {% endif %}
+
+        <!-- Development Areas -->
+        {% if dev_areas %}
+        <div class="section">
+            <h2>Зоны развития</h2>
+            <ul class="items-list">
+                {% for dev_area in dev_areas %}
+                <li class="item dev-area-item">
+                    <div class="item-title">{{ dev_area.title }}</div>
+                    {% if dev_area.actions %}
+                    <div class="item-actions">
+                        <ul>
+                            {% for action in dev_area.actions %}
+                            <li>{{ action }}</li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                    {% endif %}
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
+        {% endif %}
+
+        <!-- Recommendations -->
+        <div class="section">
+            <h2>Рекомендации по обучению</h2>
+            {% if recommendations_status == 'ready' and recommendations %}
+            <ul class="recommendations-list">
+                {% for rec in recommendations %}
+                <li class="recommendation">
+                    <div class="recommendation-title">{{ rec.title }}</div>
+                    {% if rec.skill_focus %}
+                    <div class="recommendation-skill-focus">
+                        <strong>Навык:</strong> {{ rec.skill_focus }}
+                    </div>
+                    {% endif %}
+                    {% if rec.development_advice %}
+                    <div class="recommendation-advice">
+                        {{ rec.development_advice }}
+                    </div>
+                    {% endif %}
+                    {% if rec.recommended_formats %}
+                    <div class="recommendation-formats">
+                        <strong>Рекомендуемые форматы:</strong>
+                        <ul class="formats-list">
+                            {% for format in rec.recommended_formats %}
+                            <li>{{ format }}</li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                    {% endif %}
+                </li>
+                {% endfor %}
+            </ul>
+            {% elif recommendations_status == 'ready' %}
+            <p class="recommendations-empty">Рекомендации пока не найдены для текущего набора метрик.</p>
+            {% elif recommendations_status == 'pending' %}
+            <div class="recommendations-alert pending">
+                Рекомендации находятся в процессе формирования. Пожалуйста, обновите отчёт через несколько минут.
+            </div>
+            {% elif recommendations_status == 'error' %}
+            <div class="recommendations-alert error">
+                Не удалось получить рекомендации от ИИ.
+                {% if recommendations_error %}
+                Причина: {{ recommendations_error }}
+                {% endif %}
+            </div>
+            {% elif recommendations_status == 'disabled' %}
+            <div class="recommendations-alert disabled">
+                Генерация рекомендаций отключена в текущей конфигурации.
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Metrics Table -->
+        <div class="section">
+            <h2>Приложение: таблица метрик</h2>
+            <table class="metrics-table">
+                <thead>
+                    <tr>
+                        <th>Код</th>
+                        <th>Наименование</th>
+                        <th style="text-align: center;">Значение</th>
+                        <th style="text-align: center;">Единица</th>
+                        <th style="text-align: center;">Вес</th>
+                        <th style="text-align: center;">Вклад</th>
+                        <th style="text-align: center;">Источник</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for metric in metrics %}
+                    <tr>
+                        <td class="metric-code">{{ metric.code }}</td>
+                        <td>{{ metric.name }}</td>
+                        <td class="metric-value" style="text-align: center;">{{ "%.2f"|format(metric.value) }}</td>
+                        <td style="text-align: center;">{{ metric.unit }}</td>
+                        <td style="text-align: center;">{{ "%.2f"|format(metric.weight) }}</td>
+                        <td style="text-align: center;">{{ "%.2f"|format(metric.contribution) }}</td>
+                        <td class="metric-source" style="text-align: center;">
+                            {{ metric.source }}
+                            {% if metric.confidence %}
+                            ({{ "%.0f"|format(metric.confidence * 100) }}%)
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Notes -->
+        {% if notes %}
+        <div class="notes">
+            <strong>Примечания:</strong> {{ notes }}
+        </div>
+        {% endif %}
+
+        <!-- Footer -->
+        <div class="footer">
+            Система оценки профессиональной пригодности | Версия шаблона отчёта: {{ template_version }}
+        </div>
+    </div>
+</body>
+</html>

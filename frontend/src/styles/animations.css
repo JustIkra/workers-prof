@@ -1,0 +1,89 @@
+:root {
+  --auth-error-duration: 280ms;
+  --auth-error-easing: cubic-bezier(0.36, 0.07, 0.19, 0.97);
+  --auth-error-shake-distance: 6px;
+  --auth-error-shadow: 0 0 0 3px rgba(198, 40, 40, 0.15);
+}
+
+.auth-field-error .el-input__wrapper,
+.auth-field-error .el-textarea__inner {
+  border-color: var(--color-danger);
+  box-shadow: var(--auth-error-shadow);
+}
+
+.auth-field-error .el-input__wrapper:hover,
+.auth-field-error .el-textarea__inner:hover {
+  border-color: var(--color-danger);
+}
+
+.auth-field-error .el-form-item__label {
+  color: var(--color-danger);
+}
+
+.auth-field-error .el-form-item__error {
+  color: var(--color-danger);
+}
+
+.auth-field-animate .el-input__wrapper,
+.auth-field-animate .el-textarea__inner {
+  animation: auth-field-shake var(--auth-error-duration) var(--auth-error-easing);
+}
+
+.auth-field-animate.auth-form-error,
+.auth-field-animate .auth-form-error__content {
+  animation: auth-field-shake var(--auth-error-duration) var(--auth-error-easing);
+}
+
+.auth-form-error {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm, 8px);
+  padding: var(--spacing-sm, 8px) var(--spacing-md, 12px);
+  margin-top: var(--spacing-sm, 8px);
+  border-radius: var(--border-radius-base, 4px);
+  border: 1px solid var(--color-danger);
+  background-color: rgba(198, 40, 40, 0.08);
+  color: var(--color-danger);
+  font-size: var(--font-size-base, 14px);
+  transition: opacity 160ms ease-in-out;
+}
+
+.auth-form-error__icon {
+  font-size: 18px;
+  line-height: 1;
+}
+
+.auth-form-error__content {
+  flex: 1;
+}
+
+.auth-form-error__list {
+  margin: 4px 0 0;
+  padding-left: 18px;
+  list-style: disc;
+}
+
+@keyframes auth-field-shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  20%,
+  60% {
+    transform: translateX(calc(-1 * var(--auth-error-shake-distance)));
+  }
+  40%,
+  80% {
+    transform: translateX(var(--auth-error-shake-distance));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .auth-field-animate .el-input__wrapper,
+  .auth-field-animate .el-textarea__inner,
+  .auth-field-animate.auth-form-error,
+  .auth-field-animate .auth-form-error__content {
+    animation: none;
+  }
+}
+

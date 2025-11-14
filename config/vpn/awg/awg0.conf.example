@@ -1,0 +1,25 @@
+[Interface]
+# Never commit real private keys
+PrivateKey = <REPLACE_WITH_PRIVATE_KEY>
+Address = 10.8.1.21/32
+DNS = 172.29.172.254, 1.0.0.1
+
+# AWG obfuscation parameters (required for AWG)
+Jc = 3
+Jmin = 10
+Jmax = 50
+S1 = 25
+S2 = 16
+H1 = 1189885972
+H2 = 981946312
+H3 = 1032780172
+H4 = 570475729
+
+[Peer]
+PublicKey = <REPLACE_WITH_PROVIDER_PUBLIC_KEY>
+PresharedKey = <REPLACE_WITH_PRESHARED_KEY>
+# Route everything via VPN (split-tunnel is controlled by container routing rules)
+AllowedIPs = 0.0.0.0/0, ::/0
+Endpoint = 45.147.196.230:33610
+PersistentKeepalive = 25
+
