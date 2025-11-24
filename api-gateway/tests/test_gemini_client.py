@@ -17,6 +17,7 @@ from app.clients import (
     GeminiOfflineError,
     GeminiRateLimitError,
     GeminiServerError,
+    GeminiServiceError,
     GeminiTimeoutError,
     GeminiTransport,
     GeminiValidationError,
@@ -433,6 +434,62 @@ class TestTransportLifecycle:
         await gemini_client.close()
 
         mock_transport.close.assert_called_once()
+
+    async def test_service_error_429_fixed_timeout(self, gemini_client, mock_transport):
+        """Test that service 429 errors use fixed 30-second timeout."""
+        import time
+
+        # First attempt: service error
+        mock_transport.add_response(GeminiServiceError("Service overload", status_code=429))
+        # Second attempt: success
+        mock_transport.add_response({"candidates": [{"content": {"parts": [{"text": "Success"}]}}]})
+
+        start_time = time.time()
+        response = await gemini_client.generate_text("Test")
+        elapsed = time.time() - start_time
+
+        # Should have succeeded
+        assert response["candidates"][0]["content"]["parts"][0]["text"] == "Success"
+        # Should have waited approximately 30 seconds (fixed timeout, not exponential)
+        assert elapsed >= 29.0, f"Expected at least 29 seconds, got {elapsed}"
+        assert elapsed <= 35.0, f"Expected at most 35 seconds, got {elapsed}"
+
+    async def test_service_error_503_fixed_timeout(self, gemini_client, mock_transport):
+        """Test that service 503 errors use fixed 30-second timeout."""
+        import time
+
+        # First attempt: service error
+        mock_transport.add_response(GeminiServiceError("Service unavailable", status_code=503))
+        # Second attempt: success
+        mock_transport.add_response({"candidates": [{"content": {"parts": [{"text": "Success"}]}}]})
+
+        start_time = time.time()
+        response = await gemini_client.generate_text("Test")
+        elapsed = time.time() - start_time
+
+        # Should have succeeded
+        assert response["candidates"][0]["content"]["parts"][0]["text"] == "Success"
+        # Should have waited approximately 30 seconds
+        assert elapsed >= 29.0, f"Expected at least 29 seconds, got {elapsed}"
+
+    async def test_service_error_no_exponential_backoff(self, gemini_client, mock_transport):
+        """Test that service errors don't use exponential backoff."""
+        import time
+
+        # Multiple service errors
+        mock_transport.add_response(GeminiServiceError("Service overload", status_code=429))
+        mock_transport.add_response(GeminiServiceError("Service overload", status_code=429))
+        # Finally succeed
+        mock_transport.add_response({"candidates": [{"content": {"parts": [{"text": "Success"}]}}]})
+
+        start_time = time.time()
+        response = await gemini_client.generate_text("Test")
+        elapsed = time.time() - start_time
+
+        # Should have succeeded
+        assert response["candidates"][0]["content"]["parts"][0]["text"] == "Success"
+        # Should have waited 30 seconds twice (fixed timeout, not 1s, 2s, 4s)
+        assert elapsed >= 58.0, f"Expected at least 58 seconds (2 * 30s), got {elapsed}"
 
 
 @pytest.mark.integration

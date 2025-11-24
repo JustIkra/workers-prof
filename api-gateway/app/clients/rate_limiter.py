@@ -40,7 +40,10 @@ class TokenBucket:
             raise ValueError(f"QPS must be positive, got {qps}")
 
         self.qps = qps
-        self.burst_size = burst_size or (2 * qps)
+        calculated_burst = burst_size or (2 * qps)
+        # Ensure burst_size is at least 1.0 (we always request 1.0 token per request)
+        # This prevents errors when burst_size < 1.0 due to rounding issues
+        self.burst_size = max(calculated_burst, 1.0)
         self.tokens = self.burst_size  # Start with full bucket
         self.last_update = time.monotonic()
         self._lock = asyncio.Lock()

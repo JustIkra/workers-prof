@@ -98,6 +98,12 @@ class MetricExtractionService:
         # Delay between requests (in seconds) to avoid rate limits
         self.request_delay = 0.5
 
+        # Image combination limits
+        self.max_combined_width = 4000
+        self.max_combined_height = 16000
+        self.max_image_size_mb = 20  # Gemini Vision limit
+        self.image_padding = 20  # Padding between images in pixels
+
     async def extract_metrics_from_report_images(
         self,
         report_id: UUID,
@@ -140,27 +146,32 @@ class MetricExtractionService:
 
         logger.info(f"Loaded {len(metric_defs)} active metric definitions")
 
-        # Process each image
-        for idx, img in enumerate(images):
-            logger.info(f"Processing image {idx + 1}/{len(images)}: {img.id}")
+        # Log optimization: number of requests before optimization
+        requests_before_optimization = len(images)
+        logger.info(
+            f"Image processing optimization: {requests_before_optimization} images, "
+            f"will combine into 1-2 requests"
+        )
 
-            # Add delay between requests to avoid rate limits
-            if idx > 0:
-                await asyncio.sleep(self.request_delay)
+        # Handle edge cases
+        if not images:
+            logger.warning("No images provided for extraction")
+            return {
+                "metrics_extracted": 0,
+                "metrics_saved": 0,
+                "errors": [{"error": "No images provided"}],
+            }
 
+        if len(images) == 1:
+            # Single image: process directly (no need to combine)
+            logger.info("Single image, processing directly")
+            img = images[0]
             try:
-                # Load image data
                 image_data = await self._load_image_data(img)
-
-                # Preprocess image
                 processed_data = self._preprocess_image(image_data)
-
-                # Extract metrics using Gemini Vision (with retry)
                 raw_metrics = await self._extract_metrics_with_retry(processed_data, str(img.id))
-
                 logger.info(f"Extracted {len(raw_metrics)} raw metrics from image {img.id}")
 
-                # Validate and normalize
                 for metric in raw_metrics:
                     try:
                         extracted = self._validate_and_normalize(metric, str(img.id))
@@ -174,15 +185,115 @@ class MetricExtractionService:
                                 "error": str(e),
                             }
                         )
-
             except Exception as e:
                 logger.error(f"Failed to extract metrics from image {img.id}: {e}")
-                errors.append(
-                    {
-                        "image_id": str(img.id),
-                        "error": str(e),
+                errors.append({"image_id": str(img.id), "error": str(e)})
+        else:
+            # Multiple images: combine and process together
+            logger.info(f"Combining {len(images)} images for batch processing")
+
+            try:
+                # Load and preprocess all images
+                processed_images: list[tuple[Image.Image, str]] = []
+                for img in images:
+                    try:
+                        image_data = await self._load_image_data(img)
+                        processed_data = self._preprocess_image(image_data)
+                        # Open as PIL Image for combination (copy to avoid closing issues)
+                        pil_image = Image.open(io.BytesIO(processed_data))
+                        # Convert to RGB to ensure compatibility
+                        if pil_image.mode != "RGB":
+                            pil_image = pil_image.convert("RGB")
+                        # Copy image to avoid file handle issues
+                        pil_image = pil_image.copy()
+                        processed_images.append((pil_image, str(img.id)))
+                    except Exception as e:
+                        logger.error(f"Failed to load/preprocess image {img.id}: {e}")
+                        errors.append({"image_id": str(img.id), "error": str(e)})
+
+                if not processed_images:
+                    logger.error("No images successfully loaded for combination")
+                    return {
+                        "metrics_extracted": 0,
+                        "metrics_saved": 0,
+                        "errors": errors,
                     }
+
+                # Combine images into groups (1-2 combined images)
+                # Store image IDs for each group
+                combined_groups_data: list[tuple[bytes, list[str]]] = []
+                combined_groups_bytes = self._combine_images_into_groups(processed_images)
+
+                # Create mapping: group -> list of image IDs in that group
+                # For simplicity, if split into 2 groups, first half goes to group 1, second to group 2
+                if len(combined_groups_bytes) == 1:
+                    # All images in one group
+                    image_ids = [img_id for _, img_id in processed_images]
+                    combined_groups_data.append((combined_groups_bytes[0], image_ids))
+                else:
+                    # Split into 2 groups
+                    mid_point = len(processed_images) // 2
+                    group1_ids = [img_id for _, img_id in processed_images[:mid_point]]
+                    group2_ids = [img_id for _, img_id in processed_images[mid_point:]]
+                    combined_groups_data.append((combined_groups_bytes[0], group1_ids))
+                    combined_groups_data.append((combined_groups_bytes[1], group2_ids))
+
+                logger.info(
+                    f"Combined {len(processed_images)} images into {len(combined_groups_data)} group(s)"
                 )
+
+                # Process each combined group
+                for group_idx, (combined_image_data, group_image_ids) in enumerate(
+                    combined_groups_data
+                ):
+                    try:
+                        # Extract metrics from combined image
+                        image_ids_str = ",".join(group_image_ids)
+                        raw_metrics = await self._extract_metrics_with_retry(
+                            combined_image_data, f"combined_group_{group_idx + 1}"
+                        )
+
+                        logger.info(
+                            f"Extracted {len(raw_metrics)} raw metrics from combined group {group_idx + 1}"
+                        )
+
+                        # Validate and normalize all metrics
+                        for metric in raw_metrics:
+                            try:
+                                # Use combined image IDs as source
+                                extracted = self._validate_and_normalize(
+                                    metric, f"combined_images_{image_ids_str}"
+                                )
+                                all_metrics.append(extracted)
+                            except ValueError as e:
+                                logger.warning(f"Validation failed for metric: {e}")
+                                errors.append(
+                                    {
+                                        "image_ids": image_ids_str,
+                                        "metric": metric,
+                                        "error": str(e),
+                                    }
+                                )
+                    except Exception as e:
+                        logger.error(f"Failed to extract metrics from combined group {group_idx + 1}: {e}")
+                        errors.append(
+                            {
+                                "group": group_idx + 1,
+                                "error": str(e),
+                            }
+                        )
+
+                # Log optimization results
+                requests_after_optimization = len(combined_groups_data)
+                logger.info(
+                    f"Optimization result: {requests_before_optimization} requests -> "
+                    f"{requests_after_optimization} requests "
+                    f"({requests_before_optimization - requests_after_optimization} requests saved)"
+                )
+
+            except Exception as e:
+                logger.error(f"Failed to combine and process images: {e}", exc_info=True)
+                errors.append({"error": f"Image combination failed: {str(e)}"})
 
         # Save extracted metrics to database using YAML mapping
         metrics_saved = 0
@@ -332,6 +443,147 @@ class MetricExtractionService:
             "metrics_saved": metrics_saved,
             "errors": errors,
         }
+
+    def _combine_images_into_groups(
+        self, processed_images: list[tuple[Image.Image, str]]
+    ) -> list[bytes]:
+        """
+        Combine images into 1-2 groups based on size limits.
+
+        Args:
+            processed_images: List of (PIL Image, image_id) tuples
+
+        Returns:
+            List of combined image bytes (PNG format)
+        """
+        if not processed_images:
+            return []
+
+        # Normalize image widths to a common width for better readability
+        # Use the maximum width as target, but cap at max_combined_width
+        max_width = max(img.width for img, _ in processed_images)
+        target_width = min(max_width, self.max_combined_width)
+
+        # Normalize all images to target width (maintain aspect ratio)
+        normalized_images: list[Image.Image] = []
+        for img, _ in processed_images:
+            if img.width != target_width:
+                # Calculate new height maintaining aspect ratio
+                aspect_ratio = img.height / img.width
+                new_height = int(target_width * aspect_ratio)
+                img = img.resize((target_width, new_height), Image.Resampling.LANCZOS)
+            normalized_images.append(img)
+
+        # Calculate total height needed
+        total_height = sum(img.height for img in normalized_images)
+        total_height += self.image_padding * (len(normalized_images) - 1)
+
+        # Check if we need to split into multiple groups
+        if total_height <= self.max_combined_height:
+            # All images fit in one group
+            return [self._combine_images_vertically(normalized_images)]
+        else:
+            # Split into 2 groups
+            logger.info(
+                f"Total height {total_height}px exceeds limit {self.max_combined_height}px, "
+                f"splitting into 2 groups"
+            )
+
+            # Split images roughly in half
+            mid_point = len(normalized_images) // 2
+            group1_images = normalized_images[:mid_point]
+            group2_images = normalized_images[mid_point:]
+
+            combined_groups = []
+            for group_images in [group1_images, group2_images]:
+                if group_images:
+                    combined_groups.append(self._combine_images_vertically(group_images))
+
+            return combined_groups
+
+    def _combine_images_vertically(self, images: list[Image.Image]) -> bytes:
+        """
+        Combine images vertically with padding.
+
+        Args:
+            images: List of PIL Images to combine
+
+        Returns:
+            Combined image bytes (PNG format)
+        """
+        if not images:
+            raise ValueError("No images to combine")
+
+        if len(images) == 1:
+            # Single image, just return it
+            output = io.BytesIO()
+            images[0].save(output, format="PNG")
+            return output.getvalue()
+
+        # Calculate dimensions
+        max_width = max(img.width for img in images)
+        total_height = sum(img.height for img in images)
+        total_height += self.image_padding * (len(images) - 1)
+
+        # Create combined image with white background
+        combined = Image.new("RGB", (max_width, total_height), (255, 255, 255))
+
+        # Paste images vertically with padding
+        y_offset = 0
+        for img in images:
+            # Center image horizontally if narrower than max_width
+            x_offset = (max_width - img.width) // 2
+            combined.paste(img, (x_offset, y_offset))
+            y_offset += img.height + self.image_padding
+
+        # Save to bytes
+        output = io.BytesIO()
+        combined.save(output, format="PNG", optimize=True)
+        combined_bytes = output.getvalue()
+
+        # Check size limit
+        size_mb = len(combined_bytes) / (1024 * 1024)
+        if size_mb > self.max_image_size_mb:
+            logger.warning(
+                f"Combined image size {size_mb:.2f}MB exceeds limit {self.max_image_size_mb}MB, "
+                f"compressing..."
+            )
+            # Compress by reducing quality/size
+            combined = self._compress_image(combined, target_size_mb=self.max_image_size_mb)
+            output = io.BytesIO()
+            combined.save(output, format="PNG", optimize=True)
+            combined_bytes = output.getvalue()
+            logger.info(f"Compressed to {len(combined_bytes) / (1024 * 1024):.2f}MB")
+
+        return combined_bytes
+
+    def _compress_image(self, img: Image.Image, target_size_mb: float) -> Image.Image:
+        """
+        Compress image to fit within target size.
+
+        Args:
+            img: PIL Image to compress
+            target_size_mb: Target size in MB
+
+        Returns:
+            Compressed PIL Image
+        """
+        # Try reducing dimensions first
+        current_size_mb = len(img.tobytes()) / (1024 * 1024)
+        if current_size_mb <= target_size_mb:
+            return img
+
+        # Calculate scale factor
+        scale_factor = (target_size_mb / current_size_mb) ** 0.5
+        new_width = int(img.width * scale_factor)
+        new_height = int(img.height * scale_factor)
+
+        # Ensure minimum dimensions
+        new_width = max(new_width, 800)
+        new_height = max(new_height, 600)
+
+        logger.info(f"Compressing image from {img.width}x{img.height} to {new_width}x{new_height}")
+        return img.resize((new_width, new_height), Image.Resampling.LANCZOS)
 
     async def _load_image_data(self, img: ReportImage) -> bytes:
         """Load image data from storage."""

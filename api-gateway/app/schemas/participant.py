@@ -121,6 +121,23 @@ class ParticipantMetricResponse(BaseModel):
 
     model_config = {"from_attributes": True}
 
+    @classmethod
+    def model_validate(cls, obj, **kwargs):
+        """Override model_validate to handle Decimal conversion."""
+        from decimal import Decimal
+        
+        # Convert Decimal to float if needed
+        if hasattr(obj, 'value') and isinstance(obj.value, Decimal):
+            obj_dict = {
+                'metric_code': obj.metric_code,
+                'value': float(obj.value),
+                'confidence': float(obj.confidence) if obj.confidence is not None else None,
+                'last_source_report_id': obj.last_source_report_id,
+                'updated_at': obj.updated_at,
+            }
+            return super(ParticipantMetricResponse, cls).model_validate(obj_dict, **kwargs)
+        return super(ParticipantMetricResponse, cls).model_validate(obj, **kwargs)
+
 
 class ParticipantMetricsListResponse(BaseModel):
     """Response schema for list of participant metrics."""

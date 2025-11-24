@@ -93,7 +93,7 @@ class KeyPool:
         ```python
         pool = KeyPool(
             api_keys=["key1", "key2", "key3"],
-            qps_per_key=0.5,
+            qps_per_key=0.15,  # Conservative: ~10 req/min per key
             strategy="ROUND_ROBIN",
         )
 
@@ -114,8 +114,8 @@ class KeyPool:
     def __init__(
         self,
         api_keys: list[str],
-        qps_per_key: float = 0.5,
-        burst_multiplier: float = 2.0,
+        qps_per_key: float = 0.15,
+        burst_multiplier: float = 8.1,
         strategy: Literal["ROUND_ROBIN", "LEAST_BUSY"] = "ROUND_ROBIN",
         circuit_breaker_failure_threshold: int = 5,
         circuit_breaker_recovery_timeout: float = 60.0,
@@ -150,6 +150,20 @@ class KeyPool:
 
         # Calculate burst size
         burst_size = qps_per_key * burst_multiplier
+        
+        # Ensure burst_size is at least 1.0 (we always request 1.0 token per request)
+        # This prevents errors when burst_size < 1.0 due to rounding issues
+        if burst_size < 1.0:
+            logger.warning(
+                "burst_size_too_small",
+                extra={
+                    "calculated_burst_size": burst_size,
+                    "qps_per_key": qps_per_key,
+                    "burst_multiplier": burst_multiplier,
+                    "adjusted_to": 1.0,
+                },
+            )
+            burst_size = 1.0
 
         # Initialize per-key metrics
         self._keys: list[KeyMetrics] = []
@@ -373,7 +387,8 @@ class KeyPool:
         Record rate limit error (429) for key.
 
         This is a special case of failure that indicates the key is being
-        throttled by the provider.
+        throttled by the provider. Rate limit errors are treated more aggressively:
+        we record multiple failures to open circuit breaker faster.
 
         Args:
             key_metrics: Key metrics to update
@@ -396,10 +411,18 @@ class KeyPool:
         # Track 429 response code
         key_metrics.response_codes[429] = key_metrics.response_codes.get(429, 0) + 1
 
-        # Rate limits trigger circuit breaker (fire and forget)
+        # Rate limits trigger circuit breaker more aggressively
+        # For rate limit errors, we want to open circuit breaker faster
+        # We directly increment failure count to bypass normal threshold
         try:
             loop = asyncio.get_running_loop()
-            loop.create_task(key_metrics.circuit_breaker.record_failure())
+            # Record failure multiple times to open circuit faster
+            # This ensures circuit opens after 1-2 rate limit errors instead of 5
+            async def record_rate_limit_failures():
+                # Record 3 failures to quickly open circuit (threshold is 5)
+                for _ in range(3):
+                    await key_metrics.circuit_breaker.record_failure()
+            loop.create_task(record_rate_limit_failures())
         except RuntimeError:
             # No event loop running - will update in next async operation
             pass
@@ -410,6 +433,51 @@ class KeyPool:
                 "key_id": key_metrics.key_id,
                 "total_rate_limit_errors": key_metrics.total_rate_limit_errors,
                 "latency_ms": round(latency_seconds * 1000, 2) if latency_seconds else None,
+            },
+        )
+
+    def record_service_error(
+        self,
+        key_metrics: KeyMetrics,
+        latency_seconds: float | None = None,
+        response_code: int | None = None,
+    ) -> None:
+        """
+        Record service-level error (429/503) that is NOT key-specific.
+
+        These errors indicate temporary service unavailability or overload,
+        not key-specific quota/rate limit issues. They do NOT affect circuit breaker
+        to avoid blocking keys due to service problems.
+
+        Args:
+            key_metrics: Key metrics to update
+            latency_seconds: Request latency in seconds (optional)
+            response_code: HTTP response code (optional, typically 429 or 503)
+
+        Note: This method tracks metrics but does NOT update circuit breaker.
+        """
+        # Track latency for service errors
+        if latency_seconds is not None:
+            key_metrics.total_latency_seconds += latency_seconds
+            if key_metrics.min_latency_seconds is None or latency_seconds < key_metrics.min_latency_seconds:
+                key_metrics.min_latency_seconds = latency_seconds
+            if key_metrics.max_latency_seconds is None or latency_seconds > key_metrics.max_latency_seconds:
+                key_metrics.max_latency_seconds = latency_seconds
+
+        # Track response code
+        if response_code is not None:
+            key_metrics.response_codes[response_code] = key_metrics.response_codes.get(response_code, 0) + 1
+
+        # DO NOT update circuit breaker - service errors are not key-specific
+        # DO NOT increment failure counters - these are service issues, not key issues
+
+        logger.info(
+            "key_service_error",
+            extra={
+                "key_id": key_metrics.key_id,
+                "latency_ms": round(latency_seconds * 1000, 2) if latency_seconds else None,
+                "response_code": response_code,
+                "note": "Service error - circuit breaker not affected",
             },
         )
 

@@ -90,6 +90,16 @@ METRIC_DISPLAY_NAMES_RU: Final[dict[str, str]] = {
     "anxiety": "Тревожность",
     "emotional_stability": "Уравновешенность",
     "erudition": "Эрудиция",
+    # Новые метрики из отчета Prasol
+    "systemic_thinking": "Системное мышление",
+    "influence": "Влияние",
+    "delegation": "Делегирование",
+    "management_decision_making": "Принятие управленческих решений",
+    "control": "Контроль",
+    "work_organization": "Организация работы",
+    "business_communication": "Деловая коммуникация",
+    "leadership_motivation": "Мотивация к руководству",
+    "leadership_potential": "Потенциал к руководству",
 }
 
 

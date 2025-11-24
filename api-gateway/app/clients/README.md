@@ -140,7 +140,7 @@ GEMINI_API_KEYS="key1,key2,key3"              # CSV список ключей д
 GEMINI_MODEL_TEXT="gemini-2.5-flash"          # Модель для text generation
 GEMINI_MODEL_VISION="gemini-2.5-flash"        # Модель для vision tasks
 GEMINI_TIMEOUT_S=30                           # Таймаут в секундах
-GEMINI_QPS_PER_KEY=0.5                        # QPS лимит на ключ (для AI-02)
+GEMINI_QPS_PER_KEY=0.15                       # QPS лимит на ключ (~10 req/min, консервативно)
 GEMINI_STRATEGY="ROUND_ROBIN"                 # Стратегия ротации (для AI-02)
 
 # AI Features

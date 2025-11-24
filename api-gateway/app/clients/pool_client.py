@@ -7,6 +7,7 @@ and circuit breaker for fault tolerance.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from typing import Any, Literal
 
@@ -14,6 +15,7 @@ from app.clients.exceptions import (
     GeminiClientError,
     GeminiLocationError,
     GeminiRateLimitError,
+    GeminiServiceError,
 )
 from app.clients.gemini import GeminiClient, GeminiTransport
 from app.clients.key_pool import KeyMetrics, KeyPool, KeyPoolStats
@@ -36,7 +38,7 @@ class GeminiPoolClient:
         ```python
         client = GeminiPoolClient(
             api_keys=["key1", "key2", "key3"],
-            qps_per_key=0.5,
+            qps_per_key=0.15,  # Conservative: ~10 req/min per key
             strategy="ROUND_ROBIN",
             model_text="gemini-2.5-flash",
             timeout_s=30,
@@ -62,8 +64,8 @@ class GeminiPoolClient:
         max_retries: int = 3,
         offline: bool = False,
         transport: GeminiTransport | None = None,
-        qps_per_key: float = 0.5,
-        burst_multiplier: float = 2.0,
+        qps_per_key: float = 0.15,
+        burst_multiplier: float = 8.1,
         strategy: Literal["ROUND_ROBIN", "LEAST_BUSY"] = "ROUND_ROBIN",
         circuit_breaker_failure_threshold: int = 5,
         circuit_breaker_recovery_timeout: float = 60.0,
@@ -178,7 +180,9 @@ class GeminiPoolClient:
 
         last_exception: Exception | None = None
         attempts = 0
-        max_attempts = len(self._pool._keys) * 2  # Try each key at least twice
+        # Remove limits on key attempts - use very large number for practical purposes
+        # This allows infinite retries with protection via timeouts
+        max_attempts = 1000  # Very high limit instead of len(self._pool._keys) * 2
 
         while attempts < max_attempts:
             attempts += 1
@@ -242,7 +246,57 @@ class GeminiPoolClient:
                     },
                 )
 
-                # Try next key immediately (don't wait for retry_after)
+                # Add 30-second timeout after 429 error before trying next key
+                logger.info(
+                    "pool_rate_limit_timeout",
+                    extra={
+                        "operation": operation,
+                        "key_id": key_metrics.key_id,
+                        "timeout_seconds": 30,
+                    },
+                )
+                await asyncio.sleep(30)
+
+                # Try next key after timeout
+                continue
+
+            except GeminiServiceError as e:
+                last_exception = e
+                latency_seconds = time.time() - start_time
+                response_code = e.status_code if hasattr(e, "status_code") else None
+
+                # Record service error WITHOUT affecting circuit breaker
+                self._pool.record_service_error(
+                    key_metrics, latency_seconds=latency_seconds, response_code=response_code
+                )
+
+                logger.warning(
+                    "pool_service_error",
+                    extra={
+                        "operation": operation,
+                        "key_id": key_metrics.key_id,
+                        "attempt": attempts,
+                        "error": str(e),
+                        "status_code": response_code,
+                        "latency_ms": round(latency_seconds * 1000, 2),
+                    },
+                )
+
+                # For service errors (429/503), add 30-second timeout before retry
+                # These are service-level issues, not key-specific
+                if response_code in (429, 503):
+                    logger.info(
+                        "pool_service_error_timeout",
+                        extra={
+                            "operation": operation,
+                            "key_id": key_metrics.key_id,
+                            "status_code": response_code,
+                            "timeout_seconds": 30,
+                        },
+                    )
+                    await asyncio.sleep(30)
+
+                # Continue with next key (service errors don't block keys)
                 continue
 
             except GeminiLocationError as e:

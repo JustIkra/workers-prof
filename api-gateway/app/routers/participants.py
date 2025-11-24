@@ -355,6 +355,11 @@ async def get_participant_metrics(
                 )
             )
 
+    # Debug logging
+    import logging
+    logger = logging.getLogger(__name__)
+    logger.info(f"Returning {len(response_items)} metrics for participant {participant_id} (by_code has {len(by_code)} entries)")
+
     return ParticipantMetricsListResponse(
         participant_id=participant_id,
         metrics=response_items,

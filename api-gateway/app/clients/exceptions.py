@@ -89,3 +89,16 @@ class GeminiLocationError(GeminiClientError):
 
     def __init__(self, message: str = "User location is not supported for the API use"):
         super().__init__(message, status_code=400)
+
+
+class GeminiServiceError(GeminiClientError):
+    """
+    Raised when Gemini API returns service-level errors (429/503) not related to specific keys.
+
+    These errors indicate temporary service unavailability or overload,
+    not key-specific quota/rate limit issues. They should not trigger circuit breaker
+    for individual keys and should be retried with fixed delays.
+    """
+
+    def __init__(self, message: str, status_code: int = 503):
+        super().__init__(message, status_code=status_code)

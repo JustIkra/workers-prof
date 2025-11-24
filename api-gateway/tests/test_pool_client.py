@@ -4,7 +4,7 @@ Tests for GeminiPoolClient with key rotation and 429 handling.
 
 import asyncio
 from typing import Any
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -12,6 +12,7 @@ from app.clients.exceptions import (
     GeminiAuthError,
     GeminiClientError,
     GeminiRateLimitError,
+    GeminiServiceError,
     GeminiValidationError,
 )
 from app.clients.gemini import GeminiClient, GeminiTransport
@@ -433,3 +434,157 @@ class TestGeminiPoolClient:
         # key1 should have open circuit
         key1_stats = next(s for s in stats.per_key_stats if s["key_id"] == "key_0")
         assert key1_stats["circuit_state"] == "open"
+
+    @pytest.mark.asyncio
+    async def test_30_second_timeout_after_429_error(self):
+        """Test that 30-second timeout is added after 429 error."""
+        import time
+
+        transport = MockTransport()
+
+        # First request: 429 on key1
+        transport.queue_exception(GeminiRateLimitError(retry_after=60))
+        # Second request: success on key2
+        transport.queue_response(
+            {"candidates": [{"content": {"parts": [{"text": "Success after timeout"}]}}]}
+        )
+
+        client = GeminiPoolClient(
+            api_keys=["key1", "key2"],
+            qps_per_key=10.0,
+            strategy="ROUND_ROBIN",
+            transport=transport,
+        )
+
+        start_time = time.time()
+        response = await client.generate_text("Test prompt")
+        elapsed = time.time() - start_time
+
+        # Should have succeeded on second key
+        assert response["candidates"][0]["content"]["parts"][0]["text"] == "Success after timeout"
+        assert len(transport.requests) == 2
+
+        # Should have waited approximately 30 seconds (allow some tolerance)
+        assert elapsed >= 29.0, f"Expected at least 29 seconds, got {elapsed}"
+        assert elapsed <= 35.0, f"Expected at most 35 seconds, got {elapsed}"
+
+    @pytest.mark.asyncio
+    async def test_service_error_429_no_circuit_breaker(self):
+        """Test that service-level 429 errors don't affect circuit breaker."""
+        transport = MockTransport()
+
+        # Service error (429 from service, not key-specific)
+        transport.queue_exception(GeminiServiceError("Service overload", status_code=429))
+        # Success on retry
+        transport.queue_response(
+            {"candidates": [{"content": {"parts": [{"text": "Success after service error"}]}}]}
+        )
+
+        client = GeminiPoolClient(
+            api_keys=["key1"],
+            qps_per_key=10.0,
+            circuit_breaker_failure_threshold=1,  # Very low threshold
+            transport=transport,
+        )
+
+        response = await client.generate_text("Test prompt")
+
+        # Should have succeeded
+        assert response["candidates"][0]["content"]["parts"][0]["text"] == "Success after service error"
+
+        # Circuit breaker should still be closed (service errors don't affect it)
+        stats = client.get_pool_stats()
+        assert stats.healthy_keys == 1
+        key_stats = stats.per_key_stats[0]
+        assert key_stats["circuit_state"] == "closed"
+
+    @pytest.mark.asyncio
+    async def test_service_error_503_no_circuit_breaker(self):
+        """Test that 503 service errors don't affect circuit breaker."""
+        import time
+
+        transport = MockTransport()
+
+        # Service error (503)
+        transport.queue_exception(GeminiServiceError("Service unavailable", status_code=503))
+        # Success on retry
+        transport.queue_response(
+            {"candidates": [{"content": {"parts": [{"text": "Success after 503"}]}}]}
+        )
+
+        client = GeminiPoolClient(
+            api_keys=["key1"],
+            qps_per_key=10.0,
+            circuit_breaker_failure_threshold=1,  # Very low threshold
+            transport=transport,
+        )
+
+        start_time = time.time()
+        response = await client.generate_text("Test prompt")
+        elapsed = time.time() - start_time
+
+        # Should have succeeded
+        assert response["candidates"][0]["content"]["parts"][0]["text"] == "Success after 503"
+
+        # Should have waited approximately 30 seconds
+        assert elapsed >= 29.0, f"Expected at least 29 seconds, got {elapsed}"
+
+        # Circuit breaker should still be closed
+        stats = client.get_pool_stats()
+        assert stats.healthy_keys == 1
+        key_stats = stats.per_key_stats[0]
+        assert key_stats["circuit_state"] == "closed"
+
+    @pytest.mark.asyncio
+    async def test_distinguish_key_error_vs_service_error(self):
+        """Test that key-specific 429 and service 429 are handled differently."""
+        transport = MockTransport()
+
+        # Key-specific rate limit (should affect circuit breaker)
+        transport.queue_exception(GeminiRateLimitError(retry_after=60))
+        # Success
+        transport.queue_response(
+            {"candidates": [{"content": {"parts": [{"text": "Success"}]}}]}
+        )
+
+        client = GeminiPoolClient(
+            api_keys=["key1"],
+            qps_per_key=10.0,
+            circuit_breaker_failure_threshold=1,
+            transport=transport,
+        )
+
+        await client.generate_text("Test")
+
+        # Key-specific error should affect circuit breaker
+        stats = client.get_pool_stats()
+        key_stats = stats.per_key_stats[0]
+        # Circuit should be open due to rate limit error
+        assert key_stats["circuit_state"] == "open"
+        assert key_stats["rate_limit_errors"] == 1
+
+    @pytest.mark.asyncio
+    async def test_high_max_attempts_allows_many_retries(self):
+        """Test that high max_attempts allows many retries."""
+        transport = MockTransport()
+
+        # Queue many 429 errors (more than old limit of len(keys) * 2)
+        for _ in range(10):
+            transport.queue_exception(GeminiRateLimitError())
+        # Finally succeed
+        transport.queue_response(
+            {"candidates": [{"content": {"parts": [{"text": "Success after many retries"}]}}]}
+        )
+
+        client = GeminiPoolClient(
+            api_keys=["key1", "key2"],
+            qps_per_key=10.0,
+            transport=transport,
+        )
+
+        # Should eventually succeed (with mocked sleep)
+        with patch("asyncio.sleep", new_callable=AsyncMock):
+            response = await client.generate_text("Test prompt")
+
+        assert response["candidates"][0]["content"]["parts"][0]["text"] == "Success after many retries"
+        assert len(transport.requests) == 11  # 10 failures + 1 success

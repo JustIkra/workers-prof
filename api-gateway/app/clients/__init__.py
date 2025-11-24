@@ -9,9 +9,11 @@ from app.clients.circuit_breaker import CircuitBreaker, CircuitState
 from app.clients.exceptions import (
     GeminiAuthError,
     GeminiClientError,
+    GeminiLocationError,
     GeminiOfflineError,
     GeminiRateLimitError,
     GeminiServerError,
+    GeminiServiceError,
     GeminiTimeoutError,
     GeminiValidationError,
 )
@@ -43,8 +45,10 @@ __all__ = [
     "GeminiClientError",
     "GeminiRateLimitError",
     "GeminiServerError",
+    "GeminiServiceError",
     "GeminiTimeoutError",
     "GeminiValidationError",
     "GeminiOfflineError",
     "GeminiAuthError",
+    "GeminiLocationError",
 ]

@@ -21,6 +21,7 @@ from app.clients.exceptions import (
     GeminiOfflineError,
     GeminiRateLimitError,
     GeminiServerError,
+    GeminiServiceError,
     GeminiTimeoutError,
     GeminiValidationError,
 )
@@ -128,11 +129,42 @@ class HttpxTransport(GeminiTransport):
 
             # Map HTTP errors to domain exceptions
             if status_code == 429:
-                logger.warning(
-                    "gemini_rate_limit",
-                    extra={"url": url, "retry_after": retry_after},
+                # Distinguish between key-specific rate limits and service-level overload
+                # Check response body for indicators of key-specific issues
+                response_text = e.response.text.lower()
+                is_key_specific = (
+                    "quota" in response_text
+                    or "api key" in response_text
+                    or "rate limit" in response_text
+                    or "per key" in response_text
                 )
-                raise GeminiRateLimitError(retry_after=retry_after) from e
+
+                if is_key_specific:
+                    # Key-specific rate limit (quota exceeded for this key)
+                    logger.warning(
+                        "gemini_rate_limit_key",
+                        extra={"url": url, "retry_after": retry_after},
+                    )
+                    raise GeminiRateLimitError(retry_after=retry_after) from e
+                else:
+                    # Service-level overload (429 from service, not key quota)
+                    logger.warning(
+                        "gemini_service_overload",
+                        extra={"url": url, "retry_after": retry_after},
+                    )
+                    raise GeminiServiceError(
+                        f"Service overload (429): {e.response.text[:200]}", status_code=429
+                    ) from e
+
+            elif status_code == 503:
+                # Service unavailable - always a service error, not key-specific
+                logger.warning(
+                    "gemini_service_unavailable",
+                    extra={"url": url},
+                )
+                raise GeminiServiceError(
+                    f"Service unavailable (503): {e.response.text[:200]}", status_code=503
+                ) from e
 
             elif status_code == 401 or status_code == 403:
                 logger.error("gemini_auth_error", extra={"url": url, "status": status_code})
@@ -189,6 +221,7 @@ class HttpxTransport(GeminiTransport):
                 ) from e
 
             elif status_code >= 500:
+                # Other 5xx errors (besides 503) are also service errors
                 logger.warning(
                     "gemini_server_error",
                     extra={"url": url, "status": status_code},
@@ -321,6 +354,7 @@ class GeminiClient:
         - 429 (rate limit)
         - 5xx (server errors)
         - Timeout errors
+        - Service errors (429/503 from service, not key-specific)
 
         Does NOT retry on:
         - 4xx (client errors like validation, auth)
@@ -340,6 +374,38 @@ class GeminiClient:
                     json=json,
                     timeout=timeout,
                 )
+
+            except GeminiServiceError as e:
+                # Service errors (429/503 from service) use fixed 30-second timeout
+                last_exception = e
+                is_last_attempt = attempt == attempts - 1
+
+                if is_last_attempt:
+                    logger.warning(
+                        "gemini_max_retries_exceeded",
+                        extra={
+                            "url": url,
+                            "attempts": attempt + 1,
+                            "error": str(e),
+                            "error_type": "GeminiServiceError",
+                        },
+                    )
+                    raise
+
+                # Fixed 30-second timeout for service errors (no exponential backoff)
+                delay = 30
+
+                logger.info(
+                    "gemini_service_error_retry",
+                    extra={
+                        "url": url,
+                        "attempt": attempt + 1,
+                        "delay": delay,
+                        "status_code": e.status_code,
+                    },
+                )
+
+                await asyncio.sleep(delay)
 
             except (GeminiRateLimitError, GeminiServerError, GeminiTimeoutError) as e:
                 last_exception = e

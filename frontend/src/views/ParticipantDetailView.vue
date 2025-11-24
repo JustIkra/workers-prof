@@ -695,7 +695,10 @@ const loadParticipantMetrics = async ({ silent = false } = {}) => {
   }
   try {
     const response = await participantsApi.getMetrics(route.params.id)
+    console.log('[DEBUG] loadParticipantMetrics response:', response)
+    console.log('[DEBUG] response.metrics length:', response.metrics?.length || 0)
     participantMetrics.value = response.metrics || []
+    console.log('[DEBUG] participantMetrics.value length:', participantMetrics.value.length)
   } catch (error) {
     console.error('Error loading participant metrics:', error)
     ElMessage.error('Ошибка загрузки метрик участника')

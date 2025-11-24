@@ -143,11 +143,10 @@
                   Просмотр метрик
                 </el-dropdown-item>
                 <el-dropdown-item
-                  v-if="row.status === 'UPLOADED' || row.status === 'FAILED'"
                   :command="{ action: 'extract', report: row }"
                 >
                   <el-icon><DataAnalysis /></el-icon>
-                  {{ row.status === 'FAILED' ? 'Повторить извлечение' : 'Извлечь метрики' }}
+                  {{ row.status === 'FAILED' ? 'Повторить извлечение' : row.status === 'PROCESSING' ? 'Перезапустить извлечение' : row.status === 'EXTRACTED' ? 'Переизвлечь метрики' : 'Извлечь метрики' }}
                 </el-dropdown-item>
                 <el-dropdown-item
                   divided
@@ -251,14 +250,12 @@
               Просмотр
             </el-button>
             <el-button
-              v-if="report.status === 'UPLOADED' || report.status === 'FAILED'"
               type="primary"
               size="small"
-              :loading="report.status === 'PROCESSING'"
               @click="handleAction({ action: 'extract', report })"
             >
               <el-icon><DataAnalysis /></el-icon>
-              {{ report.status === 'FAILED' ? 'Повторить' : 'Извлечь' }}
+              {{ report.status === 'FAILED' ? 'Повторить' : report.status === 'PROCESSING' ? 'Перезапустить' : report.status === 'EXTRACTED' ? 'Переизвлечь' : 'Извлечь' }}
             </el-button>
             <el-button
               size="small"
